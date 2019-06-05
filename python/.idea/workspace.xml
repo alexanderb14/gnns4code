@@ -1,0 +1,933 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="92828219-359d-49b8-be7a-2b3bf767acc9" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/model/DeepGMGModel.py" beforeDir="false" afterPath="$PROJECT_DIR$/model/DeepGMGModel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/model/cell/DeepGMGCell.py" beforeDir="false" afterPath="$PROJECT_DIR$/model/cell/DeepGMGCell.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/model/DeepGMGModelTest.py" beforeDir="false" afterPath="$PROJECT_DIR$/test/model/DeepGMGModelTest.py" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="TRACKING_ENABLED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CoverageDataManager">
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_loss_2_graph_init_node.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_2_graph_init_node Coverage Results" MODIFIED="1558449321203" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_prediction_1_graph_add_edge_to.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_add_edge_to Coverage Results" MODIFIED="1557497448478" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_loss_1_graph_add_node.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_1_graph_add_node Coverage Results" MODIFIED="1557494726612" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$All.coverage" NAME="All Coverage Results" MODIFIED="1557232595494" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_loss_1_graph_init_node.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_1_graph_init_node Coverage Results" MODIFIED="1557941375530" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$DeepGMGCellTest.coverage" NAME="DeepGMGCellTest Coverage Results" MODIFIED="1558449302656" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$DeepGMGCellTest__1_.coverage" NAME="DeepGMGCellTest (1) Coverage Results" MODIFIED="1557232633522" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_training_1_graph_add_node.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_training_1_graph_add_node Coverage Results" MODIFIED="1557399169490" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_training_1_graph_add_edge_to.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_training_1_graph_add_edge_to Coverage Results" MODIFIED="1557398814271" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_2_graphs_add_edge_to.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_2_graphs_add_edge_to Coverage Results" MODIFIED="1557391573910" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_in_model.coverage" NAME="py.test in model Coverage Results" MODIFIED="1557300432528" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test/model" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_training_2_graphs_add_edge_to.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_training_2_graphs_add_edge_to Coverage Results" MODIFIED="1557400162523" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1.coverage" NAME="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1 Coverage Results" MODIFIED="1559142060468" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_prediction_1_graph_init_node.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_init_node Coverage Results" MODIFIED="1557928681573" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_prediction_1_graph_h_g.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_h_g Coverage Results" MODIFIED="1558438533759" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$ModelLayerTests.coverage" NAME="ModelLayerTests Coverage Results" MODIFIED="1558451084850" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_training_1_graph_h_g.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_training_1_graph_h_g Coverage Results" MODIFIED="1557393031869" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_loss_1_graph_add_edge_to.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_1_graph_add_edge_to Coverage Results" MODIFIED="1557951444849" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$Unittests_in_test.coverage" NAME="Unittests in test Coverage Results" MODIFIED="1557232555611" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_training_2_graphs_add_node.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_training_2_graphs_add_node Coverage Results" MODIFIED="1557400044359" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_PropagationModelTest_test_ggnn_propagation_model_1_layer_sparse.coverage" NAME="py.test for test.model.PropagationModelTest.test_ggnn_propagation_model_1_layer_sparse Coverage Results" MODIFIED="1558451296921" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGModelTest_test_deepgmg_trainer_and_generator_defaultgraph_small_2.coverage" NAME="py.test for test.model.DeepGMGModelTest.test_deepgmg_trainer_and_generator_defaultgraph_medium Coverage Results" MODIFIED="1558624281203" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$DeepGMGModelTest.coverage" NAME="DeepGMGModelTest Coverage Results" MODIFIED="1559136860770" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$Clang_codegraphmodels.coverage" NAME="Clang codegraphmodels Coverage Results" MODIFIED="1559139187289" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_in_test.coverage" NAME="py.test in test Coverage Results" MODIFIED="1557300312236" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_loss_2_graphs_add_node.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_2_graphs_add_node Coverage Results" MODIFIED="1557930012799" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGCellTest_test_deepgmg_cell_training_1_graph_add_edge.coverage" NAME="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_training_1_graph_add_edge Coverage Results" MODIFIED="1557398159205" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/python$py_test_for_test_model_DeepGMGModelTest_test_deepgmg_trainer_and_generator_defaultgraph_medium.coverage" NAME="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1 Coverage Results" MODIFIED="1559048109948" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+      <file leaf-file-name="DeepGMGModel.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/model/DeepGMGModel.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="7020">
+              <caret line="551" column="41" selection-start-line="551" selection-start-column="41" selection-end-line="551" selection-end-column="41" />
+              <folding>
+                <element signature="e#0#11#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="writer.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/summary/writer/writer.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1040">
+              <caret line="100" column="6" selection-start-line="100" selection-start-column="6" selection-end-line="100" selection-end-column="6" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="GGNNModelLayer.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/model/layer/GGNNModelLayer.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="91">
+              <caret line="10" column="8" selection-start-line="10" selection-start-column="8" selection-end-line="10" selection-end-column="8" />
+              <folding>
+                <element signature="e#0#23#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="DeepGMGCell.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/model/cell/DeepGMGCell.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="3718">
+              <caret line="288" column="26" selection-start-line="288" selection-start-column="20" selection-end-line="288" selection-end-column="26" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="DeepGMGModelTest.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/test/model/DeepGMGModelTest.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="351">
+              <caret line="27" column="1" selection-start-line="27" selection-start-column="1" selection-end-line="27" selection-end-column="1" />
+              <folding>
+                <element signature="e#0#11#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="sample_clang_graph_large.json" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/test/model/data/sample_clang_graph_large.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="312">
+              <caret line="24" column="6" selection-start-line="24" selection-start-column="6" selection-end-line="24" selection-end-column="6" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="sample_clang_graph_medium.json" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/test/model/data/sample_clang_graph_medium.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="13">
+              <caret line="1" column="17" selection-start-line="1" selection-end-line="2" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="sample_clang_graph_small.json" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/test/model/data/sample_clang_graph_small.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="13">
+              <caret line="1" column="11" selection-start-line="1" selection-end-line="2" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="codegraph_models.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/applications/clang_code/codegraph_models.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="12532">
+              <caret line="968" column="46" selection-start-line="968" selection-start-column="46" selection-end-line="968" selection-end-column="46" />
+              <folding>
+                <element signature="e#0#9#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="utils.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/utils.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1482">
+              <caret line="119" selection-start-line="119" selection-end-line="119" />
+              <folding>
+                <element signature="e#0#11#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>StatisticsVisitor</find>
+      <find>&lt;add_node&gt;</find>
+      <find>print</find>
+      <find>num_timesteps</find>
+      <find>hidden_size</find>
+      <find>action_sequence_with_probs</find>
+      <find>LAST_ADDED_NODE_ID</find>
+      <find>print(</find>
+      <find>node_types</find>
+      <find>current_function</find>
+      <find>current_code_graph</find>
+      <find>pretty_print_ac</find>
+      <find>enrich_action_sequence_with_adj_list_data</find>
+      <find>embeddings</find>
+      <find>print('</find>
+      <find>generate</find>
+      <find>generate(</find>
+      <find>graphs</find>
+      <find>action_pretty_print_header</find>
+      <find>action_sequence_pretty_print</find>
+      <find>create_action_sequence</find>
+      <find>utils.action_</find>
+      <find>num_functions</find>
+      <find>tensorboa</find>
+      <find>with tf.variable_scope('DeepGMGCell_%i' % self.cell_id):</find>
+      <find>DeepGMGCell(</find>
+      <find>action</find>
+      <find>loss_unrolled</find>
+      <find>training_graph</find>
+      <find>train_writer</find>
+    </findStrings>
+    <replaceStrings>
+      <replace>setup_deepgmg_cell_and_fetch_op_1_graph</replace>
+      <replace>setup_deepgmg_cell_prediction_and_fetch_op</replace>
+      <replace>deepgmg_cell_prediction_</replace>
+      <replace>setup_deepgmg_cell_training_and_fetch_op</replace>
+      <replace>num_graphs</replace>
+      <replace>embeddings_last_added_node_idxs</replace>
+      <replace>test_deepgmg_cell_loss</replace>
+      <replace>.model_state.weights</replace>
+      <replace>state</replace>
+      <replace>batch_data_by_cell</replace>
+      <replace>enrich_action_sequence_with_partial_graph_data</replace>
+      <replace>enrich_action_sequence_with_adj_list_data</replace>
+      <replace>self.config</replace>
+      <replace>enrich_action_sequence_with_graph_data</replace>
+      <replace>last_added_node_idxs</replace>
+      <replace>'</replace>
+      <replace>idx_not_to_update</replace>
+      <replace>embeddings_to_update</replace>
+      <replace>DeepGMGTrainer</replace>
+      <replace>DeepGMGModel</replace>
+      <replace>model</replace>
+      <replace>DeepGMGState(config)</replace>
+      <replace>_graphs_to_batch_feed_dict</replace>
+      <replace>trainer</replace>
+      <replace>self.state.sess</replace>
+      <replace>_initialize_model</replace>
+      <replace>__compute_predictions</replace>
+      <replace>compute_predictions</replace>
+      <replace>{}</replace>
+      <replace>self.num_nodes_max</replace>
+    </replaceStrings>
+    <dirStrings>
+      <dir>$PROJECT_DIR$/env/lib/python3.7/site-packages</dir>
+      <dir>$PROJECT_DIR$/model</dir>
+    </dirStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/model/__init__.py" />
+        <option value="$PROJECT_DIR$/test/__init__.py" />
+        <option value="$PROJECT_DIR$/test/model/layer/__init__.py" />
+        <option value="$PROJECT_DIR$/model/layer/__init__.py" />
+        <option value="$PROJECT_DIR$/test/model/layer/ModelLayerTest.py" />
+        <option value="$PROJECT_DIR$/model/layer/ModelLayer.py" />
+        <option value="$PROJECT_DIR$/model/PropagationModel.py" />
+        <option value="$PROJECT_DIR$/test/model/ModelLayerTest.py" />
+        <option value="$PROJECT_DIR$/test/model/__init__.py" />
+        <option value="$PROJECT_DIR$/model/DeepGMGCell.py" />
+        <option value="$PROJECT_DIR$/model/ModelState.py" />
+        <option value="$PROJECT_DIR$/model/cell/DeepGMGCellState.py" />
+        <option value="$PROJECT_DIR$/model/layer/GGNNModelLayer.py" />
+        <option value="$PROJECT_DIR$/test/test_utils.py" />
+        <option value="$PROJECT_DIR$/model/layer/PropagationModelLayer.py" />
+        <option value="$PROJECT_DIR$/requirements.txt" />
+        <option value="$PROJECT_DIR$/test/model/DeepGMGTrainerTest.py" />
+        <option value="$PROJECT_DIR$/model/DeepGMGTrainer.py" />
+        <option value="$PROJECT_DIR$/test/model/DeepGMGCellTest.py" />
+        <option value="$PROJECT_DIR$/test/model/PropagationModelTest.py" />
+        <option value="$PROJECT_DIR$/utils.py" />
+        <option value="$PROJECT_DIR$/test/model/data/sample_clang_graph_small.json" />
+        <option value="$PROJECT_DIR$/applications/clang_code/codegraph_models.py" />
+        <option value="$PROJECT_DIR$/test/model/data/sample_clang_graph_medium.json" />
+        <option value="$PROJECT_DIR$/test/model/data/sample_clang_graph_large.json" />
+        <option value="$PROJECT_DIR$/model/cell/DeepGMGCell.py" />
+        <option value="$PROJECT_DIR$/model/DeepGMGModel.py" />
+        <option value="$PROJECT_DIR$/test/model/DeepGMGModelTest.py" />
+      </list>
+    </option>
+  </component>
+  <component name="JsBuildToolGruntFileManager" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsBuildToolPackageJson" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsGulpfileManager">
+    <detection-done>true</detection-done>
+    <sorting>DEFINITION_ORDER</sorting>
+  </component>
+  <component name="NodePackageJsonFileManager">
+    <packageJsonPaths />
+  </component>
+  <component name="ProjectFrameBounds" extendedState="1">
+    <option name="x" value="621" />
+    <option name="y" value="23" />
+    <option name="width" value="946" />
+    <option name="height" value="1027" />
+  </component>
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/model" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+    <property name="settings.editor.selected.configurable" value="preferences.keymap" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/model/cell" />
+      <recent name="$PROJECT_DIR$/test/model" />
+      <recent name="$PROJECT_DIR$/test/model/layer" />
+      <recent name="$PROJECT_DIR$/test" />
+    </key>
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/model/cell" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="Python tests.py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1">
+    <configuration name="Clang codegraphmodels" type="tests" factoryName="py.test">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/test/applications/clang_code/test_codegraph_models.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+    </configuration>
+    <configuration name="DeepGMGCellTest" type="tests" factoryName="py.test">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/test/model/DeepGMGCellTest.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+    </configuration>
+    <configuration name="DeepGMGModelTest" type="tests" factoryName="py.test">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/test/model/DeepGMGModelTest.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+    </configuration>
+    <configuration name="ModelLayerTests" type="tests" factoryName="py.test">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/test/model/PropagationModelTest.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+    </configuration>
+    <configuration name="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_1_graph_add_edge_to" type="tests" factoryName="py.test" temporary="true" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;test.model.DeepGMGCellTest.test_deepgmg_cell_loss_1_graph_add_edge_to&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
+    <configuration name="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_2_graph_init_node" type="tests" factoryName="py.test" temporary="true" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;test.model.DeepGMGCellTest.test_deepgmg_cell_loss_2_graph_init_node&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
+    <configuration name="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_add_edge_to" type="tests" factoryName="py.test" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_add_edge_to&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
+    <configuration name="py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_h_g" type="tests" factoryName="py.test" temporary="true" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_h_g&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
+    <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" type="tests" factoryName="py.test" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
+    <configuration name="py.test for test.model.PropagationModelTest.test_ggnn_propagation_model_1_layer_sparse" type="tests" factoryName="py.test" temporary="true" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/env/bin/python3" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;-vs -W ignore::DeprecationWarning&quot;" />
+      <option name="_new_target" value="&quot;test.model.PropagationModelTest.test_ggnn_propagation_model_1_layer_sparse&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
+    <list>
+      <item itemvalue="Python tests.ModelLayerTests" />
+      <item itemvalue="Python tests.DeepGMGCellTest" />
+      <item itemvalue="Python tests.DeepGMGModelTest" />
+      <item itemvalue="Python tests.Clang codegraphmodels" />
+      <item itemvalue="Python tests.py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_add_edge_to" />
+      <item itemvalue="Python tests.py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" />
+      <item itemvalue="Python tests.py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_1_graph_add_edge_to" />
+      <item itemvalue="Python tests.py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_h_g" />
+      <item itemvalue="Python tests.py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_2_graph_init_node" />
+      <item itemvalue="Python tests.py.test for test.model.PropagationModelTest.test_ggnn_propagation_model_1_layer_sparse" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python tests.py.test for test.model.PropagationModelTest.test_ggnn_propagation_model_1_layer_sparse" />
+        <item itemvalue="Python tests.py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_2_graph_init_node" />
+        <item itemvalue="Python tests.py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_prediction_1_graph_h_g" />
+        <item itemvalue="Python tests.py.test for test.model.DeepGMGCellTest.test_deepgmg_cell_loss_1_graph_add_edge_to" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="92828219-359d-49b8-be7a-2b3bf767acc9" name="Default" comment="" />
+      <created>1556181109585</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1556181109585</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TestHistory">
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 16h 44m 31s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 16h 45m 47s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 16h 52m 12s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 16h 53m 41s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 16h 56m 33s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 16h 57m 45s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 16h 58m 47s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 17h 00m 11s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 17h 00m 59s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+    <history-entry file="py_test_for_test_model_DeepGMGModelTest_test_train_and_gen_one_defaultgraph_small_1 - 2019.05.29 at 17h 01m 35s.xml">
+      <configuration name="py.test for test.model.DeepGMGModelTest.test_train_and_gen_one_defaultgraph_small_1" configurationId="tests" />
+    </history-entry>
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="621" y="23" width="946" height="1027" extended-state="1" />
+    <layout>
+      <window_info anchor="bottom" id="TODO" order="11" />
+      <window_info anchor="bottom" id="Event Log" order="3" side_tool="true" />
+      <window_info anchor="bottom" id="Database Changes" order="2" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Version Control" order="1" />
+      <window_info anchor="bottom" id="Python Console" order="5" />
+      <window_info anchor="right" x="-947" y="45" width="946" height="1155" id="Run" order="6" type="WINDOWED" weight="0.3284055" />
+      <window_info anchor="bottom" id="Terminal" order="4" weight="0.32910246" />
+      <window_info anchor="right" id="Remote Host" order="2" />
+      <window_info content_ui="combo" id="Project" order="1" weight="0.13636364" />
+      <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
+      <window_info anchor="right" id="Database" order="0" />
+      <window_info anchor="right" id="SciView" order="1" weight="0.32946146" />
+      <window_info id="Structure" order="2" side_tool="true" weight="0.25" />
+      <window_info id="Favorites" order="0" side_tool="true" />
+      <window_info anchor="bottom" x="-946" y="45" width="946" height="1155" id="Debug" order="8" type="WINDOWED" weight="0.3998187" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="5" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="10" weight="0.4" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="3" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Message" order="6" />
+      <window_info anchor="bottom" id="Cvs" order="9" weight="0.25" />
+      <window_info anchor="bottom" id="Find" order="7" />
+    </layout>
+    <layout-to-restore>
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="5" weight="0.25" />
+      <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Inspection" order="10" weight="0.4" />
+      <window_info anchor="right" id="Remote Host" order="2" />
+      <window_info content_ui="combo" id="Project" order="1" visible="true" weight="0.13636364" />
+      <window_info id="Structure" order="2" side_tool="true" weight="0.25" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="3" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="TODO" order="11" />
+      <window_info anchor="bottom" id="Version Control" order="1" />
+      <window_info active="true" anchor="right" x="-947" y="45" width="946" height="1155" id="Run" order="6" type="WINDOWED" visible="true" weight="0.3284055" />
+      <window_info anchor="bottom" id="Python Console" order="5" />
+      <window_info anchor="bottom" id="Find" order="7" />
+      <window_info anchor="right" id="Database" order="0" />
+      <window_info anchor="bottom" id="Terminal" order="4" weight="0.32910246" />
+      <window_info anchor="bottom" id="Event Log" order="3" side_tool="true" />
+      <window_info anchor="bottom" id="Database Changes" order="2" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Cvs" order="9" weight="0.25" />
+      <window_info anchor="right" id="SciView" order="1" weight="0.32946146" />
+      <window_info anchor="bottom" id="Message" order="6" />
+      <window_info anchor="bottom" x="-946" y="45" width="946" height="1155" id="Debug" order="8" type="WINDOWED" weight="0.3998187" />
+      <window_info id="Favorites" order="0" side_tool="true" />
+    </layout-to-restore>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="VcsContentAnnotationSettings">
+    <option name="myLimit" value="2678400000" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/env/lib/python3.7/site-packages/numpy/core/numeric.py</url>
+          <line>2587</line>
+          <option name="timeStamp" value="21" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/model/DeepGMGModel.py</url>
+          <line>229</line>
+          <option name="timeStamp" value="48" />
+        </line-breakpoint>
+      </breakpoints>
+      <breakpoints-dialog>
+        <breakpoints-dialog />
+      </breakpoints-dialog>
+      <option name="time" value="63" />
+    </breakpoint-manager>
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/test/model/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret selection-end-line="4" selection-end-column="41" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/__init__.py" />
+    <entry file="file://$PROJECT_DIR$/model/layer/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="39">
+          <caret line="4" column="41" selection-start-line="4" selection-start-column="41" selection-end-line="4" selection-end-column="41" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/layer/PropagationModelLayer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="221">
+          <caret line="17" column="25" lean-forward="true" selection-start-line="17" selection-start-column="25" selection-end-line="17" selection-end-column="25" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/PropagationModelTest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="507">
+          <caret line="44" column="80" selection-start-line="44" selection-start-column="65" selection-end-line="44" selection-end-column="80" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.6/site-packages/tensorflow/python/framework/ops.py" />
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/google/protobuf/descriptor.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="359">
+          <caret line="46" selection-start-line="46" selection-end-line="46" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/PropagationModel.py" />
+    <entry file="file://$PROJECT_DIR$/test/model/layer/ModelLayerTest.py" />
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/layer/__init__.py" />
+    <entry file="file://$PROJECT_DIR$/test/model/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="39">
+          <caret line="4" column="36" selection-start-line="4" selection-start-column="36" selection-end-line="4" selection-end-column="36" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/__init__.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/layer/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="39">
+          <caret line="4" column="41" selection-start-line="4" selection-start-column="41" selection-end-line="4" selection-end-column="41" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/cell/__init__.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/ops/rnn_cell_impl.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="226">
+          <caret line="564" column="30" lean-forward="true" selection-start-line="564" selection-start-column="30" selection-end-line="564" selection-end-column="30" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/ops/gen_array_ops.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="359">
+          <caret line="1148" selection-start-line="1148" selection-end-line="1148" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/cell/DeepGMGCellState.py" />
+    <entry file="file://$PROJECT_DIR$/model/__init__.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/framework/tensor_util.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="359">
+          <caret line="453" selection-start-line="453" selection-end-line="453" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/ops/array_ops.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="359">
+          <caret line="3017" selection-start-line="3017" selection-end-line="3017" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/Library/Caches/PyCharm2018.1/python_stubs/133806860/numpy/core/_multiarray_umath.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="437">
+          <caret line="754" column="18" selection-start-line="754" selection-start-column="18" selection-end-line="754" selection-end-column="18" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/training/optimizer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-705">
+          <caret line="529" column="6" selection-start-line="529" selection-start-column="6" selection-end-line="529" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/ops/gradients_impl.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="359">
+          <caret line="109" selection-start-line="109" selection-end-line="109" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/ops/math_ops.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="10205">
+          <caret line="814" selection-start-line="814" selection-end-line="814" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/ops/state_ops.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3653">
+          <caret line="297" column="30" selection-start-line="297" selection-start-column="30" selection-end-line="297" selection-end-column="30" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/framework/op_def_library.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="7280">
+          <caret line="576" column="43" selection-start-line="576" selection-start-column="43" selection-end-line="576" selection-end-column="43" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/layer/PropagationModelLayer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="221">
+          <caret line="17" column="8" selection-start-line="17" selection-start-column="8" selection-end-line="17" selection-end-column="8" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/ops/rnn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="344">
+          <caret line="251" column="64" lean-forward="true" selection-start-line="251" selection-start-column="64" selection-end-line="251" selection-end-column="64" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/framework/ops.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="259">
+          <caret line="5587" column="55" selection-start-line="5587" selection-start-column="55" selection-end-line="5587" selection-end-column="55" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/requirements.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="26">
+          <caret line="2" column="13" selection-start-line="2" selection-start-column="13" selection-end-line="2" selection-end-column="13" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/test_utils.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="468">
+          <caret line="39" column="17" selection-start-line="39" selection-start-column="17" selection-end-line="39" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/PropagationModelTest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="302">
+          <caret line="52" column="26" selection-start-line="52" selection-start-column="26" selection-end-line="52" selection-end-column="26" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_HOME_DIR$/helpers/pycharm/_jb_pytest_runner.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="390">
+          <caret line="30" selection-start-line="30" selection-end-line="30" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/client/session.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="352">
+          <caret line="1406" selection-start-line="1406" selection-end-line="1406" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/DeepGMGCellTest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="546">
+          <caret line="48" column="8" selection-start-line="48" selection-end-line="49" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/numpy/core/numeric.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3809">
+          <caret line="293" column="4" selection-start-line="293" selection-start-column="4" selection-end-line="293" selection-end-column="4" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/_pytest/python.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="5252">
+          <caret line="449" selection-start-line="449" selection-end-line="449" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/applications/utils.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/applications/clang_code/preprocess.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="286">
+          <caret line="22" column="24" selection-start-line="22" selection-start-column="24" selection-end-line="22" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/applications/clang_code/codegraph_models.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="12532">
+          <caret line="968" column="46" selection-start-line="968" selection-start-column="46" selection-end-line="968" selection-end-column="46" />
+          <folding>
+            <element signature="e#0#9#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/utils.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1482">
+          <caret line="119" selection-start-line="119" selection-end-line="119" />
+          <folding>
+            <element signature="e#0#11#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/data/sample_clang_graph_small.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13">
+          <caret line="1" column="11" selection-start-line="1" selection-end-line="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/data/sample_clang_graph_large.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="312">
+          <caret line="24" column="6" selection-start-line="24" selection-start-column="6" selection-end-line="24" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/data/sample_clang_graph_medium.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13">
+          <caret line="1" column="17" selection-start-line="1" selection-end-line="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/applications/clang_code/test_codegraph_models.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="105">
+          <caret line="84" column="19" lean-forward="true" selection-start-line="84" selection-start-column="19" selection-end-line="84" selection-end-column="19" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/layer/GGNNModelLayer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="91">
+          <caret line="10" column="8" selection-start-line="10" selection-start-column="8" selection-end-line="10" selection-end-column="8" />
+          <folding>
+            <element signature="e#0#23#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/cell/DeepGMGCell.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3718">
+          <caret line="288" column="26" selection-start-line="288" selection-start-column="20" selection-end-line="288" selection-end-column="26" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/model/DeepGMGModel.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="7020">
+          <caret line="551" column="41" selection-start-line="551" selection-start-column="41" selection-end-line="551" selection-end-column="41" />
+          <folding>
+            <element signature="e#0#11#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/env/lib/python3.7/site-packages/tensorflow/python/summary/writer/writer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1040">
+          <caret line="100" column="6" selection-start-line="100" selection-start-column="6" selection-end-line="100" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/model/DeepGMGModelTest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="351">
+          <caret line="27" column="1" selection-start-line="27" selection-start-column="1" selection-end-line="27" selection-end-column="1" />
+          <folding>
+            <element signature="e#0#11#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+  </component>
+</project>

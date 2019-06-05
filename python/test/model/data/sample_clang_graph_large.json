@@ -1,0 +1,338 @@
+{
+    "num_functions": 1,
+    "arguments": [
+        {
+            "liveness_relations": [
+                8
+            ],
+            "name": "FunctionArgument",
+            "type": 0
+        },
+        {
+            "liveness_relations": [
+                17
+            ],
+            "name": "FunctionArgument",
+            "type": 0
+        },
+        {
+            "liveness_relations": [
+                23
+            ],
+            "name": "FunctionArgument",
+            "type": 5
+        }
+    ],
+    "body": [
+        {
+            "ast_relations": [
+                37,
+                34,
+                1
+            ],
+            "is_root": true,
+            "name": "CompoundStmt"
+        },
+        {
+            "ast_relations": [
+                29,
+                2
+            ],
+            "is_root": false,
+            "name": "IfStmt"
+        },
+        {
+            "ast_relations": [
+                9,
+                3
+            ],
+            "is_root": false,
+            "name": "CompoundStmt"
+        },
+        {
+            "ast_relations": [
+                6,
+                4
+            ],
+            "is_root": false,
+            "name": "BinaryOperator",
+            "operator": "="
+        },
+        {
+            "ast_relations": [
+                5
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                7
+            ],
+            "is_root": false,
+            "name": "UnaryOperator",
+            "operator": "*"
+        },
+        {
+            "ast_relations": [
+                8
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                26,
+                21,
+                19,
+                10
+            ],
+            "is_root": false,
+            "name": "ForStmt"
+        },
+        {
+            "ast_relations": [
+                11
+            ],
+            "is_root": false,
+            "name": "CompoundStmt"
+        },
+        {
+            "ast_relations": [
+                18,
+                12
+            ],
+            "is_root": false,
+            "name": "CompoundAssignOperator",
+            "operator": "+="
+        },
+        {
+            "ast_relations": [
+                13
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "ast_relations": [
+                16,
+                14
+            ],
+            "is_root": false,
+            "name": "ArraySubscriptExpr"
+        },
+        {
+            "ast_relations": [
+                15
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                17
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                20
+            ],
+            "is_root": false,
+            "name": "UnaryOperator",
+            "operator": "++"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                24,
+                22
+            ],
+            "is_root": false,
+            "name": "BinaryOperator",
+            "operator": "<"
+        },
+        {
+            "ast_relations": [
+                23
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                25
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                27
+            ],
+            "is_root": false,
+            "liveness_relations": [
+                20,
+                15,
+                25
+            ],
+            "name": "DeclStmt",
+            "type": 5
+        },
+        {
+            "ast_relations": [
+                28
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "IntegerLiteral",
+            "value": "0"
+        },
+        {
+            "ast_relations": [
+                32,
+                30
+            ],
+            "is_root": false,
+            "name": "BinaryOperator",
+            "operator": "=="
+        },
+        {
+            "ast_relations": [
+                31
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "IntegerLiteral",
+            "value": "0"
+        },
+        {
+            "ast_relations": [
+                33
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "DeclRefExpr"
+        },
+        {
+            "ast_relations": [
+                35
+            ],
+            "is_root": false,
+            "liveness_relations": [
+                5,
+                18
+            ],
+            "name": "DeclStmt",
+            "type": 6
+        },
+        {
+            "ast_relations": [
+                36
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "IntegerLiteral",
+            "value": "0"
+        },
+        {
+            "ast_relations": [
+                38
+            ],
+            "is_root": false,
+            "liveness_relations": [
+                33
+            ],
+            "name": "DeclStmt",
+            "type": 5
+        },
+        {
+            "ast_relations": [
+                39
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "ast_relations": [
+                42,
+                40
+            ],
+            "is_root": false,
+            "name": "CallExpr"
+        },
+        {
+            "ast_relations": [
+                41
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "is_root": false,
+            "name": "IntegerLiteral",
+            "value": "0"
+        },
+        {
+            "ast_relations": [
+                43
+            ],
+            "is_root": false,
+            "name": "ImplicitCastExpr"
+        },
+        {
+            "function_name": "get_global_id",
+            "is_root": false,
+            "liveness_relations": [
+                43
+            ],
+            "name": "DeclRefExpr",
+            "type": 1813380008
+        }
+    ],
+    "type": -1
+}
