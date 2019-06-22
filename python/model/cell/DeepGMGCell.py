@@ -15,6 +15,13 @@ class DeepGMGCellState(object):
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']
+        use_choose_function_module = 'choose_function' in [action_metas[action_metas.index(a_meta)]["type"] for a_meta
+                                                           in action_metas]
+        if use_choose_function_module:
+            if not 'choose_function_dims' in self.config:
+                raise KeyError("'choose_function' module is used, but 'choose_function_dims' is not in defined.")
+            choose_function_dims = self.config['choose_function_dims']
+
 
         self.weights = {}
 
@@ -22,7 +29,8 @@ class DeepGMGCellState(object):
             with tf.variable_scope('out_layer_gated_sum_init_node_weights'):
                 self.weights['mlp_f_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m_init_node')
                 self.weights['mlp_g_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m_init_node')
-            self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1, h_size, [], 'linear', 'f_init')
+            init_extra_number = 1 if 'extended_init' in config and config['extended_init'] else 0
+            self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1 + init_extra_number, h_size, [], 'linear', 'f_init')
 
         # if with_attention:
         #     with tf.variable_scope('attention_model_weights'):
@@ -57,6 +65,12 @@ class DeepGMGCellState(object):
                 elif action_meta['type'] == 'add_basic_block':
                     self.weights[function_name] = utils.MLP(h_size * m_size * 2, input_dimension, [], 'sigmoid', 'add_basic_block')
 
+                elif action_meta['type'] == 'choose_number':
+                    self.weights[function_name] = utils.MLP(mlp_dim, 1, [], 'sigmoid', 'choose_number')
+
+                elif action_meta['type'] == 'choose_function':
+                    self.weights[function_name] = utils.MLP(mlp_dim, choose_function_dims, [], 'sigmoid', 'choose_function')
+
 
 class DeepGMGCell(object):
     """
@@ -72,6 +86,13 @@ class DeepGMGCell(object):
         self.ops = {}
         self.placeholders = {}
 
+        action_metas = config['actions']
+        use_choose_function_module = 'choose_function' in [action_metas[action_metas.index(a_meta)]["type"] for a_meta
+                                                           in action_metas]
+        if use_choose_function_module and not 'choose_function_dims' in self.config:
+            raise KeyError("'choose_function' module is used, but 'choose_function_dims' is not in defined.")
+        self.use_choose_function_module = use_choose_function_module
+
     def compute_predictions(self, embeddings: tf.Tensor) -> tf.Tensor:
         """
         Make predictions of the individual deepgmg modules based on node embeddings.
@@ -84,6 +105,10 @@ class DeepGMGCell(object):
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']
+        if self.use_choose_function_module:
+            if not 'choose_function_dims' in self.config:
+                raise KeyError("'choose_function' module is used, but 'choose_function_dims' is not in defined.")
+            choose_function_dims = self.config['choose_function_dims']
 
         # Common Placeholders
         # #########################################
@@ -116,6 +141,11 @@ class DeepGMGCell(object):
                 self.placeholders['last_added_node_types'] = tf.placeholder(tf.int32, [None], name='last_added_node_types')
                 last_added_node_types = tf.one_hot(self.placeholders['last_added_node_types'], num_node_types + 1) # [b, v]
 
+                extended_init = 'extended_init' in self.config and self.config['extended_init']
+                if extended_init:
+                    self.placeholders['extended_init'] = tf.placeholder(tf.float32, [None], name='extended_init')
+
+
                 # Model
                 # Gated Sum
                 with tf.variable_scope('out_layer_gated_sum_init_node'):
@@ -134,11 +164,17 @@ class DeepGMGCell(object):
                     self.ops['h_G_init_node'] = h_G
 
                 # Compute new embedding
-                h_G_e = tf.concat([self.ops['h_G_init_node'], last_added_node_types], 1)                        # [b, 2h + num_node_types+1]
+                if extended_init:
+                    extended_init_data = self.placeholders['extended_init']
+                    extended_init_reshaped = tf.reshape(extended_init_data, shape=(-1,1))
+                    h_G_e = tf.concat([self.ops['h_G_init_node'], last_added_node_types, extended_init_reshaped], 1)
+                else:
+                    h_G_e = tf.concat([self.ops['h_G_init_node'], last_added_node_types], 1)                        # [b, 2h + num_node_types+1]
                 f_init = self.state.weights['f_init'](h_G_e)                                                    # [b, h]
 
                 # Update embeddings
                 # 1) Mask: Action 0 (init node)
+
                 actions_transposed = tf.transpose(tf.cast(actions, dtype=tf.int32))                             # [num_actions, b]
                 action_0 = actions_transposed[0]                                                                # [b]
                 mask_action_0 = tf.gather(action_0, embeddings_to_graph_mappings)                               # [b*v]
@@ -238,6 +274,48 @@ class DeepGMGCell(object):
 
                                 self.ops['loss_ae'] = loss_ae
                                 losses.append(loss_ae)
+
+                        # Action type: choose function
+                        if action_meta['type'] == 'choose_function':
+                            # Model
+                            f_cf = self.state.weights[function_name](h_G)
+                            f_cf = tf.nn.softmax(f_cf)                                                          # [b, choose_function_dims]
+                            self.ops[function_name] = f_cf
+
+                            # Training
+                            if self.enable_training:
+                                # Input
+                                self.placeholders[label_name] = tf.placeholder(tf.int32, [None], name=label_name)
+                                labels = tf.one_hot(self.placeholders[label_name], choose_function_dims)        # [b, choose_function_dims]
+
+                                # Loss
+                                diff_loss = f_cf - labels                                                       # [b, choose_function_dims]
+                                loss_cf = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
+                                loss_cf = loss_cf * loss_scaling_factor
+
+                                self.ops['loss_cf'] = loss_cf
+                                losses.append(loss_cf)
+
+                        # Action type: choose number
+                        if action_meta['type'] == 'choose_number':
+                            # Model
+                            f_cn = self.state.weights[function_name](h_G)                                       # [b, 1]
+                            self.ops[function_name] = f_cn
+
+                            # Training
+                            if self.enable_training:
+                                # Input
+                                self.placeholders[label_name] = tf.placeholder(tf.float32, [None],
+                                                                               name=label_name)
+                                labels = self.placeholders[label_name]                                          # [b, 1]
+
+                                # Loss
+                                diff_loss = f_cn - labels  # [b, choose_function_dims]
+                                loss_cn = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
+                                loss_cn = loss_cn * loss_scaling_factor
+
+                                self.ops['loss_cn'] = loss_cn
+                                losses.append(loss_cn)
 
                         # Action type: add edge to
                         if action_meta['type'] == 'add_edge_to':

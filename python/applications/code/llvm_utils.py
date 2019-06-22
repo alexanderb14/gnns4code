@@ -7,7 +7,10 @@ import struct
 from copy import copy
 from codecs import decode
 from applications.code.codegraph_models import *
+
+from model.DeepGMGModel import  DeepGMGModel, DeepGMGState
 import applications.utils_llvm as app_utils
+import utils as general_utils
 
 
 LABEL_OFFSET = 20
@@ -19,10 +22,12 @@ class AE:
     GRAPH_IDX, STEP_IDX, ACTION, \
     LAST_ADDED_NODE_ID, LAST_ADDED_NODE_TYPE, \
     ACTIONS, \
-    GRAPH, NODE_STATES, ADJ_MAT, ACTION_CURRENT_IDX, ACTION_CURRENT, \
+    GRAPH, NODE_STATES, ADJ_LIST, ACTION_CURRENT_IDX, ACTION_CURRENT, \
     SKIP_NEXT, \
-    SUBGRAPH_START \
-    = range(0, 13)
+    SUBGRAPH_START, \
+    NUM_NODES, \
+    PROBABILITY \
+    = range(0, 15)
 
 # Labels
 class L:
@@ -31,8 +36,8 @@ class L:
 # Actions
 class A:
     INIT_NODE, ADD_INSTRUCTION_NODE, ADD_TYPE_NODE, ADD_CONST_VALUE_NODE, ADD_STRUCT, ADD_GLOBAL, ADD_EDGE, \
-    ADD_BACKWARDS_EDGE, ADD_EDGE_TO, ADD_FUNCTION, CHOOSE_BR_EDGE, CHOOSE_FUNCTION, CHOOSE_LOCAL_FUNCTION, ADD_OPERAND, CHOOSE_NUMBER, \
-    CHOOSE_STRUCT, CHOOSE_STATIC = range(ACTION_OFFSET, ACTION_OFFSET + 17)
+    ADD_BACKWARDS_EDGE, ADD_EDGE_TO, ADD_FUNCTION, CHOOSE_BR_EDGE, CHOOSE_FUNCTION, CHOOSE_LOCAL_FUNCTION, ADD_OPERAND, \
+    CHOOSE_NUMBER, CHOOSE_STRUCTURAL_NUMBER, CHOOSE_STRUCT, CHOOSE_STATIC = range(ACTION_OFFSET, ACTION_OFFSET + 18)
 
 # Type
 class T:
@@ -43,13 +48,28 @@ def get_class_key(class_to_get, class_value):
     for key in class_dict:
         if class_dict[key] == class_value:
             return key
-    raise ValueError("\"" + class_value + "\" not in " + class_to_get.__name__)
+    #raise ValueError("\"" + class_value + "\" not in " + class_to_get.__name__)
 
 def get_class_value(class_to_get, class_key):
     class_dict = class_to_get.__dict__
     if not class_key in class_dict:
         raise ValueError("\"" + class_key + "\" not in " + class_to_get.__name__)
     return class_dict[class_key]
+
+def make_action_readable(action):
+    readable_action = {}
+    for key in action:
+        key_name = get_class_key(AE, key)
+        value_name = str(action[key])
+        if not key_name:
+            key_name = get_class_key(L, key)
+        if key == AE.ACTION:
+            value_name = get_class_key(A, action[key])
+        readable_action.update({key_name : value_name})
+    return readable_action
+
+
+
 
 
 class LLVM_NODE_TYPES:
@@ -382,6 +402,24 @@ class LLVM_Graph:
             'num_nodes': utils.min_max_avg(self.num_nodes),
             'num_codegraphs': self.num_codegraphs
         }
+
+    def to_adj_list(self):
+        nodes = []
+        edges = []
+
+        if self.globals_and_structs is not None:
+            containers = [self.globals_and_structs] + self.functions
+        else:
+            containers = self.functions
+
+        for container in containers:
+            for node in container.nodes:
+                nodes.append(node.node_type)
+
+            for edge in container.edges:
+                edges.append((edge.from_node.id, edge.edge_type, edge.to_node.id))
+
+        return general_utils.graph_to_adjacency_lists(edges)
 
 
     def is_equivalent_to(self, other):
@@ -3061,7 +3099,7 @@ class GraphActionizer():
         primary_type = type.node_type
         self.create_add_node_action(primary_type, is_type_node=False, is_pseudo_node=True)
         number = self.get_number_label(primary_type, type.number)
-        self.create_choose_number_action(number, is_deterministic)
+        self.create_choose_number_action(number, is_deterministic, structural_number=True)
         self.active_llvm_container.add_node(primary_type, number)
         self.append_active_node(primary_type)
         self.create_init_node_action(primary_type, number)
@@ -3125,7 +3163,7 @@ class GraphActionizer():
         self.create_add_node_action(node_type, is_deterministic=True)
         if node_type in [LLVM_NODE_TYPES.array_of, LLVM_NODE_TYPES.vector_of]:
             num_elements = self.get_number_label(node_type, type.number)
-            self.create_choose_number_action(num_elements, is_deterministic)
+            self.create_choose_number_action(num_elements, is_deterministic, structural_number=True)
             self.create_init_node_action(node_type, num_elements)
         else:
             self.create_init_node_action(node_type)
@@ -3154,7 +3192,8 @@ class GraphActionizer():
             L.LABEL_0: label,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if label == 1:
             self.active_llvm_container = LLVM_Container(self.internal_llvm_graph)
@@ -3169,7 +3208,8 @@ class GraphActionizer():
             L.LABEL_0: second_edge,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             print("\tChoose br edge: " + str(second_edge))
@@ -3183,7 +3223,8 @@ class GraphActionizer():
             L.LABEL_0: label,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             print("\tChoose function: " + str(function.id) + " (" + function.name + ")")
@@ -3196,7 +3237,8 @@ class GraphActionizer():
             L.LABEL_0: 1 if not stop else 0,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             if not stop:
@@ -3210,7 +3252,8 @@ class GraphActionizer():
             L.LABEL_0: 1 if is_static else 0,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             if is_static:
@@ -3230,7 +3273,8 @@ class GraphActionizer():
             L.LABEL_0: label,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if node != None:
             self.append_active_node(label)
@@ -3252,7 +3296,8 @@ class GraphActionizer():
             L.LABEL_0: label,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             print("Add struct: " + ("yes " if label == 1 else "no ") + self.get_active_node_string())
@@ -3263,7 +3308,8 @@ class GraphActionizer():
             L.LABEL_0: label,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             print("Add global: " + ("yes " if label == 1 else "no ") + self.get_active_node_string())
@@ -3275,7 +3321,8 @@ class GraphActionizer():
                 L.LABEL_0: node_type,
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-                AE.SUBGRAPH_START: 0
+                AE.SUBGRAPH_START: 0,
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
             }
         pseudo_text = " [pseudo node]"
         if not is_pseudo_node:
@@ -3290,10 +3337,11 @@ class GraphActionizer():
         self.actions[len(self.actions)] = {
             AE.ACTION: A.INIT_NODE,
             L.LABEL_0: label,
-            L.LABEL_1: label_1,
+            L.LABEL_1: 0 if label_1 is None else label_1,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
 
         if self.debug:
@@ -3311,7 +3359,8 @@ class GraphActionizer():
                 L.LABEL_0: label,
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-                AE.SUBGRAPH_START: 0
+                AE.SUBGRAPH_START: 0,
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
             }
 
         if self.debug and not is_deterministic:
@@ -3323,10 +3372,12 @@ class GraphActionizer():
             self.actions[len(self.actions)] = {
                 AE.ACTION: A.ADD_EDGE_TO,
                 L.LABEL_0: end_node,
-                L.LABEL_1: type_id,
+                L.LABEL_1: 0,
+                #L.LABEL_1: type_id,
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-                AE.SUBGRAPH_START: 0
+                AE.SUBGRAPH_START: 0,
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
             }
         if not is_pseudo_edge:
             pseudo_text = ""
@@ -3343,7 +3394,8 @@ class GraphActionizer():
             L.LABEL_0: end_node,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             print("\tChoose local function: " + str(end_node) + " " + self.get_active_node_string())
@@ -3354,28 +3406,32 @@ class GraphActionizer():
             L.LABEL_0: end_node,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.SUBGRAPH_START: 0
+            AE.SUBGRAPH_START: 0,
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
         }
         if self.debug:
             print("\tChoose struct-node: " + str(end_node) + " " + self.get_active_node_string())
 
-    def create_choose_number_action(self, label, is_deterministic = False):
+    def create_choose_number_action(self, label, is_deterministic = False, structural_number = False):
         if not is_deterministic:
             self.actions[len(self.actions)] = {
-                AE.ACTION: A.CHOOSE_NUMBER,
+                AE.ACTION: A.CHOOSE_NUMBER if not structural_number else A.CHOOSE_STRUCTURAL_NUMBER,
                 L.LABEL_0: label,
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-                AE.SUBGRAPH_START: 0
+                AE.SUBGRAPH_START: 0,
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
             }
 
         if self.debug and not is_deterministic:
             print("\tChoose number: " + str(label))
 
 
-class GraphGenerator:
+class GraphGenerator(DeepGMGModel):
 
-    def __init__(self, debug = False, debug_actions = None, debug_print = False):
+    def __init__(self, debug = False, debug_actions = None, debug_print = False, config = None):
+        if (not debug_actions and not config) or (debug_actions and config):
+            raise KeyError("Either 'debug_actions' or 'config' needs to be set in the constructor.")
         self.debug = debug
         self.debug_print = debug_print
         self.debug_actions = debug_actions
@@ -3402,6 +3458,13 @@ class GraphGenerator:
         self.unfinished_phi_instructions = []
         self.type_dict = {}
         self.br_dict = {}
+
+        if not debug_actions:
+            state = DeepGMGState(config)
+            super().__init__(config, state)
+            self.num_nodes_max = config['gen_num_node_max']
+            with self.state.graph.as_default():
+                self.__make_model()
 
     def add_node(self, node_type, label=0):
         #TODO delete the assertion
@@ -3457,7 +3520,7 @@ class GraphGenerator:
                        " [active node-id: " + str(self.last_added_node_id) + "]"
         if self.debug_print:
             print(debug_string)
-        if action_type in [A.ADD_TYPE_NODE, A.ADD_CONST_VALUE_NODE, A.ADD_INSTRUCTION_NODE, A.CHOOSE_NUMBER,
+        if action_type in [A.ADD_TYPE_NODE, A.ADD_CONST_VALUE_NODE, A.ADD_INSTRUCTION_NODE, A.CHOOSE_NUMBER, A.CHOOSE_STRUCTURAL_NUMBER,
                            A.ADD_EDGE_TO, A.CHOOSE_FUNCTION, A.CHOOSE_LOCAL_FUNCTION, A.CHOOSE_STRUCT]:
             return debug_action[L.LABEL_0]
         return bool(debug_action[L.LABEL_0])
@@ -3471,7 +3534,7 @@ class GraphGenerator:
             pass
 
 
-    def do_init_node_action(self, init_number = None):
+    def do_init_node_action(self, init_number = 0):
         if self.debug:
             action = self.get_next_debug_action()
             self.check_debug_action_result(action, A.INIT_NODE, init_number)
@@ -3545,6 +3608,13 @@ class GraphGenerator:
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_NUMBER)
+        else:
+            pass
+
+    def sample_choose_structural_number_action(self):
+        if self.debug:
+            action = self.get_next_debug_action()
+            return self.check_debug_action_result(action, A.CHOOSE_STRUCTURAL_NUMBER)
         else:
             pass
 
@@ -3954,12 +4024,12 @@ class GraphGenerator:
 
         node_id = self.add_node(node_type)
         llvm_type = LLVM_Type(node_type)
-        init_number = None
+        init_number = 0
         if node_type in [LLVM_NODE_TYPES.vector_of, LLVM_NODE_TYPES.array_of]:
             if predetermined_type is not None:
                 init_number = predetermined_type.number
             else:
-                init_number = int(self.sample_choose_number_action())
+                init_number = int(self.sample_choose_structural_number_action())
             llvm_type.number = init_number
         self.do_init_node_action(init_number)
 
@@ -4053,7 +4123,7 @@ class GraphGenerator:
         if is_deterministic:
             init_number = init_number
         else:
-            init_number = int(self.sample_choose_number_action())
+            init_number = int(self.sample_choose_structural_number_action())
         base_node = self.add_node(type_main_node, init_number)
         self.do_init_node_action(init_number)
         self.active_llvm_container.add_edge(starting_node, edge_type, base_node)
