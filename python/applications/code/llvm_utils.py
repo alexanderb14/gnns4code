@@ -8,10 +8,14 @@ from copy import copy
 from codecs import decode
 from applications.code.codegraph_models import *
 
-from model.DeepGMGModel import  DeepGMGModel, DeepGMGState
+from model.DeepGMGModel import  DeepGMGModel, DeepGMGState, GGNNModelLayer, DeepGMGCell
 import applications.utils_llvm as app_utils
 import utils as general_utils
+import tensorflow as tf
 
+
+SMALL_NUMBER = 1e-5
+VERY_SMALL_NUMBER = 1e-30
 
 LABEL_OFFSET = 20
 ACTION_OFFSET = 30
@@ -35,9 +39,10 @@ class L:
 
 # Actions
 class A:
-    INIT_NODE, ADD_INSTRUCTION_NODE, ADD_TYPE_NODE, ADD_CONST_VALUE_NODE, ADD_STRUCT, ADD_GLOBAL, ADD_EDGE, \
-    ADD_BACKWARDS_EDGE, ADD_EDGE_TO, ADD_FUNCTION, CHOOSE_BR_EDGE, CHOOSE_FUNCTION, CHOOSE_LOCAL_FUNCTION, ADD_OPERAND, \
-    CHOOSE_NUMBER, CHOOSE_STRUCTURAL_NUMBER, CHOOSE_STRUCT, CHOOSE_STATIC = range(ACTION_OFFSET, ACTION_OFFSET + 18)
+    INIT_NODE, ADD_NODE, ADD_EDGE, ADD_EDGE_TO, ADD_FUNCTION, ADD_BASIC_BLOCK, \
+    ADD_INSTRUCTION_NODE, ADD_TYPE_NODE, ADD_CONST_VALUE_NODE, ADD_STRUCT, ADD_GLOBAL, \
+    ADD_BACKWARDS_EDGE, CHOOSE_BR_EDGE, CHOOSE_FUNCTION, CHOOSE_LOCAL_FUNCTION, ADD_OPERAND, \
+    CHOOSE_NUMBER, CHOOSE_STRUCTURAL_NUMBER, CHOOSE_STRUCT, CHOOSE_STATIC = range(ACTION_OFFSET, ACTION_OFFSET + 20)
 
 # Type
 class T:
@@ -65,6 +70,8 @@ def make_action_readable(action):
             key_name = get_class_key(L, key)
         if key == AE.ACTION:
             value_name = get_class_key(A, action[key])
+        if key == AE.LAST_ADDED_NODE_TYPE:
+            value_name = get_class_key(LLVM_NODE_TYPES, action[key])
         readable_action.update({key_name : value_name})
     return readable_action
 
@@ -3429,12 +3436,22 @@ class GraphActionizer():
 
 class GraphGenerator(DeepGMGModel):
 
-    def __init__(self, debug = False, debug_actions = None, debug_print = False, config = None):
-        if (not debug_actions and not config) or (debug_actions and config):
-            raise KeyError("Either 'debug_actions' or 'config' needs to be set in the constructor.")
+    def __init__(self, debug = False, debug_actions = None, debug_print = False, config = None, state = None):
+        if not debug_actions and not config:
+            raise KeyError("'debug_actions' and/or 'config' needs to be set in the constructor.")
         self.debug = debug
         self.debug_print = debug_print
         self.debug_actions = debug_actions
+        self.config = None
+        self.initialize()
+
+        if config:
+            super().__init__(config, state)
+            self.num_nodes_max = config['gen_num_node_max']
+            with self.state.graph.as_default():
+                self.__make_model()
+
+    def initialize(self):
         self.last_debug_action_index = -1
         self.internal_llvm_graph = LLVM_Graph()
         self.active_llvm_container = LLVM_Container(self.internal_llvm_graph)
@@ -3459,12 +3476,251 @@ class GraphGenerator(DeepGMGModel):
         self.type_dict = {}
         self.br_dict = {}
 
-        if not debug_actions:
-            state = DeepGMGState(config)
-            super().__init__(config, state)
-            self.num_nodes_max = config['gen_num_node_max']
-            with self.state.graph.as_default():
-                self.__make_model()
+    def compare_actions(self, debug_action, real_action):
+        if not debug_action:
+            return
+        readable_debug_action = make_action_readable(debug_action)
+        readable_real_action = make_action_readable(real_action)
+        a = 3
+
+    def __make_model(self):
+        """
+        Create tf model
+        """
+        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='embeddings_in')
+
+        # Create layer and propagate
+        ggnn_layer = GGNNModelLayer(self.config, self.state.ggnn_layer_state)
+        embeddings = ggnn_layer.compute_embeddings(self.placeholders['embeddings_in'])
+        self.ops['peek'] = embeddings
+
+        # Create cell and predict
+        deepgmg_cell = DeepGMGCell(self.config, True, self.state.deepgmg_cell_state, 0)
+        self.placeholders['embeddings_out'] = deepgmg_cell.compute_predictions(embeddings)
+
+        self.ggnn_layers.append(ggnn_layer)
+        self.cells.append(deepgmg_cell)
+
+    def __sample_add_node_action(self, action_type):
+        if action_type not in [A.ADD_INSTRUCTION_NODE, A.ADD_CONST_VALUE_NODE, A.ADD_TYPE_NODE]:
+            raise ValueError("Action type needs to be an 'add node' type.")
+        function_name = "f_" + get_class_key(A, action_type).lower()
+
+        # Prepare
+        action = {
+            AE.ACTION:                    action_type,
+            AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
+            AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+        }
+
+
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict[self.placeholders['embeddings_in']] = self.embeddings
+
+        fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops[function_name]]
+
+        # Predict
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        # Update/Extract
+        self.embeddings = result[0]
+        p_addnode = result[1][0]
+
+        # Sample if to add node
+        p_addnode_norm = p_addnode / (np.sum(p_addnode) + SMALL_NUMBER)   # Normalize to sum up to 1
+        node_type = np.random.multinomial(1, p_addnode_norm)                    # Sample categorial
+        node_type = np.argmax(node_type)                                        # One hot -> integer
+
+        # Print
+        action[L.LABEL_0] = node_type
+        action[AE.PROBABILITY] = p_addnode_norm[node_type]
+        #utils.action_pretty_print(action)
+
+        action[L.LABEL_0] = str(node_type)
+        if self.debug_actions:
+            self.compare_actions(self.get_next_debug_action(), action)
+
+        return node_type, p_addnode_norm
+
+    def __do_init_node_action(self, init_number):
+        # Prepare
+        action = {
+            AE.ACTION:                    A.INIT_NODE,
+            AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
+            AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
+            L.LABEL_1:                    init_number,
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+        }
+        if self.debug_actions:
+            self.compare_actions(self.get_next_debug_action(), action)
+
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict[self.placeholders['embeddings_in']] = self.embeddings
+
+        fetch_list = [self.cells[0].ops['embeddings']]
+
+        # Predict
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        # Update/Extract
+        self.embeddings = result[0]
+
+        # Print
+        #utils.action_pretty_print(action)
+
+    def __sample_add_edge_action(self, action_type):
+        if action_type not in [A.ADD_EDGE, A.ADD_STRUCT, A.ADD_GLOBAL, A.ADD_FUNCTION, A.ADD_OPERAND, A.CHOOSE_STATIC, A.CHOOSE_BR_EDGE]:
+            raise ValueError("Action type needs to be an 'add edge' type.")
+        function_name = "f_" + get_class_key(A, action_type).lower()
+
+        # Prepare
+        action = {
+            AE.ACTION:                    action_type,
+            AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
+            AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+        }
+
+
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict[self.placeholders['embeddings_in']] = self.embeddings
+
+        fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops[function_name]]
+
+        # Predict
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        # Update/Extract
+        self.embeddings = result[0]
+        p_addedge = result[1][0]
+
+        # Sample if to add edge
+        p_addedge_norm = p_addedge / (np.sum(p_addedge) + utils.SMALL_NUMBER)
+        add_edge = np.random.multinomial(1, p_addedge_norm)                          # Sample bernoulli
+        add_edge = np.argmax(add_edge)                                          # One hot -> integer
+
+        # Print
+        action[L.LABEL_0] = add_edge
+        action[AE.PROBABILITY] = p_addedge[add_edge]
+        #utils.action_pretty_print(action)
+
+        action[L.LABEL_0] = str(add_edge)
+        if self.debug_actions:
+            self.compare_actions(self.get_next_debug_action(), action)
+
+        return add_edge, p_addedge
+
+    def __sample_add_edge_to_action(self, action_type):
+        if action_type not in [A.ADD_EDGE_TO, A.CHOOSE_STRUCT, A.CHOOSE_LOCAL_FUNCTION]:
+            raise ValueError("Action type needs to be an 'add edge to' type.")
+        function_name = "f_" + get_class_key(A, action_type).lower()
+        # Prepare
+        action = {
+            AE.ACTION:                    action_type,
+            AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
+            AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+        }
+
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict[self.placeholders['embeddings_in']] = self.embeddings
+
+        fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops[function_name]]
+
+        # Predict
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        # Update/Extract
+        self.embeddings = result[0]
+        p_nodes = result[1]
+
+        # Sample where to add edge to
+        p_nodes_limited = p_nodes[0:self.internal_llvm_graph.get_num_nodes()] # Limit choice of sampling
+        for i in range(len(p_nodes_limited[self.last_added_node_id])):
+            p_nodes_limited[self.last_added_node_id][i] = 0
+        p_nodes_limited = np.reshape(p_nodes_limited, (-1))
+        p_nodes_limited = p_nodes_limited / (np.sum(p_nodes_limited) + SMALL_NUMBER)  # Normalize to sum up to 1
+        sum = 0
+        for i in range(len(p_nodes_limited)):
+            sum += p_nodes_limited[i]
+        p_nodes_limited_reshaped = np.reshape(p_nodes_limited, (-1, self.config['num_edge_types']))
+
+        v_t = np.random.multinomial(1, p_nodes_limited)                         # Sample categorial
+        v_t = np.reshape(v_t, (-1, self.config['num_edge_types']))
+
+        node = np.sum(np.argmax(v_t, axis = 0))                                 # One-hot 2D np-array
+        edge_type = np.sum(np.argmax(v_t, axis = 1))                            # -> Positions for col, row
+
+        # Print
+        action[L.LABEL_0] = node
+        action[L.LABEL_1] = edge_type
+        action[AE.PROBABILITY] = p_nodes_limited_reshaped[node][edge_type]
+        #utils.action_pretty_print(action)
+
+        action[L.LABEL_0] = str(node)
+        if self.debug_actions:
+            self.compare_actions(self.get_next_debug_action(), action)
+
+        return node, edge_type, p_nodes_limited_reshaped[node][edge_type]
+
+    def __sample_choose_number_action(self, action_type):
+        if action_type not in [A.CHOOSE_NUMBER, A.CHOOSE_STRUCTURAL_NUMBER]:
+            raise ValueError("Action type needs to be an 'choose number' type.")
+
+        function_name = "f_" + get_class_key(A, action_type).lower()
+        action = {
+            AE.ACTION: action_type,
+            AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
+            AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
+            AE.ADJ_LIST: self.internal_llvm_graph.to_adj_list()[0]
+        }
+
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict[self.placeholders['embeddings_in']] = self.embeddings
+
+        fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops[function_name]]
+
+        # Predict
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        # Update/Extract
+        self.embeddings = result[0]
+        result_number = result[1][0][0]
+
+        action[L.LABEL_0] = result_number
+        if self.debug_actions:
+            self.compare_actions(self.get_next_debug_action(), action)
+
+        return result_number
+
+    def __sample_choose_function_action(self):
+        action = {
+            AE.ACTION: A.CHOOSE_FUNCTION,
+            AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
+            AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
+            AE.ADJ_LIST: self.internal_llvm_graph.to_adj_list()[0]
+        }
+
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict[self.placeholders['embeddings_in']] = self.embeddings
+
+        fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops["f_choose_function"]]
+
+        # Predict
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        # Update/Extract
+        self.embeddings = result[0]
+        p_choose_function = result[1][0]
+        chosen_function = np.random.multinomial(1, p_choose_function)  # Sample bernoulli
+        chosen_function = np.argmax(chosen_function)
+
+        action[L.LABEL_0] = chosen_function
+        if self.debug_actions:
+            self.compare_actions(self.get_next_debug_action(), action)
+
+        return chosen_function
 
     def add_node(self, node_type, label=0):
         #TODO delete the assertion
@@ -3503,7 +3759,8 @@ class GraphGenerator(DeepGMGModel):
 
     def get_next_debug_action(self):
         self.last_debug_action_index += 1
-        return self.debug_actions[self.last_debug_action_index]
+        if len(self.debug_actions) > self.last_debug_action_index:
+            return self.debug_actions[self.last_debug_action_index]
 
     def check_debug_action_result(self, debug_action, action_type, init_number = None):
         if debug_action[AE.ACTION] != action_type:
@@ -3531,7 +3788,7 @@ class GraphGenerator(DeepGMGModel):
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_BR_EDGE)
         else:
-            pass
+            return bool(self.__sample_add_edge_action(A.CHOOSE_BR_EDGE)[0])
 
 
     def do_init_node_action(self, init_number = 0):
@@ -3539,112 +3796,113 @@ class GraphGenerator(DeepGMGModel):
             action = self.get_next_debug_action()
             self.check_debug_action_result(action, A.INIT_NODE, init_number)
         else:
-            pass
+            self.__do_init_node_action(init_number)
 
     def sample_add_struct_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_STRUCT)
         else:
-            pass
+            return bool(self.__sample_add_edge_action(A.ADD_STRUCT)[0])
+
 
     def sample_add_global_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_GLOBAL)
         else:
-            pass
+            return bool(self.__sample_add_edge_action(A.ADD_GLOBAL)[0])
 
     def sample_add_function_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_FUNCTION)
         else:
-            pass
+            return bool(self.__sample_add_edge_action(A.ADD_FUNCTION)[0])
 
     def sample_add_type_node_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_TYPE_NODE)
         else:
-            pass
+            return self.__sample_add_node_action(A.ADD_TYPE_NODE)[0]
 
     def sample_add_const_value_node_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_CONST_VALUE_NODE)
         else:
-            pass
+            return self.__sample_add_node_action(A.ADD_CONST_VALUE_NODE)[0]
 
     def sample_add_instruction_node_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_INSTRUCTION_NODE)
         else:
-            pass
+            return self.__sample_add_node_action(A.ADD_INSTRUCTION_NODE)[0]
 
     def sample_choose_struct_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_STRUCT)
         else:
-            pass
+            return self.__sample_add_edge_to_action(A.CHOOSE_STRUCT)[0]
 
     def sample_choose_function_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_FUNCTION)
         else:
-            pass
+            return self.__sample_choose_function_action()
 
     def sample_choose_local_function_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_LOCAL_FUNCTION)
         else:
-            pass
+            return self.__sample_add_edge_to_action(A.CHOOSE_LOCAL_FUNCTION)[0]
 
     def sample_choose_number_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_NUMBER)
         else:
-            pass
-
+            return self.__sample_choose_number_action(A.CHOOSE_NUMBER)
     def sample_choose_structural_number_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_STRUCTURAL_NUMBER)
         else:
-            pass
+            return int(round(self.__sample_choose_number_action(A.CHOOSE_STRUCTURAL_NUMBER)))
 
     def sample_add_operand_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return  self.check_debug_action_result(action, A.ADD_OPERAND)
         else:
-            pass
+            return bool(self.__sample_add_edge_action(A.ADD_OPERAND)[0])
 
     def sample_is_operand_static_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.CHOOSE_STATIC)
         else:
-            pass
+            return bool(self.__sample_add_edge_action(A.CHOOSE_STATIC)[0])
 
     def sample_add_edge_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_EDGE)
         else:
-            pass
+            return bool(self.__sample_add_edge_action(A.ADD_EDGE)[0])
 
     def sample_add_edge_to_action(self):
         if self.debug:
             action = self.get_next_debug_action()
             return self.check_debug_action_result(action, A.ADD_EDGE_TO)
         else:
-            pass
+            return self.__sample_add_edge_to_action(A.ADD_EDGE_TO)[0]
+
 
     def choose_add_operand_action(self, opcode, index, function_id = None):
         create_action = True
@@ -3690,6 +3948,10 @@ class GraphGenerator(DeepGMGModel):
 
 
     def generate_graph(self):
+        self.initialize()
+        if self.config is not None:
+            self.embeddings = np.ones((self.num_nodes_max, self.config['hidden_size']))
+
         # TODO eliminate backwards edges
         LLVM_Node.reset_id()
 
@@ -4029,7 +4291,7 @@ class GraphGenerator(DeepGMGModel):
             if predetermined_type is not None:
                 init_number = predetermined_type.number
             else:
-                init_number = int(self.sample_choose_structural_number_action())
+                init_number = int(round(self.sample_choose_structural_number_action()))
             llvm_type.number = init_number
         self.do_init_node_action(init_number)
 
@@ -4079,7 +4341,7 @@ class GraphGenerator(DeepGMGModel):
                 llvm_type = LLVM_Type(node_type)
         elif node_type in LLVM_NODE_TYPES.integer_types + LLVM_NODE_TYPES.floating_point_types:
             if node_type in LLVM_NODE_TYPES.integer_types:
-                init_number = int(self.sample_choose_number_action())
+                init_number = int(round(self.sample_choose_number_action()))
             else:
                 init_number = float(self.sample_choose_number_action())
             base_node = self.add_node(node_type, init_number)
