@@ -331,18 +331,23 @@ class DeepGMGCell(object):
 
                             s_u = self.state.weights[function_name](h_u_all_h_v)                                # [b*v, e]
 
-                            # Softmax
-                            es = tf.math.exp(s_u)                                                               # [b*v, e]
-                            es_sums = tf.unsorted_segment_sum(data=es,
+                            s_u_max = tf.unsorted_segment_max(data=s_u,
                                                               segment_ids=embeddings_to_graph_mappings_existent,
                                                               num_segments=num_graphs)                          # [b, e]
-
-                            es_sums_2 = tf.reduce_sum(es_sums, axis=1)                                          # [b]
-                            es_sums_2 = tf.gather(es_sums_2, embeddings_to_graph_mappings)                      # [b*v]
-                            es_sums_2 = tf.expand_dims(es_sums_2, 1)                                            # [b*v, 1]
-                            es_sums_2 = tf.broadcast_to(es_sums_2, tf.shape(es))                                # [b*v, e]
-
-                            f_nodes = es / es_sums_2                                                            # [b*v, e]
+                            s_u_max = tf.reduce_max(s_u_max, axis=1)                                            # [b]
+                            s_u_max = tf.broadcast_to(s_u_max, tf.shape(s_u))                                   # [b*v, e]
+                            s_u_normalized = s_u - s_u_max                                                      # [b*v, e]
+                            # - Build exponents
+                            es = tf.math.exp(s_u_normalized)                                                    # [b*v, e]
+                            # - Build sums
+                            es_sum = tf.unsorted_segment_sum(data=es,
+                                                             segment_ids=embeddings_to_graph_mappings_existent,
+                                                             num_segments=num_graphs)                           # [b, e]
+                            es_sum = tf.reduce_sum(es_sum, axis=1)                                              # [b]
+                            es_sum = tf.broadcast_to(es_sum, tf.shape(es))                                      # [b*v, e]
+                            # - Build softmax
+                            f_nodes = es / es_sum
+                            # end test
 
                             self.ops[function_name] = f_nodes
 
