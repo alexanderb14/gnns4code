@@ -112,17 +112,12 @@ class DeepGMGModel(object):
 
                 # Generative model
                 if utils.AE.ACTION in action:
-                    # TODO: this fixes the issue of a mismatch between the order of elements in class 'utils.A'
-                    #  and the order of actions_metas causing the model to train incorrectly. Needs to be discussed.
                     action_index = None
                     action_name = get_class_key(utils.A, action[utils.AE.ACTION]).lower()
                     for action_meta in self.config['actions']:
                         if action_meta['name'] == action_name:
                             action_index = self.config['actions'].index(action_meta)
                     batch_data['actions'].append(action_index)
-
-                    # TODO: original bugged line
-                    #batch_data['actions'].append(action[utils.AE.ACTION] - utils.ACTION_OFFSET)
                 else:
                     batch_data['actions'].append(-1)
 

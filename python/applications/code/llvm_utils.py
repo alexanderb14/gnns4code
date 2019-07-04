@@ -110,6 +110,13 @@ class LLVM_NODE_TYPES:
     cast_const_expression_opcodes = [bitcast, ptrtoint, inttoptr]
     const_expression_opcodes = [select, icmp, getelementptr] + cast_const_expression_opcodes
 
+    const_value_node_types = const_expression_opcodes + predicates + integer_types + floating_point_types + [undef, zeroinitializer, null, array_of, vector_of]
+    type_node_types = [vector_of, array_of, struct_of, pointer_of, struct] + integer_types + floating_point_types
+    instruction_node_types = [none_type, argument, phi, call, trunc, add, icmp, and_type, or_type, mul, br, zext, getelementptr, bitcast, load, store, shl, ret, ashr, sdiv,sub,
+    sext, insertelement, shufflevector, srem, urem, select, fadd, fmul, fsub, xor, alloca, lshr, extractelement,
+    fdiv, fcmp, sitofp, fptoui, udiv, fpext, fptrunc, fptosi, insertvalue, extractvalue, switch, uitofp, ptrtoint,
+    inttoptr,unreachable]
+
     num_ops_list = []
     call_dict_by_name = {}
     call_dict_by_id = {}
@@ -3275,9 +3282,11 @@ class GraphActionizer():
         elif node != None:
             label = LLVM_NODE_TYPES.parse_opcode(node.opcode)
 
+        translated_label = LLVM_NODE_TYPES.instruction_node_types.index(label)
+
         self.actions[len(self.actions)] = {
             AE.ACTION: A.ADD_INSTRUCTION_NODE,
-            L.LABEL_0: label,
+            L.LABEL_0: translated_label,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
@@ -3323,9 +3332,14 @@ class GraphActionizer():
 
     def create_add_node_action(self, node_type, node_label = 0, is_deterministic = False, is_pseudo_node = False, is_type_node = True):
         if not is_deterministic:
+            translated_node_type = None
+            if is_type_node:
+                translated_node_type = LLVM_NODE_TYPES.type_node_types.index(node_type)
+            else:
+                translated_node_type = LLVM_NODE_TYPES.const_value_node_types.index(node_type)
             self.actions[len(self.actions)] = {
                 AE.ACTION: A.ADD_TYPE_NODE if is_type_node else A.ADD_CONST_VALUE_NODE,
-                L.LABEL_0: node_type,
+                L.LABEL_0: translated_node_type,
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
                 AE.SUBGRAPH_START: 0,
@@ -3470,6 +3484,7 @@ class GraphGenerator(DeepGMGModel):
         self.is_current_func_void = True
         self.structs = []
         self.struct_nodes = []
+        self.function_nodes = []
         self.node_dict = {}
         self.current_function_start_node = None
         self.unfinished_phi_instructions = []
@@ -3639,11 +3654,19 @@ class GraphGenerator(DeepGMGModel):
         p_nodes_limited = p_nodes[0:self.internal_llvm_graph.get_num_nodes()] # Limit choice of sampling
         for i in range(len(p_nodes_limited[self.last_added_node_id])):
             p_nodes_limited[self.last_added_node_id][i] = 0
+        if action_type in [A.CHOOSE_STRUCT, A.CHOOSE_LOCAL_FUNCTION]:
+            mask = self.function_nodes
+            if action_type == A.CHOOSE_STRUCT:
+                mask = self.struct_nodes
+            for i in range(len(p_nodes_limited)):
+                if i not in mask:
+                    for j in range(len(p_nodes_limited[i])):
+                        p_nodes_limited[i][j] = 0
+
+
+
         p_nodes_limited = np.reshape(p_nodes_limited, (-1))
         p_nodes_limited = p_nodes_limited / (np.sum(p_nodes_limited) + SMALL_NUMBER)  # Normalize to sum up to 1
-        sum = 0
-        for i in range(len(p_nodes_limited)):
-            sum += p_nodes_limited[i]
         p_nodes_limited_reshaped = np.reshape(p_nodes_limited, (-1, self.config['num_edge_types']))
 
         v_t = np.random.multinomial(1, p_nodes_limited)                         # Sample categorial
@@ -3713,6 +3736,7 @@ class GraphGenerator(DeepGMGModel):
         # Update/Extract
         self.embeddings = result[0]
         p_choose_function = result[1][0]
+        chosen_function = chosen_function / (np.sum(chosen_function) + SMALL_NUMBER)
         chosen_function = np.random.multinomial(1, p_choose_function)  # Sample bernoulli
         chosen_function = np.argmax(chosen_function)
 
@@ -3823,23 +3847,29 @@ class GraphGenerator(DeepGMGModel):
     def sample_add_type_node_action(self):
         if self.debug:
             action = self.get_next_debug_action()
-            return self.check_debug_action_result(action, A.ADD_TYPE_NODE)
+            result = self.check_debug_action_result(action, A.ADD_TYPE_NODE)
         else:
-            return self.__sample_add_node_action(A.ADD_TYPE_NODE)[0]
+            result = self.__sample_add_node_action(A.ADD_TYPE_NODE)[0]
+
+        return LLVM_NODE_TYPES.type_node_types[result]
 
     def sample_add_const_value_node_action(self):
         if self.debug:
             action = self.get_next_debug_action()
-            return self.check_debug_action_result(action, A.ADD_CONST_VALUE_NODE)
+            result = self.check_debug_action_result(action, A.ADD_CONST_VALUE_NODE)
         else:
-            return self.__sample_add_node_action(A.ADD_CONST_VALUE_NODE)[0]
+            result = self.__sample_add_node_action(A.ADD_CONST_VALUE_NODE)[0]
+
+        return LLVM_NODE_TYPES.const_value_node_types[result]
 
     def sample_add_instruction_node_action(self):
         if self.debug:
             action = self.get_next_debug_action()
-            return self.check_debug_action_result(action, A.ADD_INSTRUCTION_NODE)
+            result = self.check_debug_action_result(action, A.ADD_INSTRUCTION_NODE)
         else:
-            return self.__sample_add_node_action(A.ADD_INSTRUCTION_NODE)[0]
+            result = self.__sample_add_node_action(A.ADD_INSTRUCTION_NODE)[0]
+
+        return LLVM_NODE_TYPES.instruction_node_types[result]
 
     def sample_choose_struct_action(self):
         if self.debug:
@@ -3975,6 +4005,7 @@ class GraphGenerator(DeepGMGModel):
             self.internal_llvm_graph.functions.append(self.active_llvm_container)
             self.first_occurrence_of_ret = True
             self.add_node(LLVM_NODE_TYPES.function)
+            self.function_nodes.append(self.last_added_node_id)
             self.do_init_node_action()
             instruction_node_type = self.sample_add_instruction_node_action()
             is_first_instruction = True

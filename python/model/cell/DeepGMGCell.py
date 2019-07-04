@@ -71,6 +71,9 @@ class DeepGMGCellState(object):
                 elif action_meta['type'] == 'choose_function':
                     self.weights[function_name] = utils.MLP(mlp_dim, choose_function_dims, [], 'sigmoid', 'choose_function')
 
+                elif action_meta['type'] in ['add_const_value_node', 'add_type_node', 'add_instruction_node']:
+                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', action_meta['type'])
+
 
 class DeepGMGCell(object):
     """
@@ -234,7 +237,7 @@ class DeepGMGCell(object):
                         self.ops['h_v'] = h_v
 
                         # Action type: add node
-                        if action_meta['type'] == 'add_node':
+                        if action_meta['type'] in ['add_node', 'add_const_value_node', 'add_type_node', 'add_instruction_node']:
                             # Model
                             f_an = self.state.weights[function_name](h_G)                                       # [b, input_dimension]
                             f_an = tf.nn.softmax(f_an)                                                          # [b, input_dimension]
@@ -243,15 +246,16 @@ class DeepGMGCell(object):
                             # Training
                             if self.enable_training:
                                 # Input
+
                                 self.placeholders[label_name] = tf.placeholder(tf.int32, [None], name=label_name)
-                                labels = tf.one_hot(self.placeholders[label_name], input_dimension)             # [b, input_dimension]
+                                labels = tf.one_hot(self.placeholders[label_name], input_dimension)        # [b, input_dimension]
 
                                 # Loss
                                 diff_loss = f_an - labels                                                       # [b, input_dimension]
                                 loss_an = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
                                 loss_an = loss_an * loss_scaling_factor
 
-                                self.ops['loss_an'] = loss_an
+                                self.ops['loss_' + action_meta['type']] = loss_an
                                 losses.append(loss_an)
 
                         # Action type: add edge
