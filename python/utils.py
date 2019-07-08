@@ -7,7 +7,7 @@ from typing import Tuple, Dict
 
 
 # Constants
-SMALL_NUMBER = 1e-5
+SMALL_NUMBER = 1e-7
 VERY_SMALL_NUMBER = 1e-30
 
 LABEL_OFFSET = 20
@@ -44,7 +44,7 @@ class T:
 
 # Functions
 ###########
-def action_pretty_print(action):
+def action_pretty_print(action, id=0):
     # Action name
     action_name = ''
 
@@ -77,7 +77,8 @@ def action_pretty_print(action):
     if AE.PROBABILITY in action:
         p = action[AE.PROBABILITY]
 
-    print('{:<30s}{:<10s}{:<10s}{:<20s}{:<22s}{:<15s}{:<25s}'.format(
+    print('{:<5s}{:<30s}{:<10s}{:<10s}{:<20s}{:<22s}{:<15s}{:<25s}'.format(
+        str(id),
         action_name,
         str(l0_name),
         str(l1_name),
@@ -93,7 +94,8 @@ def print_dash():
 
 def action_pretty_print_header():
     print_dash()
-    print('{:<30s}{:<10s}{:<10s}{:<20s}{:<22s}{:<15s}{:<25s}'.format(
+    print('{:<5s}{:<30s}{:<10s}{:<10s}{:<20s}{:<22s}{:<15s}{:<25s}'.format(
+        'ID',
         'ACTION',
         'LABEL_0',
         'LABEL_1',
@@ -109,9 +111,9 @@ def action_sequence_pretty_print(actions):
 
     actions = copy.deepcopy(actions)
 
-    for action_idx in actions:
+    for id, action_idx in enumerate(actions):
         action = actions[action_idx]
-        action_pretty_print(action)
+        action_pretty_print(action, id)
 
 
 def glorot_init(shape):
