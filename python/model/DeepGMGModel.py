@@ -1,5 +1,7 @@
+import argparse
 import json
 import os
+import random
 import shutil
 import time
 
@@ -11,6 +13,9 @@ import utils
 import applications.clang_code.codegraph_models as clang_codegraph_models
 from model.cell.DeepGMGCell import DeepGMGCell, DeepGMGCellState
 from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
+
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def apply_action_to_graph(graph:dict, action:dict) -> None:
@@ -573,7 +578,31 @@ class DeepGMGTrainer(DeepGMGModel):
         # Initialize newly-introduced variables:
         self.state.sess.run(tf.local_variables_initializer())
 
-    def train(self, actions_by_graphs, graph_sizes) -> None:
+    def __run_batch(self, feed_dict, iteration):
+        fetch_list = [self.ops['loss'], self.ops['losses'], self.ops['train_step'],
+                      self.ops['loss_an'], self.ops['loss_ae'], self.ops['loss_nodes']]
+        if self.with_gradient_monitoring:
+            offset = len(fetch_list)
+            fetch_list.extend([self.ops['gradients'], self.ops['clipped_gradients']])
+
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        summary = tf.Summary()
+        summary.value.add(tag='loss', simple_value=result[0])
+        summary.value.add(tag='loss_an', simple_value=result[3])
+        summary.value.add(tag='loss_ae', simple_value=result[4])
+        summary.value.add(tag='loss_nodes', simple_value=result[5])
+        self.train_writer.add_summary(summary, iteration)
+
+        if self.with_gradient_monitoring:
+            (gradients, clipped_gradients) = (result[offset + 0], result[offset + 1])
+
+            self.train_writer.add_summary(gradients, iteration)
+            self.train_writer.add_summary(clipped_gradients, iteration)
+
+        return result
+
+    def train_standalone(self, actions_by_graphs, graph_sizes):
         # Build feed dict
         # 1. Graph info
         feed_dict = self._graphs_to_batch_feed_dict(actions_by_graphs, graph_sizes,
@@ -585,30 +614,98 @@ class DeepGMGTrainer(DeepGMGModel):
 
         iteration = 0
         while True:
-            # Run and fetch
-            fetch_list = [self.ops['loss'], self.ops['losses'], self.ops['train_step'],
-                          self.ops['loss_an'], self.ops['loss_ae'], self.ops['loss_nodes']]
-            if self.with_gradient_monitoring:
-                offset = len(fetch_list)
-                fetch_list.extend([self.ops['gradients'], self.ops['clipped_gradients']])
+            start_time = time.time()
+            result = self.__run_batch(feed_dict, iteration)
+            end_time = time.time()
 
-            result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
-
-            summary = tf.Summary()
-            summary.value.add(tag='loss', simple_value=result[0])
-            summary.value.add(tag='loss_an', simple_value=result[3])
-            summary.value.add(tag='loss_ae', simple_value=result[4])
-            summary.value.add(tag='loss_nodes', simple_value=result[5])
-            self.train_writer.add_summary(summary, iteration)
-
-            if self.with_gradient_monitoring:
-                (gradients, clipped_gradients) = (result[offset + 0], result[offset + 1])
-
-                self.train_writer.add_summary(gradients, iteration)
-                self.train_writer.add_summary(clipped_gradients, iteration)
-
-            print(iteration, result)
+            instances_per_sec = len(actions_by_graphs) / (end_time - start_time)
+            print('iteration: %i, instances/sec: %.2f, result: %s' %(iteration, instances_per_sec, str(result)))
             iteration += 1
 
             if iteration >= self.config['num_epochs']:
                 break
+
+    def train(self, train_data, debug=False) -> None:
+        actions_by_graphs = []
+
+        # Extract actions
+        for actions in train_data:
+            actions = actions[utils.AE.ACTIONS]
+            utils.enrich_action_sequence_with_adj_list_data(actions)
+            actions_by_graphs.append(actions)
+
+        # Extract graph sizes
+        graph_sizes = []
+        for actions in train_data:
+            actions = actions[utils.AE.ACTIONS]
+            action_last = actions[len(actions) - 1]
+
+            graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID])
+
+        # Extract num actions
+        if debug:
+            num_actions = []
+            for actions in train_data:
+                actions = actions[utils.AE.ACTIONS]
+                num_actions.append(len(actions))
+            print("num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
+
+        for iteration in range(0, self.config['num_epochs']):
+            # Partition into batches
+            batch_size = self.config['batch_size']
+
+            lst = list(zip(actions_by_graphs, graph_sizes))
+            random.shuffle(lst)
+            batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
+                       range((len(lst) + batch_size - 1) // batch_size)]
+
+            # Run epoch
+            for batch in batches:
+                start_time = time.time()
+                batch_actions_by_graphs, batch_graph_sizes = zip(*batch)
+
+                batch_actions_by_graphs = list(batch_actions_by_graphs)
+                batch_graph_sizes = list(batch_graph_sizes)
+
+                # Build feed dict
+                # 1. Graph info
+                feed_dict = self._graphs_to_batch_feed_dict(batch_actions_by_graphs, batch_graph_sizes, self.config['num_training_unroll'])
+
+                # 2. Initial node embeddings
+                num_nodes_all_graphs = sum(graph_sizes)
+                feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['hidden_size']))
+
+                # Run batch
+                result = self.__run_batch(feed_dict, iteration)
+                end_time = time.time()
+
+                # Log
+                instances_per_sec = len(actions_by_graphs) / (end_time - start_time)
+                print('iteration: %i, instances/sec: %.2f, result: %s' %(iteration, instances_per_sec, str(result)))
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_file')
+    parser.add_argument('--config_additional_params')
+    args = parser.parse_args()
+
+    # Build Config
+    with open(os.path.join(SCRIPT_DIR, args.config_file)) as f:
+        config = json.load(f)
+    if args.config_additional_params is not None:
+        config.update(json.loads(args.config_additional_params))
+    print('Training starting with following parameters:\n%s' % json.dumps(config))
+
+    # Load data
+    with open(SCRIPT_DIR + '/' + config['train_file'], 'r') as f:
+        train_data = json.load(f, object_hook=utils.json_keys_to_int)
+
+    # Create objects
+    state = DeepGMGState(config)
+    trainer = DeepGMGTrainer(config, state)
+
+    # Train
+    trainer.train(train_data)
+
+if __name__ == '__main__':
+    main()

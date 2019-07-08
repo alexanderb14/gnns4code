@@ -89,7 +89,7 @@ def train_generate_and_validate_default_graphs(training_graphs, config, num_grap
     # Train
     state = DeepGMGState(config)
     trainer = DeepGMGTrainer(config, state)
-    trainer.train(actions_by_graphs, graph_sizes)
+    trainer.train_standalone(actions_by_graphs, graph_sizes)
 
     # Generate and validate
     generator = DeepGMGGenerator(config, state)
@@ -139,7 +139,7 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
     # Train
     state = DeepGMGState(config)
     trainer = DeepGMGTrainer(config, state)
-    trainer.train(actions_by_graphs, num_nodes)
+    trainer.train_standalone(actions_by_graphs, num_nodes)
 
     # Generate and validate
     generator = DeepGMGGenerator(config, state)
@@ -168,7 +168,7 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
 
 # Tests
 @pytest.mark.acceptance
-def test_train_and_gen_one_defaultgraph_small_1():
+def test_train_and_gen_defaultgraph_small_1():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -197,7 +197,7 @@ def test_train_and_gen_one_defaultgraph_small_1():
 
 
 @pytest.mark.acceptance
-def test_train_and_gen_one_defaultgraph_small_2():
+def test_train_and_gen_defaultgraph_small_2():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -226,7 +226,7 @@ def test_train_and_gen_one_defaultgraph_small_2():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_1():
+def test_train_and_gen_defaultgraph_medium_1():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -258,7 +258,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_1():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_2():
+def test_train_and_gen_defaultgraph_medium_2():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -290,7 +290,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_2():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_3():
+def test_train_and_gen_defaultgraph_medium_3():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -321,7 +321,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_3():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_4():
+def test_train_and_gen_defaultgraph_medium_4():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -352,8 +352,41 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_4():
     train_generate_and_validate_default_graphs([training_graph], config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
 
+@pytest.mark.performance
+def test_train_and_gen_many_defaultgraphs_medium():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'num_timesteps': 2,
+        'hidden_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 46,
+        "run_id": "defaultgraph_medium_4",
+
+        "num_node_types": 4,
+        "num_edge_types": 4,
+
+        "num_epochs": 1000,
+        "gen_num_node_max": 12
+    })
+
+    nodes = [2, 3, 1, 2, 1, 3, 2, 3, 2]
+    edges = [(0, 0, 1), (1, 1, 2), (2, 1, 3), (3, 1, 4), \
+             (4, 1, 5), (5, 2, 6), (6, 2, 7), (7, 3, 8), \
+             (5, 1, 1)]
+    training_graph = {utils.T.NODES: nodes, utils.T.EDGES: edges}
+    training_graphs = [training_graph] * 10
+
+    train_generate_and_validate_default_graphs(training_graphs, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+
+
 @pytest.mark.acceptance
-def test_train_and_gen_two_defaultgraphs_small():
+def test_train_and_gen_many_defaultgraphs_small():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -374,11 +407,10 @@ def test_train_and_gen_two_defaultgraphs_small():
         "gen_num_node_max": 5
     })
 
-    training_graph_1 = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
-    training_graph_2 = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
+    training_graph = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
+    training_graphs = [training_graph] * 250
 
-    train_generate_and_validate_default_graphs([training_graph_1, training_graph_2],
-                                               config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+    train_generate_and_validate_default_graphs(training_graphs, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
 
 @pytest.mark.acceptance

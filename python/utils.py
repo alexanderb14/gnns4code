@@ -273,6 +273,12 @@ def pretty_print_dict(d: dict) -> None:
     print(json.dumps(d, indent=2))
 
 
+def json_keys_to_int(x):
+    if isinstance(x, dict):
+            return { int(k):v for k,v in x.items() }
+    return x
+
+
 # Classes
 #########
 class MLP(object):
