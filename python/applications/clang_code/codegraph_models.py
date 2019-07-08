@@ -12,26 +12,26 @@ LITERAL_NAMES = ['IntegerLiteral', 'FloatLiteral', 'CharacterLiteral']
 # Helper functions
 def get_id_for_edge_type(name: str) -> int:
     if name == 'AST':
-        return 1
+        return 2
     elif name == 'LIVE':
         return 3
 
 def get_id_for_reverse_edge_type(name: str) -> int:
     if name == 'AST':
-        return 2
+        return 0
     elif name == 'LIVE':
-        return 4
+        return 1
 
 def is_forward_edge_type(edge_type_id) -> bool:
-    if edge_type_id % 2 == 1:
+    if edge_type_id in [2, 3]:
         return True
     else:
         return False
 
 def get_edge_name_by_edge_type(edge_type_id) -> str:
-    if edge_type_id == 1 or edge_type_id == 2:
+    if edge_type_id in [0, 2]:
         return 'AST'
-    elif edge_type_id == 3 or edge_type_id == 4:
+    elif edge_type_id in [1, 3]:
         return 'LIVE'
 
 def sort_edges_conforming_c_syntax(edges_in):

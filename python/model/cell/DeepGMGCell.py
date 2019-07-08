@@ -22,7 +22,7 @@ class DeepGMGCellState(object):
             with tf.variable_scope('out_layer_gated_sum_init_node_weights'):
                 self.weights['mlp_f_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m_init_node')
                 self.weights['mlp_g_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m_init_node')
-            self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1, h_size, [], 'linear', 'f_init')
+            self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1, h_size, [h_size * m_size + num_node_types + 1], 'sigmoid', 'f_init')
 
         # if with_attention:
         #     with tf.variable_scope('attention_model_weights'):
@@ -63,7 +63,7 @@ class DeepGMGCell(object):
     Implementation of the model described in
     Li, Yujia, et al. "Learning deep generative models of graphs." arXiv preprint arXiv:1803.03324 (2018).
     """
-    def __init__(self, config, enable_training, state, cell_id):
+    def __init__(self, config, enable_training, state, cell_id=0):
         self.config = config
         self.enable_training = enable_training
         self.state = state
@@ -149,6 +149,7 @@ class DeepGMGCell(object):
 
                 idx_to_update = mask_action_0 * last_added_node_idxs_onehot                                     # [b*v]
                 idx_not_to_update = tf.abs(1 - idx_to_update)                                                   # [b*v]
+
                 idx_to_update = tf.expand_dims(idx_to_update, 1)                                                # [b*v, 1]
                 idx_not_to_update = tf.expand_dims(idx_not_to_update, 1)                                        # [b*v, 1]
 
@@ -242,25 +243,35 @@ class DeepGMGCell(object):
                         # Action type: add edge to
                         if action_meta['type'] == 'add_edge_to':
                             # Model
-                            h_v_repeated = tf.gather(h_v, embeddings_to_graph_mappings)                         # [b*v, 2h]
+                            h_v_repeated = tf.gather(h_v, embeddings_to_graph_mappings)                         # [b*v, h]
 
-                            h_u_all = embeddings                                                                # [b*v, h]
-                            h_u_all_h_v = tf.concat([h_u_all, h_v_repeated], 1)                                 # [b*v, 3h]
+                            h_u_all = embeddings
+                            h_u_all_h_v = tf.concat([h_u_all, h_v_repeated], 1)                                 # [b*v, 2h]
 
                             s_u = self.state.weights[function_name](h_u_all_h_v)                                # [b*v, e]
 
                             # Softmax
-                            es = tf.math.exp(s_u)                                                               # [b*v, e]
-                            es_sums = tf.unsorted_segment_sum(data=es,
+                            # a) Normalize probabilities
+                            s_u_max = tf.unsorted_segment_max(data=s_u,
+                                                              segment_ids=embeddings_to_graph_mappings_existent,
+                                                              num_segments=num_graphs)                          # [b, e]
+                            s_u_max = tf.reduce_max(s_u_max, axis=1)                                            # [b]
+                            s_u_max = tf.broadcast_to(s_u_max, tf.shape(s_u))                                   # [b*v, e]
+                            s_u_normalized = s_u - s_u_max                                                      # [b*v, e]
+
+                            # - Build exponents
+                            es = tf.math.exp(s_u_normalized)                                                    # [b*v, e]
+
+                            # - Build sums
+                            es_sum = tf.unsorted_segment_sum(data=es,
                                                               segment_ids=embeddings_to_graph_mappings_existent,
                                                               num_segments=num_graphs)                          # [b, e]
 
-                            es_sums_2 = tf.reduce_sum(es_sums, axis=1)                                          # [b]
-                            es_sums_2 = tf.gather(es_sums_2, embeddings_to_graph_mappings)                      # [b*v]
-                            es_sums_2 = tf.expand_dims(es_sums_2, 1)                                            # [b*v, 1]
-                            es_sums_2 = tf.broadcast_to(es_sums_2, tf.shape(es))                                # [b*v, e]
+                            es_sum = tf.reduce_sum(es_sum, axis=1)                                              # [b]
+                            es_sum = tf.broadcast_to(es_sum, tf.shape(es))                                      # [b*v, e]
 
-                            f_nodes = es / es_sums_2                                                            # [b*v, e]
+                            # - Build softmax
+                            f_nodes = es / es_sum                                                               # [b*v, e]
 
                             self.ops[function_name] = f_nodes
 
@@ -277,8 +288,9 @@ class DeepGMGCell(object):
                                 loss_nodes = tf.unsorted_segment_sum(data=sqared_loss,
                                                                      segment_ids=embeddings_to_graph_mappings_existent,
                                                                      num_segments=num_graphs)                   # [b, e]
-                                loss_nodes = loss_nodes * loss_scaling_factor                                   # [b, e]
+
                                 loss_nodes = tf.reduce_sum(loss_nodes, axis=1, keep_dims=True)                  # [b, 1]
+                                loss_nodes = loss_nodes * loss_scaling_factor                                   # [b, e]
 
                                 self.ops['loss_nodes'] = loss_nodes
                                 losses.append(loss_nodes)
@@ -290,8 +302,9 @@ class DeepGMGCell(object):
 
                     loss = tf.concat(losses, 1)                                                                 # [b, num_action_metas-1]
                     loss = loss * action_mask                                                                   # [b, num_action_metas-1]
-                    loss = tf.reduce_sum(loss, 0)                                                               # [b]
+                    loss = tf.reduce_sum(loss, axis=0)                                                          # [num_action_metas-1]
 
+                    self.ops['loss_by_actions'] = loss
                     self.ops['loss'] = tf.reduce_sum(loss)                                                      # Scalar
 
         return embeddings

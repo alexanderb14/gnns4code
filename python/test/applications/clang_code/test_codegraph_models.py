@@ -8,13 +8,12 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/../..')
 
 import applications.clang_code.codegraph_models as codegraph_models
-
+import applications.utils as utils
 
 # Static data
 TEST_DATA_DIR = SCRIPT_DIR + '/test_data'
 REAL_DATA_DIR = SCRIPT_DIR + '/real_data'
 OPENCL_KERNEL_DIR = '/devel/clgen/kernels_c'
-CLANG_MINER = '/devel/git/alexanderb14/ML-CodeGraph/c/clang_miner/build/clang_miner'
 
 
 # Helper functions
@@ -29,14 +28,14 @@ def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
 
     # Clang tool C -> Graph
     if is_open_cl_code:
-        ret = subprocess.call([CLANG_MINER,
+        ret = subprocess.call([utils.CLANG_MINER_EXECUTABLE,
                                '-extra-arg-before=-xcl',
                                '-extra-arg=-I/Users/alex/clgen-0.4.0/clgen/data/libclc',
                                '-extra-arg=-include/Users/alex/clgen-0.4.0/clgen/data/include/opencl-shim.h',
                                os.path.join(datadir, c_file),
                                '-o', graph_out_file])
     else:
-        ret = subprocess.call([CLANG_MINER,
+        ret = subprocess.call([utils.CLANG_MINER_EXECUTABLE,
                                os.path.join(datadir, c_file),
                                '-o', graph_out_file])
     assert ret == 0

@@ -23,7 +23,9 @@ class GGNNModelLayerState(object):
         cell_type = self.config['graph_rnn_cell'].lower()
         activation_fun = tf.nn.tanh
         if cell_type == 'gru':
-            cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun)
+            cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun,
+                                          kernel_initializer=tf.glorot_uniform_initializer,
+                                          bias_initializer=tf.glorot_uniform_initializer)
         elif cell_type == 'cudnncompatiblegrucell':
             import tensorflow.contrib.cudnn_rnn as cudnn_rnn
             cell = cudnn_rnn.CudnnCompatibleGRUCell(h_dim)

@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 import utils
 import applications.clang_code.codegraph_models as clang_codegraph_models
@@ -38,6 +39,7 @@ class DeepGMGState(object):
         tf_config = tf.ConfigProto()
         tf_config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=self.graph, config=tf_config)
+        # self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
 
         with self.graph.as_default():
             self.ggnn_layer_state = GGNNModelLayerState(config)
@@ -81,8 +83,6 @@ class DeepGMGModel(object):
                 num_nodes = graph_sizes[graph_idx]
 
                 num_nodes_current = action[utils.AE.LAST_ADDED_NODE_ID]
-                if num_nodes_current == 0:
-                    num_nodes_current = 1
 
                 if cell_idx not in batch_data_by_cell:
                     batch_data_by_cell[cell_idx] = {
@@ -147,6 +147,8 @@ class DeepGMGModel(object):
                 graph_mappings_all = np.full(num_nodes, graph_idx)
                 batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
 
+                if num_nodes_current == 0:
+                   num_nodes_current = 1
                 graph_mappings = np.full(num_nodes_current, graph_idx)
                 filler = np.full(num_nodes - num_nodes_current, -1)
                 batch_data['embeddings_to_graph_mappings_existent'].append(np.concatenate((graph_mappings, filler)))
@@ -482,7 +484,7 @@ class DeepGMGTrainer(DeepGMGModel):
             os.makedirs(out_dir)
 
         if 'run_id' in self.config:
-            self.run_id = self.config['run_id']
+            self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
         else:
             self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
 
@@ -524,12 +526,24 @@ class DeepGMGTrainer(DeepGMGModel):
 
         # Accumulate losses
         losses = []
+        losses_an = []
+        losses_ae = []
+        losses_nodes = []
+
         for cell in self.cells:
             losses.append(cell.ops['loss'])
 
-        self.ops['losses'] = losses
+            l = cell.ops['loss_by_actions']
+            losses_an.append(l[0])
+            losses_ae.append(l[1])
+            losses_nodes.append(l[2])
 
-        self.ops['loss_unrolled'] = tf.reduce_sum(losses, axis=0)
+        self.ops['losses'] = losses
+        self.ops['loss'] = tf.reduce_sum(losses)
+        self.ops['loss_an'] = tf.reduce_sum(losses_an)
+        self.ops['loss_ae'] = tf.reduce_sum(losses_ae)
+        self.ops['loss_nodes'] = tf.reduce_sum(losses_nodes)
+
 
     def __make_train_step(self) -> None:
         """
@@ -538,7 +552,7 @@ class DeepGMGTrainer(DeepGMGModel):
         trainable_vars = self.state.sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
 
         optimizer = tf.train.AdamOptimizer(self.config['learning_rate'])
-        grads_and_vars = optimizer.compute_gradients(self.ops['loss_unrolled'], var_list=trainable_vars)
+        grads_and_vars = optimizer.compute_gradients(self.ops['loss'], var_list=trainable_vars)
 
         # Clipping
         clipped_grads = []
@@ -572,18 +586,23 @@ class DeepGMGTrainer(DeepGMGModel):
         iteration = 0
         while True:
             # Run and fetch
-            fetch_list = [self.ops['loss_unrolled'], self.ops['losses'], self.ops['train_step']]
+            fetch_list = [self.ops['loss'], self.ops['losses'], self.ops['train_step'],
+                          self.ops['loss_an'], self.ops['loss_ae'], self.ops['loss_nodes']]
             if self.with_gradient_monitoring:
+                offset = len(fetch_list)
                 fetch_list.extend([self.ops['gradients'], self.ops['clipped_gradients']])
 
             result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
 
             summary = tf.Summary()
             summary.value.add(tag='loss', simple_value=result[0])
+            summary.value.add(tag='loss_an', simple_value=result[3])
+            summary.value.add(tag='loss_ae', simple_value=result[4])
+            summary.value.add(tag='loss_nodes', simple_value=result[5])
             self.train_writer.add_summary(summary, iteration)
 
             if self.with_gradient_monitoring:
-                (gradients, clipped_gradients) = (result[3], result[4])
+                (gradients, clipped_gradients) = (result[offset + 0], result[offset + 1])
 
                 self.train_writer.add_summary(gradients, iteration)
                 self.train_writer.add_summary(clipped_gradients, iteration)
