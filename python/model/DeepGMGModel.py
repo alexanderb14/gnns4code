@@ -85,10 +85,6 @@ class DeepGMGModel(object):
                 else:
                     action = None
 
-                num_nodes = graph_sizes[graph_idx]
-
-                num_nodes_current = action[utils.AE.LAST_ADDED_NODE_ID]
-
                 if cell_idx not in batch_data_by_cell:
                     batch_data_by_cell[cell_idx] = {
                         # Graph model
@@ -105,20 +101,25 @@ class DeepGMGModel(object):
                     for action_idx in range(0, len(self.config['actions'])):
                         batch_data_by_cell[cell_idx]['a%i_labels' % action_idx] = []
 
+                num_nodes = graph_sizes[graph_idx]
+                num_nodes_current = action[utils.AE.LAST_ADDED_NODE_ID] if action else 0
+
                 batch_data = batch_data_by_cell[cell_idx]
 
                 # Generative model
-                if utils.AE.ACTION in action:
+                if action and utils.AE.ACTION in action:
                     batch_data['actions'].append(action[utils.AE.ACTION] - utils.ACTION_OFFSET)
                 else:
                     batch_data['actions'].append(-1)
 
-                if utils.AE.LAST_ADDED_NODE_ID in action:
+                if action and utils.AE.LAST_ADDED_NODE_ID in action:
                     batch_data['last_added_node_idxs'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
+                    last_added_node_idx = sum(graph_sizes[0:graph_idx]) + num_nodes_current
                 else:
-                    batch_data['last_added_node_idxs'].append(0)
+                    last_added_node_idx += 1
+                    batch_data['last_added_node_idxs'].append(last_added_node_idx)
 
-                if utils.AE.LAST_ADDED_NODE_TYPE in action:
+                if action and utils.AE.LAST_ADDED_NODE_TYPE in action:
                     batch_data['last_added_node_types'].append(action[utils.AE.LAST_ADDED_NODE_TYPE])
                 else:
                     batch_data['last_added_node_types'].append(0)
@@ -131,7 +132,7 @@ class DeepGMGModel(object):
                     if action_meta['type'] == 'add_edge_to':
                         mat = np.zeros((num_nodes, num_edge_types))
 
-                        if utils.L.LABEL_0 in action and utils.L.LABEL_1 in action:
+                        if action and utils.L.LABEL_0 in action and utils.L.LABEL_1 in action:
                             node = action[utils.L.LABEL_0]
                             edge_type = action[utils.L.LABEL_1]
                             mat[node][edge_type] = 1
@@ -139,21 +140,22 @@ class DeepGMGModel(object):
                         batch_data[label_name].append(mat)
 
                     else:
-                        if utils.L.LABEL_0 in action:
+                        if action and utils.L.LABEL_0 in action:
                             batch_data[label_name].append(action[utils.L.LABEL_0])
                         else:
                             batch_data[label_name].append(0)
 
                 # Graph model
-                adj_lists = action[utils.AE.ADJ_LIST]
+                adj_lists = action[utils.AE.ADJ_LIST] if action else utils.graph_to_adjacency_lists([])[0]
                 for idx, adj_list in adj_lists.items():
                     batch_data['adjacency_lists'][idx].append(adj_list)
 
+                # Embedding to graph mappings
                 graph_mappings_all = np.full(num_nodes, graph_idx)
                 batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
 
-                if num_nodes_current == 0:
-                   num_nodes_current = 1
+                #if num_nodes_current == 0:
+                #   num_nodes_current = 1
                 graph_mappings = np.full(num_nodes_current, graph_idx)
                 filler = np.full(num_nodes - num_nodes_current, -1)
                 batch_data['embeddings_to_graph_mappings_existent'].append(np.concatenate((graph_mappings, filler)))
@@ -173,6 +175,7 @@ class DeepGMGModel(object):
             feed_dict[self.cells[cell_idx].placeholders['actions']] = cell_data['actions']
             feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs']] \
                 = cell_data['last_added_node_idxs']
+            print(cell_data['last_added_node_idxs'])
             feed_dict[self.cells[cell_idx].placeholders['last_added_node_types']] \
                 = cell_data['last_added_node_types']
 
@@ -672,7 +675,7 @@ class DeepGMGTrainer(DeepGMGModel):
                 feed_dict = self._graphs_to_batch_feed_dict(batch_actions_by_graphs, batch_graph_sizes, self.config['num_training_unroll'])
 
                 # 2. Initial node embeddings
-                num_nodes_all_graphs = sum(graph_sizes)
+                num_nodes_all_graphs = sum(batch_graph_sizes)
                 feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['hidden_size']))
 
                 # Run batch
