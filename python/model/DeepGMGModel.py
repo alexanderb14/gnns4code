@@ -85,6 +85,10 @@ class DeepGMGModel(object):
                 else:
                     action = None
 
+                num_nodes = graph_sizes[graph_idx]
+
+                num_nodes_current = action[utils.AE.LAST_ADDED_NODE_ID] if action else 0
+
                 if cell_idx not in batch_data_by_cell:
                     batch_data_by_cell[cell_idx] = {
                         # Graph model
@@ -101,9 +105,6 @@ class DeepGMGModel(object):
                     for action_idx in range(0, len(self.config['actions'])):
                         batch_data_by_cell[cell_idx]['a%i_labels' % action_idx] = []
 
-                num_nodes = graph_sizes[graph_idx]
-                num_nodes_current = action[utils.AE.LAST_ADDED_NODE_ID] if action else 0
-
                 batch_data = batch_data_by_cell[cell_idx]
 
                 # Generative model
@@ -114,10 +115,9 @@ class DeepGMGModel(object):
 
                 if action and utils.AE.LAST_ADDED_NODE_ID in action:
                     batch_data['last_added_node_idxs'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
-                    last_added_node_idx = sum(graph_sizes[0:graph_idx]) + num_nodes_current
+#                    print(sum(graph_sizes[0:graph_idx]), num_nodes_current, sum(graph_sizes[0:graph_idx]) + num_nodes_current)
                 else:
-                    last_added_node_idx += 1
-                    batch_data['last_added_node_idxs'].append(last_added_node_idx)
+                    batch_data['last_added_node_idxs'].append(0)
 
                 if action and utils.AE.LAST_ADDED_NODE_TYPE in action:
                     batch_data['last_added_node_types'].append(action[utils.AE.LAST_ADDED_NODE_TYPE])
@@ -150,12 +150,11 @@ class DeepGMGModel(object):
                 for idx, adj_list in adj_lists.items():
                     batch_data['adjacency_lists'][idx].append(adj_list)
 
-                # Embedding to graph mappings
                 graph_mappings_all = np.full(num_nodes, graph_idx)
                 batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
 
-                #if num_nodes_current == 0:
-                #   num_nodes_current = 1
+                if num_nodes_current == 0:
+                   num_nodes_current = 1
                 graph_mappings = np.full(num_nodes_current, graph_idx)
                 filler = np.full(num_nodes - num_nodes_current, -1)
                 batch_data['embeddings_to_graph_mappings_existent'].append(np.concatenate((graph_mappings, filler)))
@@ -171,11 +170,12 @@ class DeepGMGModel(object):
                 else:
                     feed_dict[adj_list] = feed_dict[adj_list][0]
 
+#            print(cell_data['last_added_node_idxs'])
+
             # Generative model
             feed_dict[self.cells[cell_idx].placeholders['actions']] = cell_data['actions']
             feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs']] \
                 = cell_data['last_added_node_idxs']
-            print(cell_data['last_added_node_idxs'])
             feed_dict[self.cells[cell_idx].placeholders['last_added_node_types']] \
                 = cell_data['last_added_node_types']
 
@@ -189,6 +189,8 @@ class DeepGMGModel(object):
             feed_dict[self.cells[cell_idx].placeholders['embeddings_to_graph_mappings_existent']] \
                 = np.concatenate(cell_data['embeddings_to_graph_mappings_existent'], axis=0)
 
+#            print(len(np.concatenate(cell_data['embeddings_to_graph_mappings'], axis=0)))
+#            print(np.concatenate(cell_data['embeddings_to_graph_mappings'], axis=0))
         # # Print
         # print('--------------------------------------------')
         # for k, v in batch_data_by_cell[0].items():
@@ -628,7 +630,7 @@ class DeepGMGTrainer(DeepGMGModel):
             if iteration >= self.config['num_epochs']:
                 break
 
-    def train(self, train_data, debug=False) -> None:
+    def train(self, train_data) -> None:
         actions_by_graphs = []
 
         # Extract actions
@@ -643,22 +645,14 @@ class DeepGMGTrainer(DeepGMGModel):
             actions = actions[utils.AE.ACTIONS]
             action_last = actions[len(actions) - 1]
 
-            graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID])
-
-        # Extract num actions
-        if debug:
-            num_actions = []
-            for actions in train_data:
-                actions = actions[utils.AE.ACTIONS]
-                num_actions.append(len(actions))
-            print("num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
+            graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID] + 1)
 
         for iteration in range(0, self.config['num_epochs']):
             # Partition into batches
             batch_size = self.config['batch_size']
 
             lst = list(zip(actions_by_graphs, graph_sizes))
-            random.shuffle(lst)
+#            random.shuffle(lst)
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
 
@@ -702,6 +696,7 @@ def main():
     # Load data
     with open(SCRIPT_DIR + '/' + config['train_file'], 'r') as f:
         train_data = json.load(f, object_hook=utils.json_keys_to_int)
+    utils.get_data_stats(train_data)
 
     # Create objects
     state = DeepGMGState(config)

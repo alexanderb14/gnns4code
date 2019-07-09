@@ -91,7 +91,7 @@ class DeepGMGCell(object):
         self.placeholders['embeddings_to_graph_mappings'] \
             = tf.placeholder(tf.int32, [None], name='embeddings_to_graph_mappings')
         embeddings_to_graph_mappings = self.placeholders['embeddings_to_graph_mappings']
-        num_graphs = tf.math.reduce_max(embeddings_to_graph_mappings) + 1                                   # Scalar
+        num_graphs = tf.reduce_max(embeddings_to_graph_mappings) + 1                                   # Scalar
 
         # Embeddings to graph mappings. Only embeddings that really exists are mapped here. All others are -1.
         self.placeholders['embeddings_to_graph_mappings_existent'] \
@@ -143,7 +143,12 @@ class DeepGMGCell(object):
                 action_0 = actions_transposed[0]                                                                # [b]
                 mask_action_0 = tf.gather(action_0, embeddings_to_graph_mappings)                               # [b*v]
 
-                last_added_node_idxs_onehot = tf.sparse_to_dense(sparse_indices=embeddings_last_added_node_idxs,
+                # Remove zeros
+                zero_vector = tf.zeros(shape=tf.shape(embeddings_last_added_node_idxs), dtype=tf.int32)
+                bool_mask = tf.not_equal(embeddings_last_added_node_idxs, zero_vector)
+                embeddings_last_added_node_idxs_without_zeros = tf.boolean_mask(embeddings_last_added_node_idxs, bool_mask)
+
+                last_added_node_idxs_onehot = tf.sparse_to_dense(sparse_indices=embeddings_last_added_node_idxs_without_zeros,
                                                                  output_shape=[tf.shape(mask_action_0)[0]],
                                                                  sparse_values=1)                               # [b*v]
 

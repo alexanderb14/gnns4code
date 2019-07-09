@@ -279,6 +279,27 @@ def json_keys_to_int(x):
     return x
 
 
+def get_data_stats(data):
+    num_actions = []
+    node_types = []
+
+    for actions in data:
+        actions = actions[AE.ACTIONS]
+        num_actions.append(len(actions))
+
+        for _, action in actions.items():
+            action_type = action[AE.ACTION]
+            if action_type == A.ADD_NODE:
+                node_type = action[L.LABEL_0]
+
+                node_types.append(node_type)
+
+    print("Dataset Statistics")
+    print("- num_graphs: %i" % (len(data)))
+    print("- num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
+    print("- num_node_types: %i" % (max(node_types)))
+
+
 # Classes
 #########
 class MLP(object):

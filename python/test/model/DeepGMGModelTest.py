@@ -414,6 +414,36 @@ def test_train_and_gen_many_defaultgraphs_small():
 
 
 @pytest.mark.acceptance
+def test_train_and_gen_many_defaultgraphs_different_size_small():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'hidden_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 13,
+        "run_id": "two_defaultgraphs_small",
+
+        "num_node_types": 3,
+        "num_edge_types": 2,
+
+        "num_epochs": 500,
+        "gen_num_node_max": 5
+    })
+
+    training_graph1 = {utils.T.NODES: [1, 2], utils.T.EDGES: [(1, 1, 0)]}
+    training_graph2 = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
+
+    training_graphs = [training_graph1, training_graph2]
+
+    train_generate_and_validate_default_graphs(training_graphs, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+
+
+@pytest.mark.acceptance
 def test_train_and_gen_clang_codegraph_small():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
