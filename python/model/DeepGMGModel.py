@@ -3,19 +3,20 @@ import json
 import os
 import random
 import shutil
+import sys
 import time
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(SCRIPT_DIR + '/..')
+
 import utils
 import applications.clang_code.codegraph_models as clang_codegraph_models
 from model.cell.DeepGMGCell import DeepGMGCell, DeepGMGCellState
 from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
-
-
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def apply_action_to_graph(graph:dict, action:dict) -> None:
@@ -652,7 +653,7 @@ class DeepGMGTrainer(DeepGMGModel):
             batch_size = self.config['batch_size']
 
             lst = list(zip(actions_by_graphs, graph_sizes))
-#            random.shuffle(lst)
+            random.shuffle(lst)
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
 
