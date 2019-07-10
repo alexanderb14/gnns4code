@@ -593,19 +593,6 @@ class DeepGMGTrainer(DeepGMGModel):
 
         result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
 
-        summary = tf.Summary()
-        summary.value.add(tag='loss', simple_value=result[0])
-        summary.value.add(tag='loss_an', simple_value=result[3])
-        summary.value.add(tag='loss_ae', simple_value=result[4])
-        summary.value.add(tag='loss_nodes', simple_value=result[5])
-        self.train_writer.add_summary(summary, iteration)
-
-        if self.with_gradient_monitoring:
-            (gradients, clipped_gradients) = (result[offset + 0], result[offset + 1])
-
-            self.train_writer.add_summary(gradients, iteration)
-            self.train_writer.add_summary(clipped_gradients, iteration)
-
         return result
 
     def train_standalone(self, actions_by_graphs, graph_sizes):
@@ -620,6 +607,7 @@ class DeepGMGTrainer(DeepGMGModel):
 
         iteration = 0
         while True:
+            # Execution
             start_time = time.time()
             result = self.__run_batch(feed_dict, iteration)
             end_time = time.time()
@@ -627,6 +615,20 @@ class DeepGMGTrainer(DeepGMGModel):
             instances_per_sec = len(actions_by_graphs) / (end_time - start_time)
             print('iteration: %i, instances/sec: %.2f, result: %s' %(iteration, instances_per_sec, str(result)))
             iteration += 1
+
+            # Logging
+            summary = tf.Summary()
+            summary.value.add(tag='loss', simple_value=result[0])
+            summary.value.add(tag='loss_an', simple_value=result[3])
+            summary.value.add(tag='loss_ae', simple_value=result[4])
+            summary.value.add(tag='loss_nodes', simple_value=result[5])
+            self.train_writer.add_summary(summary, iteration)
+
+            if self.with_gradient_monitoring:
+                (gradients, clipped_gradients) = (result[offset + 0], result[offset + 1])
+
+                self.train_writer.add_summary(gradients, iteration)
+                self.train_writer.add_summary(clipped_gradients, iteration)
 
             if iteration >= self.config['num_epochs']:
                 break
@@ -648,7 +650,7 @@ class DeepGMGTrainer(DeepGMGModel):
 
             graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID] + 1)
 
-        for iteration in range(0, self.config['num_epochs']):
+        for epoch in range(0, self.config['num_epochs']):
             # Partition into batches
             batch_size = self.config['batch_size']
 
@@ -657,7 +659,10 @@ class DeepGMGTrainer(DeepGMGModel):
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
 
-            # Run epoch
+            # Run batches
+            epoch_losses = []
+            epoch_instances_per_secs = []
+
             for batch in batches:
                 start_time = time.time()
                 batch_actions_by_graphs, batch_graph_sizes = zip(*batch)
@@ -674,12 +679,26 @@ class DeepGMGTrainer(DeepGMGModel):
                 feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['hidden_size']))
 
                 # Run batch
-                result = self.__run_batch(feed_dict, iteration)
+                result = self.__run_batch(feed_dict, epoch)
                 end_time = time.time()
 
                 # Log
                 instances_per_sec = len(actions_by_graphs) / (end_time - start_time)
-                print('iteration: %i, instances/sec: %.2f, result: %s' %(iteration, instances_per_sec, str(result)))
+                epoch_instances_per_secs.append(instances_per_sec)
+
+                epoch_losses.append(result[0])
+
+                # print('epoch: %i, instances/sec: %.2f, result: %s' %(epoch, instances_per_sec, str(result)))
+
+            epoch_loss = np.mean(epoch_losses)
+            epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
+
+            print('epoch: %i, instances/sec: %.2f, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_loss))
+
+            # Logging
+            summary = tf.Summary()
+            summary.value.add(tag='loss', simple_value=epoch_loss)
+            self.train_writer.add_summary(summary, epoch)
 
 def main():
     parser = argparse.ArgumentParser()

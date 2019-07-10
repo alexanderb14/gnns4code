@@ -282,6 +282,7 @@ def json_keys_to_int(x):
 def get_data_stats(data):
     num_actions = []
     node_types = []
+    edge_types = []
 
     for actions in data:
         actions = actions[AE.ACTIONS]
@@ -291,14 +292,18 @@ def get_data_stats(data):
             action_type = action[AE.ACTION]
             if action_type == A.ADD_NODE:
                 node_type = action[L.LABEL_0]
-
                 node_types.append(node_type)
+
+            elif action_type == A.ADD_EDGE_TO:
+                edge_type = action[L.LABEL_1]
+                edge_types.append(edge_type)
+
 
     print("Dataset Statistics")
     print("- num_graphs: %i" % (len(data)))
     print("- num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
-    print("- num_node_types: %i" % (max(node_types)))
-
+    print("- node_types (max of it): %i" % (max(node_types)))
+    print("- edge_types (max of it): %i" % (max(edge_types)))
 
 # Classes
 #########
