@@ -92,8 +92,6 @@ class DeepGMGCell(object):
         action_metas = config['actions']
         use_choose_function_module = 'choose_function' in [action_metas[action_metas.index(a_meta)]["type"] for a_meta
                                                            in action_metas]
-        if use_choose_function_module and not 'choose_function_dims' in self.config:
-            raise KeyError("'choose_function' module is used, but 'choose_function_dims' is not in defined.")
         self.use_choose_function_module = use_choose_function_module
 
     def compute_predictions(self, embeddings: tf.Tensor) -> tf.Tensor:
@@ -109,8 +107,6 @@ class DeepGMGCell(object):
 
         action_metas = self.config['actions']
         if self.use_choose_function_module:
-            if not 'choose_function_dims' in self.config:
-                raise KeyError("'choose_function' module is used, but 'choose_function_dims' is not in defined.")
             choose_function_dims = self.config['choose_function_dims']
 
         # Common Placeholders

@@ -209,11 +209,6 @@ class DeepGMGModel(object):
 
                 label_index += 1
 
-
-            #feed_dict[self.cells[cell_idx].placeholders['a1_labels']] = cell_data['a1_labels']
-            #feed_dict[self.cells[cell_idx].placeholders['a2_labels']] = cell_data['a2_labels']
-            #feed_dict[self.cells[cell_idx].placeholders['a3_labels']] = np.concatenate(cell_data['a3_labels'], axis=0)
-
             feed_dict[self.cells[cell_idx].placeholders['embeddings_to_graph_mappings']] \
                 = np.concatenate(cell_data['embeddings_to_graph_mappings'], axis=0)
             feed_dict[self.cells[cell_idx].placeholders['embeddings_to_graph_mappings_existent']] \

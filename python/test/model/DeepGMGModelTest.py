@@ -229,7 +229,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium():
 
         'hidden_size': 16,
 
-        "num_epochs": 500,
+        "num_epochs": 1000,
         "gen_num_node_max": 14
     })
 
