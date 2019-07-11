@@ -213,7 +213,6 @@ def test_train_and_gen_one_defaultgraph_small_2():
 
     train_generate_and_validate_default_graphs([training_graph], config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
-
 def test_deepgmg_trainer_and_generator_defaultgraph_medium():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
@@ -230,7 +229,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium():
 
         'hidden_size': 16,
 
-        "num_epochs": 1000,
+        "num_epochs": 500,
         "gen_num_node_max": 14
     })
 

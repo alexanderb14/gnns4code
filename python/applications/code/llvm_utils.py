@@ -1,52 +1,16 @@
 from random import random, randint, shuffle
 import  numpy as np
 import math
-import  os
-import re
 import struct
 from copy import copy
 from codecs import decode
 from applications.code.codegraph_models import *
 
-from model.DeepGMGModel import  DeepGMGModel, DeepGMGState, GGNNModelLayer, DeepGMGCell
+from model.DeepGMGModel import  DeepGMGModel, GGNNModelLayer, DeepGMGCell
 import applications.utils_llvm as app_utils
 import utils as general_utils
 import tensorflow as tf
-
-
-SMALL_NUMBER = 1e-5
-VERY_SMALL_NUMBER = 1e-30
-
-LABEL_OFFSET = 20
-ACTION_OFFSET = 30
-
-# Enums
-#######
-class AE:
-    GRAPH_IDX, STEP_IDX, ACTION, \
-    LAST_ADDED_NODE_ID, LAST_ADDED_NODE_TYPE, \
-    ACTIONS, \
-    GRAPH, NODE_STATES, ADJ_LIST, ACTION_CURRENT_IDX, ACTION_CURRENT, \
-    SKIP_NEXT, \
-    SUBGRAPH_START, \
-    NUM_NODES, \
-    PROBABILITY \
-    = range(0, 15)
-
-# Labels
-class L:
-    LABEL_0, LABEL_1 = range(LABEL_OFFSET, LABEL_OFFSET + 2)
-
-# Actions
-class A:
-    INIT_NODE, ADD_NODE, ADD_EDGE, ADD_EDGE_TO, ADD_FUNCTION, ADD_BASIC_BLOCK, \
-    ADD_INSTRUCTION_NODE, ADD_TYPE_NODE, ADD_CONST_VALUE_NODE, ADD_STRUCT, ADD_GLOBAL, \
-    ADD_BACKWARDS_EDGE, CHOOSE_BR_EDGE, CHOOSE_FUNCTION, CHOOSE_LOCAL_FUNCTION, ADD_OPERAND, \
-    CHOOSE_NUMBER, CHOOSE_STRUCTURAL_NUMBER, CHOOSE_STRUCT, CHOOSE_STATIC = range(ACTION_OFFSET, ACTION_OFFSET + 20)
-
-# Type
-class T:
-    NODES, EDGES = range(30, 32)
+from utils import SMALL_NUMBER, VERY_SMALL_NUMBER, LABEL_OFFSET, ACTION_OFFSET, AE, A, L, T
 
 def get_class_key(class_to_get, class_value):
     class_dict = class_to_get.__dict__
