@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import pickle
 import random
 import shutil
 import sys
@@ -47,9 +48,74 @@ class DeepGMGState(object):
         self.sess = tf.Session(graph=self.graph, config=tf_config)
         # self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
 
+        self.best_epoch_weights = None
+
         with self.graph.as_default():
-            self.ggnn_layer_state = GGNNModelLayerState(config)
-            self.deepgmg_cell_state = DeepGMGCellState(config)
+            self.ggnn_layer_state = GGNNModelLayerState(config, self)
+            self.deepgmg_cell_state = DeepGMGCellState(config, self)
+
+    def __get_weights(self):
+        """
+        Get model weights
+        """
+        weights = {}
+        for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+            weights[variable.name] = self.sess.run(variable)
+
+        return weights
+
+    def __set_weights(self, weights):
+        """
+        Set model weights
+        """
+        variables_to_initialize = []
+        with tf.name_scope("restore"):
+            restore_ops = []
+            used_vars = set()
+            for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+                used_vars.add(variable.name)
+                if variable.name in weights:
+                    restore_ops.append(variable.assign(weights[variable.name]))
+                else:
+                    print('Freshly initializing %s since no saved value was found.' % variable.name)
+                    variables_to_initialize.append(variable)
+            for var_name in weights:
+                if var_name not in used_vars:
+                    print('Saved weights for %s not used by model.' % var_name)
+            self.sess.run(restore_ops)
+
+    def backup_best_weights(self):
+        """
+        Backup current state of the model
+        """
+        print('Backuping up best weights...')
+        self.best_epoch_weights = self.__get_weights()
+
+    def restore_best_weights(self):
+        """
+        Restore best state of the model
+        """
+        if self.best_epoch_weights:
+            self.__set_weights(self.best_epoch_weights)
+
+    def save_weights_to_disk(self, path):
+        """
+        Save model weights to given file
+        """
+        data = self.__get_weights()
+
+        with open(path, 'wb') as out_file:
+            pickle.dump(data, out_file, pickle.HIGHEST_PROTOCOL)
+
+    def restore_weights_from_disk(self, path):
+        """
+        Save model weights to given file
+        """
+        print("Restoring weights from file %s." % path)
+        with open(path, 'rb') as in_file:
+            data = pickle.load(in_file)
+
+        self.__set_weights(data)
 
 
 class DeepGMGModel(object):
@@ -100,7 +166,7 @@ class DeepGMGModel(object):
                         # Generative model
                         'actions': [],
                         'last_added_node_idxs': [],
-                        'last_added_node_idxs_2': [],
+                        'last_added_node_idxs_with_minus_ones': [],
                         'last_added_node_types': []
                     }
 
@@ -117,11 +183,11 @@ class DeepGMGModel(object):
 
                 if action and utils.AE.LAST_ADDED_NODE_ID in action:
                     batch_data['last_added_node_idxs'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
-                    batch_data['last_added_node_idxs_2'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
+                    batch_data['last_added_node_idxs_with_minus_ones'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
 #                    print(sum(graph_sizes[0:graph_idx]), num_nodes_current, sum(graph_sizes[0:graph_idx]) + num_nodes_current)
                 else:
                     batch_data['last_added_node_idxs'].append(0)
-                    batch_data['last_added_node_idxs_2'].append(-1)
+                    batch_data['last_added_node_idxs_with_minus_ones'].append(-1)
 
                 if action and utils.AE.LAST_ADDED_NODE_TYPE in action:
                     batch_data['last_added_node_types'].append(action[utils.AE.LAST_ADDED_NODE_TYPE])
@@ -178,8 +244,8 @@ class DeepGMGModel(object):
             feed_dict[self.cells[cell_idx].placeholders['actions']] = cell_data['actions']
             feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs']] \
                 = cell_data['last_added_node_idxs']
-            feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs_2']] \
-                = cell_data['last_added_node_idxs_2']
+            feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs_with_minus_ones']] \
+                = cell_data['last_added_node_idxs_with_minus_ones']
             feed_dict[self.cells[cell_idx].placeholders['last_added_node_types']] \
                 = cell_data['last_added_node_types']
 
@@ -615,6 +681,9 @@ class DeepGMGTrainer(DeepGMGModel):
 
             graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID] + 1)
 
+        best_epoch_loss = sys.maxsize
+        best_epoch_count = 0
+
         for epoch in range(0, self.config['num_epochs']):
             # Partition into batches
             batch_size = self.config['batch_size']
@@ -653,11 +722,17 @@ class DeepGMGTrainer(DeepGMGModel):
 
                 epoch_losses.append(result[0])
 
-                # print('epoch: %i, instances/sec: %.2f, result: %s' %(epoch, instances_per_sec, str(result)))
-
             epoch_loss = np.mean(epoch_losses)
-            epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
+            if epoch_loss < best_epoch_loss:
+                best_epoch_loss = epoch_loss
 
+                best_epoch_count += 1
+                if 'save_best_model_interval' in self.config and best_epoch_count > self.config['save_best_model_interval']:
+                    self.state.backup_best_weights()
+
+                    best_epoch_count = 0
+
+            epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
             print('epoch: %i, instances/sec: %.2f, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_loss))
 
             # Logging
@@ -665,11 +740,15 @@ class DeepGMGTrainer(DeepGMGModel):
             summary.value.add(tag='loss', simple_value=epoch_loss)
             self.train_writer.add_summary(summary, epoch)
 
+        self.state.restore_best_weights()
+
 
 def main():
     parser = argparse.ArgumentParser()
+
     parser.add_argument('--config_file')
     parser.add_argument('--config_additional_params')
+
     args = parser.parse_args()
 
     # Build Config
@@ -691,6 +770,8 @@ def main():
     # Train
     trainer.train(train_data)
 
+    # Save
+    state.save_weights_to_disk(os.path.join(trainer.model_save_dir, 'model.pickle'))
 
 if __name__ == '__main__':
     main()

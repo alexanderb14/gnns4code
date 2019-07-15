@@ -27,6 +27,7 @@ CONFIG_DEFAULTGRAPH = {
 
     'batch_size': 100,
     "num_epochs": 100,
+
     "out_dir": '/tmp',
 
     'actions': [
@@ -176,6 +177,86 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
 
 
 # Tests
+@pytest.mark.acceptance
+def test_train_save_load_and_gen_defaultgraph():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+    MODEL_PATH = '/tmp/model.pickle'
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'hidden_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 14,
+        "run_id": "train_save_load_and_gen_defaultgraph",
+
+        "num_node_types": 3,
+        "num_edge_types": 5,
+
+        "num_epochs": 500,
+        "gen_num_node_max": 5,
+
+        'save_best_model_interval': 50
+    })
+
+    nodes = [1, 2, 1]
+    edges = [(2, 1, 1), (2, 0, 0)]
+    training_graphs = [{utils.T.NODES: nodes, utils.T.EDGES: edges}]
+
+    # Actionize
+    actions = utils.actionize_default_graphs(training_graphs)
+
+    # Build train data
+    train_datas = []
+    for action in actions:
+        utils.action_sequence_pretty_print(action)
+        train_datas.append({
+            utils.AE.ACTIONS: action
+        })
+
+    # Train
+    state = DeepGMGState(config)
+    trainer = DeepGMGTrainer(config, state)
+    trainer.train(train_datas)
+
+    # Save weights to disk
+    state.save_weights_to_disk(MODEL_PATH)
+
+    # Reset objects
+    state = None
+    trainer = None
+
+    # Create state and generator by loading weights from disk
+    state = DeepGMGState(config)
+    generator = DeepGMGGenerator(config, state)
+    state.restore_weights_from_disk(MODEL_PATH)
+
+    num_graphs_equal = 0
+    for _ in range(NUM_GRAPHS_TO_GENERATE):
+        try:
+            generated_graph = generator.generate()
+
+            ok = False
+            for training_graph in training_graphs:
+                if generated_graph and are_graphs_equal(training_graph, generated_graph):
+                    print('-> TRAIN AND GEN GRAPH EQUAL')
+                    ok = True
+                else:
+                    print('-> TRAIN AND GEN GRAPH DIFFERENT')
+
+            if ok == True:
+                num_graphs_equal += 1
+
+        except:
+            print(sys.exc_info()[0])
+
+    print(NUM_GRAPHS_TO_GENERATE, num_graphs_equal)
+    assert num_graphs_equal > NUM_GRAPHS_TO_BE_EQUAL
+
+
 @pytest.mark.acceptance
 def test_train_and_gen_defaultgraph_small_1():
     # Config
@@ -417,7 +498,7 @@ def test_train_and_gen_many_same_defaultgraphs_small():
     })
 
     training_graph = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
-    training_graphs = [training_graph] * 250
+    training_graphs = [training_graph] * 25
 
     train_generate_and_validate_default_graphs(training_graphs, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
