@@ -1,8 +1,8 @@
 {
     "graph_rnn_cell": "GRU",
 
-    "num_timesteps": 2,
-    "hidden_size": 4,
+    "num_timesteps": 1,
+    "hidden_size": 256,
     "deepgmg_mlp_size": 2,
 
     "num_node_types": 126,
