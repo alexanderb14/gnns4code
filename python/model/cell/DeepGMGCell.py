@@ -98,10 +98,24 @@ class DeepGMGCell(object):
             = tf.placeholder(tf.int32, [None], name='embeddings_to_graph_mappings_existent')
         embeddings_to_graph_mappings_existent = self.placeholders['embeddings_to_graph_mappings_existent']
 
+        # Embeddings to graph mappings. Only embeddings that really exists are mapped here. Without -1's.
+        minus_one_vector = tf.fill(dims=tf.shape(embeddings_to_graph_mappings_existent), value=-1)
+        bool_mask = tf.not_equal(embeddings_to_graph_mappings_existent, minus_one_vector)
+        embeddings_to_graph_mappings_existent_without_minus_ones = tf.boolean_mask(embeddings_to_graph_mappings_existent, bool_mask)
+
         # Last added node indices of graphs
         self.placeholders['embeddings_last_added_node_idxs'] \
             = tf.placeholder(tf.int32, [None], name='embeddings_last_added_node_idxs')
         embeddings_last_added_node_idxs = self.placeholders['embeddings_last_added_node_idxs']
+
+        self.placeholders['embeddings_last_added_node_idxs_2'] \
+            = tf.placeholder(tf.int32, [None], name='embeddings_last_added_node_idxs_2')
+        embeddings_last_added_node_idxs_2 = self.placeholders['embeddings_last_added_node_idxs_2']
+
+        # Last added node indices of graphs without -1's
+        minus_one_vector = tf.fill(dims=tf.shape(embeddings_last_added_node_idxs_2), value=-1)
+        bool_mask = tf.not_equal(embeddings_last_added_node_idxs_2, minus_one_vector)
+        embeddings_last_added_node_idxs_without_minus_ones = tf.boolean_mask(embeddings_last_added_node_idxs_2, bool_mask)
 
         # Actions
         self.placeholders['actions'] = tf.placeholder(tf.int32, [None], name='actions')
@@ -143,12 +157,7 @@ class DeepGMGCell(object):
                 action_0 = actions_transposed[0]                                                                # [b]
                 mask_action_0 = tf.gather(action_0, embeddings_to_graph_mappings)                               # [b*v]
 
-                # Remove zeros
-                zero_vector = tf.zeros(shape=tf.shape(embeddings_last_added_node_idxs), dtype=tf.int32)
-                bool_mask = tf.not_equal(embeddings_last_added_node_idxs, zero_vector)
-                embeddings_last_added_node_idxs_without_zeros = tf.boolean_mask(embeddings_last_added_node_idxs, bool_mask)
-
-                last_added_node_idxs_onehot = tf.sparse_to_dense(sparse_indices=embeddings_last_added_node_idxs_without_zeros,
+                last_added_node_idxs_onehot = tf.sparse_to_dense(sparse_indices=embeddings_last_added_node_idxs_without_minus_ones,
                                                                  output_shape=[tf.shape(mask_action_0)[0]],
                                                                  sparse_values=1)                               # [b*v]
 

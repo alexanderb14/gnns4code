@@ -100,6 +100,7 @@ class DeepGMGModel(object):
                         # Generative model
                         'actions': [],
                         'last_added_node_idxs': [],
+                        'last_added_node_idxs_2': [],
                         'last_added_node_types': []
                     }
 
@@ -116,9 +117,11 @@ class DeepGMGModel(object):
 
                 if action and utils.AE.LAST_ADDED_NODE_ID in action:
                     batch_data['last_added_node_idxs'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
+                    batch_data['last_added_node_idxs_2'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
 #                    print(sum(graph_sizes[0:graph_idx]), num_nodes_current, sum(graph_sizes[0:graph_idx]) + num_nodes_current)
                 else:
                     batch_data['last_added_node_idxs'].append(0)
+                    batch_data['last_added_node_idxs_2'].append(-1)
 
                 if action and utils.AE.LAST_ADDED_NODE_TYPE in action:
                     batch_data['last_added_node_types'].append(action[utils.AE.LAST_ADDED_NODE_TYPE])
@@ -171,12 +174,12 @@ class DeepGMGModel(object):
                 else:
                     feed_dict[adj_list] = feed_dict[adj_list][0]
 
-#            print(cell_data['last_added_node_idxs'])
-
             # Generative model
             feed_dict[self.cells[cell_idx].placeholders['actions']] = cell_data['actions']
             feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs']] \
                 = cell_data['last_added_node_idxs']
+            feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs_2']] \
+                = cell_data['last_added_node_idxs_2']
             feed_dict[self.cells[cell_idx].placeholders['last_added_node_types']] \
                 = cell_data['last_added_node_types']
 
@@ -469,6 +472,7 @@ class DeepGMGGenerator(DeepGMGModel):
 
         return current_code_graph
 
+
 class DeepGMGTrainer(DeepGMGModel):
     """
     Implementation of the training process.
@@ -555,7 +559,6 @@ class DeepGMGTrainer(DeepGMGModel):
         self.ops['loss_ae'] = tf.reduce_sum(losses_ae)
         self.ops['loss_nodes'] = tf.reduce_sum(losses_nodes)
 
-
     def __make_train_step(self) -> None:
         """
         Create tf train step
@@ -595,57 +598,19 @@ class DeepGMGTrainer(DeepGMGModel):
 
         return result
 
-    def train_standalone(self, actions_by_graphs, graph_sizes):
-        # Build feed dict
-        # 1. Graph info
-        feed_dict = self._graphs_to_batch_feed_dict(actions_by_graphs, graph_sizes,
-                                                    self.config['num_training_unroll'])
-
-        # 2. Initial node embeddings
-        num_nodes_all_graphs = sum(graph_sizes)
-        feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['hidden_size']))
-
-        iteration = 0
-        while True:
-            # Execution
-            start_time = time.time()
-            result = self.__run_batch(feed_dict, iteration)
-            end_time = time.time()
-
-            instances_per_sec = len(actions_by_graphs) / (end_time - start_time)
-            print('iteration: %i, instances/sec: %.2f, result: %s' %(iteration, instances_per_sec, str(result)))
-            iteration += 1
-
-            # Logging
-            summary = tf.Summary()
-            summary.value.add(tag='loss', simple_value=result[0])
-            summary.value.add(tag='loss_an', simple_value=result[3])
-            summary.value.add(tag='loss_ae', simple_value=result[4])
-            summary.value.add(tag='loss_nodes', simple_value=result[5])
-            self.train_writer.add_summary(summary, iteration)
-
-            if self.with_gradient_monitoring:
-                (gradients, clipped_gradients) = (result[offset + 0], result[offset + 1])
-
-                self.train_writer.add_summary(gradients, iteration)
-                self.train_writer.add_summary(clipped_gradients, iteration)
-
-            if iteration >= self.config['num_epochs']:
-                break
-
-    def train(self, train_data) -> None:
+    def train(self, train_datas) -> None:
         actions_by_graphs = []
 
         # Extract actions
-        for actions in train_data:
-            actions = actions[utils.AE.ACTIONS]
+        for train_data in train_datas:
+            actions = train_data[utils.AE.ACTIONS]
             utils.enrich_action_sequence_with_adj_list_data(actions)
             actions_by_graphs.append(actions)
 
         # Extract graph sizes
         graph_sizes = []
-        for actions in train_data:
-            actions = actions[utils.AE.ACTIONS]
+        for train_data in train_datas:
+            actions = train_data[utils.AE.ACTIONS]
             action_last = actions[len(actions) - 1]
 
             graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID] + 1)
@@ -700,6 +665,7 @@ class DeepGMGTrainer(DeepGMGModel):
             summary.value.add(tag='loss', simple_value=epoch_loss)
             self.train_writer.add_summary(summary, epoch)
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_file')
@@ -724,6 +690,7 @@ def main():
 
     # Train
     trainer.train(train_data)
+
 
 if __name__ == '__main__':
     main()
