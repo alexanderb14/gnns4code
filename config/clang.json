@@ -1,0 +1,46 @@
+{
+    "graph_rnn_cell": "GRU",
+
+    "num_timesteps": 1,
+    "hidden_size": 256,
+    "deepgmg_mlp_size": 2,
+
+    "num_node_types": 126,
+    "num_edge_types": 8,
+
+    "learning_rate": 0.001,
+    "num_training_unroll": 190,
+    "clamp_gradient_norm": 1.0,
+
+    "batch_size": 64,    
+    "num_epochs": 100,
+    "train_file": "../../data/code_clang_train.json",
+    "out_dir": "/tmp",
+
+    "actions": [
+        {
+            "name": "init_node",
+            "type": "init_node",
+            "input_dimension": 1,
+            "loss_scaling_factor": 1
+        },
+        {
+            "name": "add_node",
+            "type": "add_node",
+            "input_dimension": "num_node_types",
+            "loss_scaling_factor": 1
+        },
+        {
+            "name": "add_edge",
+            "type": "add_edge",
+            "input_dimension": 2,
+            "loss_scaling_factor": 1
+        },
+        {
+            "name": "add_edge_to",
+            "type": "add_edge_to",
+            "input_dimension": "num_edge_types",
+            "loss_scaling_factor": 1
+        }
+    ]
+}

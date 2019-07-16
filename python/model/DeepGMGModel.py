@@ -1,11 +1,17 @@
+import argparse
 import json
 import os
+import pickle
+import random
 import shutil
+import sys
 import time
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.python import debug as tf_debug
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(SCRIPT_DIR + '/..')
 
 import utils
 import applications.clang_code.codegraph_models as clang_codegraph_models
@@ -39,11 +45,75 @@ class DeepGMGState(object):
         tf_config = tf.ConfigProto()
         tf_config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=self.graph, config=tf_config)
-        # self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
+
+        self.best_epoch_weights = None
 
         with self.graph.as_default():
-            self.ggnn_layer_state = GGNNModelLayerState(config)
-            self.deepgmg_cell_state = DeepGMGCellState(config)
+            self.ggnn_layer_state = GGNNModelLayerState(config, self)
+            self.deepgmg_cell_state = DeepGMGCellState(config, self)
+
+    def __get_weights(self):
+        """
+        Get model weights
+        """
+        weights = {}
+        for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+            weights[variable.name] = self.sess.run(variable)
+
+        return weights
+
+    def __set_weights(self, weights):
+        """
+        Set model weights
+        """
+        variables_to_initialize = []
+        with tf.name_scope("restore"):
+            restore_ops = []
+            used_vars = set()
+            for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+                used_vars.add(variable.name)
+                if variable.name in weights:
+                    restore_ops.append(variable.assign(weights[variable.name]))
+                else:
+                    print('Freshly initializing %s since no saved value was found.' % variable.name)
+                    variables_to_initialize.append(variable)
+            for var_name in weights:
+                if var_name not in used_vars:
+                    print('Saved weights for %s not used by model.' % var_name)
+            self.sess.run(restore_ops)
+
+    def backup_best_weights(self):
+        """
+        Backup current state of the model
+        """
+        print('Backuping up best weights...')
+        self.best_epoch_weights = self.__get_weights()
+
+    def restore_best_weights(self):
+        """
+        Restore best state of the model
+        """
+        if self.best_epoch_weights:
+            self.__set_weights(self.best_epoch_weights)
+
+    def save_weights_to_disk(self, path):
+        """
+        Save model weights to given file
+        """
+        data = self.__get_weights()
+
+        with open(path, 'wb') as out_file:
+            pickle.dump(data, out_file, pickle.HIGHEST_PROTOCOL)
+
+    def restore_weights_from_disk(self, path):
+        """
+        Save model weights to given file
+        """
+        print("Restoring weights from file %s." % path)
+        with open(path, 'rb') as in_file:
+            data = pickle.load(in_file)
+
+        self.__set_weights(data)
 
 
 class DeepGMGModel(object):
@@ -82,7 +152,7 @@ class DeepGMGModel(object):
 
                 num_nodes = graph_sizes[graph_idx]
 
-                num_nodes_current = action[utils.AE.LAST_ADDED_NODE_ID]
+                num_nodes_current = action[utils.AE.LAST_ADDED_NODE_ID] if action else 0
 
                 if cell_idx not in batch_data_by_cell:
                     batch_data_by_cell[cell_idx] = {
@@ -94,6 +164,7 @@ class DeepGMGModel(object):
                         # Generative model
                         'actions': [],
                         'last_added_node_idxs': [],
+                        'last_added_node_idxs_with_minus_ones': [],
                         'last_added_node_types': []
                     }
 
@@ -103,17 +174,19 @@ class DeepGMGModel(object):
                 batch_data = batch_data_by_cell[cell_idx]
 
                 # Generative model
-                if utils.AE.ACTION in action:
+                if action and utils.AE.ACTION in action:
                     batch_data['actions'].append(action[utils.AE.ACTION] - utils.ACTION_OFFSET)
                 else:
                     batch_data['actions'].append(-1)
 
-                if utils.AE.LAST_ADDED_NODE_ID in action:
+                if action and utils.AE.LAST_ADDED_NODE_ID in action:
                     batch_data['last_added_node_idxs'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
+                    batch_data['last_added_node_idxs_with_minus_ones'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
                 else:
                     batch_data['last_added_node_idxs'].append(0)
+                    batch_data['last_added_node_idxs_with_minus_ones'].append(-1)
 
-                if utils.AE.LAST_ADDED_NODE_TYPE in action:
+                if action and utils.AE.LAST_ADDED_NODE_TYPE in action:
                     batch_data['last_added_node_types'].append(action[utils.AE.LAST_ADDED_NODE_TYPE])
                 else:
                     batch_data['last_added_node_types'].append(0)
@@ -126,7 +199,7 @@ class DeepGMGModel(object):
                     if action_meta['type'] == 'add_edge_to':
                         mat = np.zeros((num_nodes, num_edge_types))
 
-                        if utils.L.LABEL_0 in action and utils.L.LABEL_1 in action:
+                        if action and utils.L.LABEL_0 in action and utils.L.LABEL_1 in action:
                             node = action[utils.L.LABEL_0]
                             edge_type = action[utils.L.LABEL_1]
                             mat[node][edge_type] = 1
@@ -134,13 +207,13 @@ class DeepGMGModel(object):
                         batch_data[label_name].append(mat)
 
                     else:
-                        if utils.L.LABEL_0 in action:
+                        if action and utils.L.LABEL_0 in action:
                             batch_data[label_name].append(action[utils.L.LABEL_0])
                         else:
                             batch_data[label_name].append(0)
 
                 # Graph model
-                adj_lists = action[utils.AE.ADJ_LIST]
+                adj_lists = action[utils.AE.ADJ_LIST] if action else utils.graph_to_adjacency_lists([])[0]
                 for idx, adj_list in adj_lists.items():
                     batch_data['adjacency_lists'][idx].append(adj_list)
 
@@ -168,6 +241,8 @@ class DeepGMGModel(object):
             feed_dict[self.cells[cell_idx].placeholders['actions']] = cell_data['actions']
             feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs']] \
                 = cell_data['last_added_node_idxs']
+            feed_dict[self.cells[cell_idx].placeholders['embeddings_last_added_node_idxs_with_minus_ones']] \
+                = cell_data['last_added_node_idxs_with_minus_ones']
             feed_dict[self.cells[cell_idx].placeholders['last_added_node_types']] \
                 = cell_data['last_added_node_types']
 
@@ -181,6 +256,8 @@ class DeepGMGModel(object):
             feed_dict[self.cells[cell_idx].placeholders['embeddings_to_graph_mappings_existent']] \
                 = np.concatenate(cell_data['embeddings_to_graph_mappings_existent'], axis=0)
 
+#            print(len(np.concatenate(cell_data['embeddings_to_graph_mappings'], axis=0)))
+#            print(np.concatenate(cell_data['embeddings_to_graph_mappings'], axis=0))
         # # Print
         # print('--------------------------------------------')
         # for k, v in batch_data_by_cell[0].items():
@@ -220,14 +297,18 @@ class DeepGMGGenerator(DeepGMGModel):
         self.cells.append(deepgmg_cell)
 
     def __add_node_to_graph(self, add_node):
-        # Add sampled node to graph
+        """
+        Add sampled node to graph
+        """
         apply_action_to_graph(self.current_graph, {
             utils.AE.ACTION:      utils.A.ADD_NODE,
             utils.L.LABEL_0:      add_node
         })
 
     def __add_edge_to_graph(self, node, edge_type):
-        # Add sampled edge to graph
+        """
+        Add sampled edge to graph
+        """
         apply_action_to_graph(self.current_graph, {
             utils.AE.ACTION:                  utils.A.ADD_EDGE_TO,
             utils.AE.LAST_ADDED_NODE_ID:      self.last_added_node_id,
@@ -236,6 +317,9 @@ class DeepGMGGenerator(DeepGMGModel):
         })
 
     def __do_init_node_action(self):
+        """
+        Apply init node action to current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.INIT_NODE,
@@ -258,6 +342,9 @@ class DeepGMGGenerator(DeepGMGModel):
         utils.action_pretty_print(action)
 
     def __sample_add_node_action(self):
+        """
+        Sample add node action from current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.ADD_NODE,
@@ -290,6 +377,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return node_type, p_addnode_norm
 
     def __sample_add_edge_action(self):
+        """
+        Sample add edge action from current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.ADD_EDGE,
@@ -321,6 +411,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return add_edge, p_addedge
 
     def __sample_add_edge_to_action(self):
+        """
+        Sample add edge to action from current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.ADD_EDGE_TO,
@@ -361,6 +454,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return node, edge_type, p_nodes_limited_reshaped[node][edge_type]
 
     def generate(self):
+        """
+        Generate a default graph using the pre-trained model
+        """
         is_first_node = True
         utils.action_pretty_print_header()
 
@@ -402,6 +498,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return self.current_graph
 
     def generate_clang(self, node_types):
+        """
+        Generate a clang graph using the pre-trained model
+        """
         is_first_node = True
         utils.action_pretty_print_header()
 
@@ -458,6 +557,7 @@ class DeepGMGGenerator(DeepGMGModel):
 
         return current_code_graph
 
+
 class DeepGMGTrainer(DeepGMGModel):
     """
     Implementation of the training process.
@@ -492,8 +592,9 @@ class DeepGMGTrainer(DeepGMGModel):
         if os.path.exists(out_dir):
             shutil.rmtree(out_dir)
 
-        self.model_save_dir = out_dir + '/model'
-        os.makedirs(self.model_save_dir, exist_ok=True)
+        model_path = out_dir + '/model'
+        os.makedirs(model_path, exist_ok=True)
+        self.model_file = os.path.join(model_path, 'model.pickle')
 
         self.tensorboard_dir = out_dir + '/tensorboard'
         os.makedirs(self.tensorboard_dir, exist_ok=True)
@@ -544,7 +645,6 @@ class DeepGMGTrainer(DeepGMGModel):
         self.ops['loss_ae'] = tf.reduce_sum(losses_ae)
         self.ops['loss_nodes'] = tf.reduce_sum(losses_nodes)
 
-
     def __make_train_step(self) -> None:
         """
         Create tf train step
@@ -573,42 +673,165 @@ class DeepGMGTrainer(DeepGMGModel):
         # Initialize newly-introduced variables:
         self.state.sess.run(tf.local_variables_initializer())
 
-    def train(self, actions_by_graphs, graph_sizes) -> None:
-        # Build feed dict
-        # 1. Graph info
-        feed_dict = self._graphs_to_batch_feed_dict(actions_by_graphs, graph_sizes,
-                                                    self.config['num_training_unroll'])
+    def __run_batch(self, feed_dict, iteration):
+        """
+        Train model with one batch and retrieve result
+        """
+        fetch_list = [self.ops['loss'], self.ops['losses'], self.ops['train_step'],
+                      self.ops['loss_an'], self.ops['loss_ae'], self.ops['loss_nodes']]
+        if self.with_gradient_monitoring:
+            offset = len(fetch_list)
+            fetch_list.extend([self.ops['gradients'], self.ops['clipped_gradients']])
 
-        # 2. Initial node embeddings
-        num_nodes_all_graphs = sum(graph_sizes)
-        feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['hidden_size']))
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
 
-        iteration = 0
-        while True:
-            # Run and fetch
-            fetch_list = [self.ops['loss'], self.ops['losses'], self.ops['train_step'],
-                          self.ops['loss_an'], self.ops['loss_ae'], self.ops['loss_nodes']]
-            if self.with_gradient_monitoring:
-                offset = len(fetch_list)
-                fetch_list.extend([self.ops['gradients'], self.ops['clipped_gradients']])
+        return result
 
-            result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+    def train(self, train_datas) -> None:
+        """
+        Train model with training set in multiple epochs
+        """
+        actions_by_graphs = []
 
+        # Extract actions
+        for train_data in train_datas:
+            actions = train_data[utils.AE.ACTIONS]
+            utils.enrich_action_sequence_with_adj_list_data(actions)
+            actions_by_graphs.append(actions)
+
+        # Extract graph sizes
+        graph_sizes = []
+        for train_data in train_datas:
+            actions = train_data[utils.AE.ACTIONS]
+            action_last = actions[len(actions) - 1]
+
+            graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID] + 1)
+
+        best_epoch_loss = sys.maxsize
+        best_epoch_count = 0
+
+        for epoch in range(0, self.config['num_epochs']):
+            # Partition into batches
+            batch_size = self.config['batch_size']
+
+            lst = list(zip(actions_by_graphs, graph_sizes))
+            random.shuffle(lst)
+            batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
+                       range((len(lst) + batch_size - 1) // batch_size)]
+
+            # Run batches
+            epoch_losses = []
+            epoch_instances_per_secs = []
+
+            for batch in batches:
+                start_time = time.time()
+                batch_actions_by_graphs, batch_graph_sizes = zip(*batch)
+
+                batch_actions_by_graphs = list(batch_actions_by_graphs)
+                batch_graph_sizes = list(batch_graph_sizes)
+
+                # Build feed dict
+                # 1. Graph info
+                feed_dict = self._graphs_to_batch_feed_dict(batch_actions_by_graphs, batch_graph_sizes, self.config['num_training_unroll'])
+
+                # 2. Initial node embeddings
+                num_nodes_all_graphs = sum(batch_graph_sizes)
+                feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['hidden_size']))
+
+                # Run batch
+                result = self.__run_batch(feed_dict, epoch)
+                end_time = time.time()
+
+                # Log
+                instances_per_sec = len(actions_by_graphs) / (end_time - start_time)
+                epoch_instances_per_secs.append(instances_per_sec)
+
+                epoch_losses.append(result[0])
+
+            epoch_loss = np.mean(epoch_losses)
+            if epoch_loss < best_epoch_loss:
+                best_epoch_loss = epoch_loss
+
+                best_epoch_count += 1
+                if 'save_best_model_interval' in self.config and best_epoch_count > self.config['save_best_model_interval']:
+                    self.state.backup_best_weights()
+
+                    best_epoch_count = 0
+
+            epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
+            print('epoch: %i, instances/sec: %.2f, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_loss))
+
+            # Logging
             summary = tf.Summary()
-            summary.value.add(tag='loss', simple_value=result[0])
-            summary.value.add(tag='loss_an', simple_value=result[3])
-            summary.value.add(tag='loss_ae', simple_value=result[4])
-            summary.value.add(tag='loss_nodes', simple_value=result[5])
-            self.train_writer.add_summary(summary, iteration)
+            summary.value.add(tag='loss', simple_value=epoch_loss)
+            self.train_writer.add_summary(summary, epoch)
 
-            if self.with_gradient_monitoring:
-                (gradients, clipped_gradients) = (result[offset + 0], result[offset + 1])
+        self.state.restore_best_weights()
 
-                self.train_writer.add_summary(gradients, iteration)
-                self.train_writer.add_summary(clipped_gradients, iteration)
 
-            print(iteration, result)
-            iteration += 1
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', help='Subcommand to run')
+    subparsers = parser.add_subparsers()
 
-            if iteration >= self.config['num_epochs']:
-                break
+    # Parse command
+    command_arg = parser.parse_args(sys.argv[1:2])
+    if not hasattr(command_arg, 'command'):
+        print('Unrecognized command')
+        parser.print_help()
+        exit(1)
+
+    # Train command
+    if command_arg.command == 'train':
+        # Parse args
+        parser_train = subparsers.add_parser('train')
+        parser_train.add_argument('--config_file')
+        parser_train.add_argument('--config_additional_params')
+        args = parser_train.parse_args(sys.argv[2:])
+
+        # Build Config
+        with open(os.path.join(SCRIPT_DIR, args.config_file)) as f:
+            config = json.load(f)
+        if args.config_additional_params is not None:
+            config.update(json.loads(args.config_additional_params))
+        print('Config: %s' % json.dumps(config))
+
+        # Load data
+        with open(SCRIPT_DIR + '/' + config['train_file'], 'r') as f:
+            train_data = json.load(f, object_hook=utils.json_keys_to_int)
+        utils.get_data_stats(train_data)
+
+        # Create objects
+        state = DeepGMGState(config)
+        trainer = DeepGMGTrainer(config, state)
+
+        # Train
+        trainer.train(train_data)
+
+        # Save weights
+        state.save_weights_to_disk(trainer.model_file)
+
+    # Generate command
+    if command_arg.command == 'generate':
+        # Parse args
+        parser_generate = subparsers.add_parser('generate')
+        parser_generate.add_argument('--artifact_path')
+        parser_generate.add_argument('--num_generate')
+        args = parser_generate.parse_args(sys.argv[2:])
+
+        # Restore Config
+        with open(os.path.join(args.artifact_path, 'config.json')) as f:
+            config = json.load(f)
+
+        # Create objects
+        state = DeepGMGState(config)
+        generator = DeepGMGGenerator(config, state)
+        state.restore_weights_from_disk(os.path.join(args.artifact_path, 'model', 'model.pickle'))
+
+        # Generate
+        for i in range(0, int(args.num_generate)):
+            generated_graph = generator.generate()
+
+
+if __name__ == '__main__':
+    main()

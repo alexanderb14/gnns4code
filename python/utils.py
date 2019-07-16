@@ -273,6 +273,38 @@ def pretty_print_dict(d: dict) -> None:
     print(json.dumps(d, indent=2))
 
 
+def json_keys_to_int(x):
+    if isinstance(x, dict):
+            return { int(k):v for k,v in x.items() }
+    return x
+
+
+def get_data_stats(data):
+    num_actions = []
+    node_types = []
+    edge_types = []
+
+    for actions in data:
+        actions = actions[AE.ACTIONS]
+        num_actions.append(len(actions))
+
+        for _, action in actions.items():
+            action_type = action[AE.ACTION]
+            if action_type == A.ADD_NODE:
+                node_type = action[L.LABEL_0]
+                node_types.append(node_type)
+
+            elif action_type == A.ADD_EDGE_TO:
+                edge_type = action[L.LABEL_1]
+                edge_types.append(edge_type)
+
+
+    print("Dataset Statistics")
+    print("- num_graphs: %i" % (len(data)))
+    print("- num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
+    print("- node_types (max of it): %i" % (max(node_types)))
+    print("- edge_types (max of it): %i" % (max(edge_types)))
+
 # Classes
 #########
 class MLP(object):

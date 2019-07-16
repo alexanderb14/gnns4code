@@ -8,7 +8,7 @@ class GGNNModelLayerState(object):
     """
     Holds the state / weights of a GGNN Layer.
     """
-    def __init__(self, config):
+    def __init__(self, config, master):
         self.config = config
 
         h_dim = self.config['hidden_size']
@@ -16,24 +16,26 @@ class GGNNModelLayerState(object):
 
         self.weights = {}
 
-        edge_weights = tf.Variable(glorot_init([num_edge_types * h_dim, h_dim]),
-                                                   name='edge_weights')
-        self.weights['edge_weights'] = tf.reshape(edge_weights, [num_edge_types, h_dim, h_dim])
+        with master.graph.as_default():
+            edge_weights = tf.Variable(glorot_init([num_edge_types * h_dim, h_dim]),
+                                                       name='edge_weights')
+            self.weights['edge_weights'] = tf.reshape(edge_weights, [num_edge_types, h_dim, h_dim])
 
-        cell_type = self.config['graph_rnn_cell'].lower()
-        activation_fun = tf.nn.tanh
-        if cell_type == 'gru':
-            cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun,
-                                          kernel_initializer=tf.glorot_uniform_initializer,
-                                          bias_initializer=tf.glorot_uniform_initializer)
-        elif cell_type == 'cudnncompatiblegrucell':
-            import tensorflow.contrib.cudnn_rnn as cudnn_rnn
-            cell = cudnn_rnn.CudnnCompatibleGRUCell(h_dim)
-        elif cell_type == 'rnn':
-            cell = tf.nn.rnn_cell.BasicRNNCell(h_dim, activation=activation_fun)
-        else:
-            raise Exception("Unknown RNN cell type '%s'." % cell_type)
-        self.weights['rnn_cells'] = cell
+            cell_type = self.config['graph_rnn_cell'].lower()
+            activation_fun = tf.nn.tanh
+            if cell_type == 'gru':
+                # cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun,
+                #                               kernel_initializer=tf.glorot_uniform_initializer,
+                #                               bias_initializer=tf.glorot_uniform_initializer)
+                cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun)
+            elif cell_type == 'cudnncompatiblegrucell':
+                import tensorflow.contrib.cudnn_rnn as cudnn_rnn
+                cell = cudnn_rnn.CudnnCompatibleGRUCell(h_dim)
+            elif cell_type == 'rnn':
+                cell = tf.nn.rnn_cell.BasicRNNCell(h_dim, activation=activation_fun)
+            else:
+                raise Exception("Unknown RNN cell type '%s'." % cell_type)
+            self.weights['rnn_cells'] = cell
 
 class GGNNModelLayer(PropagationModelLayer):
     """

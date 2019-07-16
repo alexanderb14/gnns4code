@@ -25,7 +25,9 @@ CONFIG_DEFAULTGRAPH = {
     'num_training_unroll': 4,
     "clamp_gradient_norm": 1.0,
 
+    'batch_size': 100,
     "num_epochs": 100,
+
     "out_dir": '/tmp',
 
     'actions': [
@@ -81,15 +83,21 @@ def are_graphs_equal(training_graph, generated_graph):
 
 
 def train_generate_and_validate_default_graphs(training_graphs, config, num_graphs_to_gen, num_graphs_to_be_equal):
-    utils.actionize_default_graphs(training_graphs, True)
+    # Actionize
+    actions = utils.actionize_default_graphs(training_graphs)
 
-    actions_by_graphs = utils.actionize_default_graphs(training_graphs)
-    graph_sizes = [len(graph[utils.T.NODES]) for graph in training_graphs]
+    # Build train data
+    train_datas = []
+    for action in actions:
+        utils.action_sequence_pretty_print(action)
+        train_datas.append({
+            utils.AE.ACTIONS: action
+        })
 
     # Train
     state = DeepGMGState(config)
     trainer = DeepGMGTrainer(config, state)
-    trainer.train(actions_by_graphs, graph_sizes)
+    trainer.train(train_datas)
 
     # Generate and validate
     generator = DeepGMGGenerator(config, state)
@@ -98,19 +106,20 @@ def train_generate_and_validate_default_graphs(training_graphs, config, num_grap
     for _ in range(num_graphs_to_gen):
         try:
             generated_graph = generator.generate()
+
+            ok = False
+            for training_graph in training_graphs:
+                if generated_graph and are_graphs_equal(training_graph, generated_graph):
+                    print('-> TRAIN AND GEN GRAPH EQUAL')
+                    ok = True
+                else:
+                    print('-> TRAIN AND GEN GRAPH DIFFERENT')
+
+            if ok == True:
+                num_graphs_equal += 1
+
         except:
             print(sys.exc_info()[0])
-
-        ok = False
-        for training_graph in training_graphs:
-            if generated_graph and are_graphs_equal(training_graph, generated_graph):
-                print('-> TRAIN AND GEN GRAPH EQUAL')
-                ok = True
-            else:
-                print('-> TRAIN AND GEN GRAPH DIFFERENT')
-
-        if ok == True:
-            num_graphs_equal += 1
 
     print(num_graphs_to_gen, num_graphs_equal)
     assert num_graphs_equal > num_graphs_to_be_equal
@@ -128,10 +137,11 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
     actions = clang_codegraph_models.create_action_sequence(training_graph)
     utils.enrich_action_sequence_with_adj_list_data(actions)
     utils.action_sequence_pretty_print(actions)
-    actions_by_graphs = [actions]
 
-    # Get number of nodes
-    num_nodes = [clang_codegraph_models.get_num_nodes(training_graph)]
+    # Build train data
+    train_datas = [{
+        utils.AE.ACTIONS: actions
+    }]
 
     # Get node types
     node_types = nic_vstr.node_type_ids_by_statements
@@ -139,7 +149,7 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
     # Train
     state = DeepGMGState(config)
     trainer = DeepGMGTrainer(config, state)
-    trainer.train(actions_by_graphs, num_nodes)
+    trainer.train(train_datas)
 
     # Generate and validate
     generator = DeepGMGGenerator(config, state)
@@ -168,7 +178,88 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
 
 # Tests
 @pytest.mark.acceptance
-def test_train_and_gen_one_defaultgraph_small_1():
+def test_train_save_load_and_gen_defaultgraph():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'hidden_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 14,
+        "run_id": "train_save_load_and_gen_defaultgraph",
+
+        "num_node_types": 3,
+        "num_edge_types": 5,
+
+        "num_epochs": 500,
+        "gen_num_node_max": 5,
+
+        'save_best_model_interval': 50
+    })
+
+    nodes = [1, 2, 1]
+    edges = [(2, 1, 1), (2, 0, 0)]
+    training_graphs = [{utils.T.NODES: nodes, utils.T.EDGES: edges}]
+
+    # Actionize
+    actions = utils.actionize_default_graphs(training_graphs)
+
+    # Build train data
+    train_datas = []
+    for action in actions:
+        utils.action_sequence_pretty_print(action)
+        train_datas.append({
+            utils.AE.ACTIONS: action
+        })
+
+    # Train
+    state = DeepGMGState(config)
+    trainer = DeepGMGTrainer(config, state)
+    trainer.train(train_datas)
+
+    model_path = trainer.model_file
+
+    # Save weights to disk
+    state.save_weights_to_disk(model_path)
+
+    # Reset objects
+    state = None
+    trainer = None
+
+    # Create state and generator by loading weights from disk
+    state = DeepGMGState(config)
+    generator = DeepGMGGenerator(config, state)
+    state.restore_weights_from_disk(model_path)
+
+    num_graphs_equal = 0
+    for _ in range(NUM_GRAPHS_TO_GENERATE):
+        try:
+            generated_graph = generator.generate()
+
+            ok = False
+            for training_graph in training_graphs:
+                if generated_graph and are_graphs_equal(training_graph, generated_graph):
+                    print('-> TRAIN AND GEN GRAPH EQUAL')
+                    ok = True
+                else:
+                    print('-> TRAIN AND GEN GRAPH DIFFERENT')
+
+            if ok == True:
+                num_graphs_equal += 1
+
+        except:
+            print(sys.exc_info()[0])
+
+    print(NUM_GRAPHS_TO_GENERATE, num_graphs_equal)
+    assert num_graphs_equal > NUM_GRAPHS_TO_BE_EQUAL
+
+
+@pytest.mark.acceptance
+def test_train_and_gen_defaultgraph_small_1():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -185,7 +276,7 @@ def test_train_and_gen_one_defaultgraph_small_1():
         "num_node_types": 3,
         "num_edge_types": 5,
 
-        "num_epochs": 2000,
+        "num_epochs": 500,
         "gen_num_node_max": 5
     })
 
@@ -197,7 +288,7 @@ def test_train_and_gen_one_defaultgraph_small_1():
 
 
 @pytest.mark.acceptance
-def test_train_and_gen_one_defaultgraph_small_2():
+def test_train_and_gen_defaultgraph_small_2():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -226,7 +317,7 @@ def test_train_and_gen_one_defaultgraph_small_2():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_1():
+def test_train_and_gen_defaultgraph_medium_1():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -239,7 +330,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_1():
 
         "learning_rate": 0.001,
         "num_training_unroll": 55,
-        "run_id": "defaultgraph_medium_1",
+        "run_id": "one_defaultgraph_medium_1",
 
         "num_node_types": 7,
         "num_edge_types": 5,
@@ -258,7 +349,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_1():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_2():
+def test_train_and_gen_defaultgraph_medium_2():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -271,7 +362,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_2():
 
         "learning_rate": 0.001,
         "num_training_unroll": 55,
-        "run_id": "defaultgraph_medium_2",
+        "run_id": "one_defaultgraph_medium_2",
 
         "num_node_types": 7,
         "num_edge_types": 5,
@@ -290,7 +381,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_2():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_3():
+def test_train_and_gen_defaultgraph_medium_3():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -303,7 +394,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_3():
 
         "learning_rate": 0.001,
         "num_training_unroll": 43,
-        "run_id": "defaultgraph_medium_3",
+        "run_id": "one_defaultgraph_medium_3",
 
         "num_node_types": 7,
         "num_edge_types": 5,
@@ -321,7 +412,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_3():
 
 
 @pytest.mark.performance
-def test_deepgmg_trainer_and_generator_defaultgraph_medium_4():
+def test_train_and_gen_defaultgraph_medium_4():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -334,7 +425,7 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_4():
 
         "learning_rate": 0.001,
         "num_training_unroll": 45,
-        "run_id": "defaultgraph_medium_4",
+        "run_id": "one_defaultgraph_medium_4",
 
         "num_node_types": 4,
         "num_edge_types": 3,
@@ -352,8 +443,41 @@ def test_deepgmg_trainer_and_generator_defaultgraph_medium_4():
     train_generate_and_validate_default_graphs([training_graph], config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
 
+@pytest.mark.performance
+def test_train_and_gen_many_defaultgraphs_medium():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'num_timesteps': 2,
+        'hidden_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 46,
+        "run_id": "one_defaultgraph_medium_4",
+
+        "num_node_types": 4,
+        "num_edge_types": 4,
+
+        "num_epochs": 1000,
+        "gen_num_node_max": 12
+    })
+
+    nodes = [2, 3, 1, 2, 1, 3, 2, 3, 2]
+    edges = [(0, 0, 1), (1, 1, 2), (2, 1, 3), (3, 1, 4), \
+             (4, 1, 5), (5, 2, 6), (6, 2, 7), (7, 3, 8), \
+             (5, 1, 1)]
+    training_graph = {utils.T.NODES: nodes, utils.T.EDGES: edges}
+    training_graphs = [training_graph] * 10
+
+    train_generate_and_validate_default_graphs(training_graphs, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+
+
 @pytest.mark.acceptance
-def test_train_and_gen_two_defaultgraphs_small():
+def test_train_and_gen_many_same_defaultgraphs_small():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
@@ -365,7 +489,7 @@ def test_train_and_gen_two_defaultgraphs_small():
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
-        "run_id": "two_defaultgraphs_small",
+        "run_id": "many_same_defaultgraphs_small",
 
         "num_node_types": 3,
         "num_edge_types": 2,
@@ -374,11 +498,40 @@ def test_train_and_gen_two_defaultgraphs_small():
         "gen_num_node_max": 5
     })
 
-    training_graph_1 = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
-    training_graph_2 = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
+    training_graph = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
+    training_graphs = [training_graph] * 25
 
-    train_generate_and_validate_default_graphs([training_graph_1, training_graph_2],
-                                               config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+    train_generate_and_validate_default_graphs(training_graphs, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+
+
+@pytest.mark.acceptance
+def test_train_and_gen_two_different_defaultgraphs_small():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'hidden_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 14,
+        "run_id": "two_different_defaultgraphs_small",
+
+        "num_node_types": 3,
+        "num_edge_types": 2,
+
+        "num_epochs": 500,
+        "gen_num_node_max": 5
+    })
+
+    training_graph1 = {utils.T.NODES: [1, 2], utils.T.EDGES: [(1, 1, 0)]}
+    training_graph2 = {utils.T.NODES: [1, 2, 1], utils.T.EDGES: [(2, 1, 1), (2, 0, 0)]}
+
+    training_graphs = [training_graph1, training_graph2]
+
+    train_generate_and_validate_default_graphs(training_graphs, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
 
 @pytest.mark.acceptance
@@ -394,7 +547,7 @@ def test_train_and_gen_clang_codegraph_small():
 
         "learning_rate": 0.001,
         "num_training_unroll": 33,
-        "run_id": "clang_codegraph_small",
+        "run_id": "one_clang_codegraph_small",
 
         "num_node_types": 6,
         "num_edge_types": 8,
@@ -425,7 +578,7 @@ def test_train_and_gen_clang_codegraph_medium():
 
         "learning_rate": 0.001,
         "num_training_unroll": 81,
-        "run_id": "clang_codegraph_medium",
+        "run_id": "one_clang_codegraph_medium",
 
         "num_node_types": 12,
         "num_edge_types": 4,
@@ -459,7 +612,7 @@ def test_train_and_gen_clang_codegraph_large():
 
         "learning_rate": 0.001,
         "num_training_unroll": 137,
-        "run_id": "clang_codegraph_large",
+        "run_id": "one_clang_codegraph_large",
 
         "num_edge_types": 8,
         "num_node_types": 20,

@@ -7,7 +7,7 @@ class DeepGMGCellState(object):
     """
     Holds the state / weights of a DeepGMG cell.
     """
-    def __init__(self, config):
+    def __init__(self, config, master):
         self.config = config
 
         h_size = self.config['hidden_size']
@@ -18,44 +18,45 @@ class DeepGMGCellState(object):
 
         self.weights = {}
 
-        with tf.variable_scope('init_node_model_weights'):
-            with tf.variable_scope('out_layer_gated_sum_init_node_weights'):
-                self.weights['mlp_f_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m_init_node')
-                self.weights['mlp_g_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m_init_node')
-            self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1, h_size, [h_size * m_size + num_node_types + 1], 'sigmoid', 'f_init')
+        with master.graph.as_default():
+            with tf.variable_scope('init_node_model_weights'):
+                with tf.variable_scope('out_layer_gated_sum_init_node_weights'):
+                    self.weights['mlp_f_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m_init_node')
+                    self.weights['mlp_g_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m_init_node')
+                self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1, h_size, [h_size * m_size + num_node_types + 1], 'sigmoid', 'f_init')
 
-        # if with_attention:
-        #     with tf.variable_scope('attention_model_weights'):
-        #         self.weights['mlp_attention'] = utils.MLP(h_size * 2, 1, [], 'sigmoid', 'mlp_attention')
+            # if with_attention:
+            #     with tf.variable_scope('attention_model_weights'):
+            #         self.weights['mlp_attention'] = utils.MLP(h_size * 2, 1, [], 'sigmoid', 'mlp_attention')
 
-        with tf.variable_scope('out_model_weights'):
-            with tf.variable_scope('out_layer_gated_sum_weights'):
-                self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m')
-                self.weights['mlp_g_m'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m')
+            with tf.variable_scope('out_model_weights'):
+                with tf.variable_scope('out_layer_gated_sum_weights'):
+                    self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m')
+                    self.weights['mlp_g_m'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m')
 
-        with tf.variable_scope('gen_model_weights'):
-            for action_idx, action_meta in enumerate(action_metas):
-                name = action_meta['name']
-                function_name = 'f_' + name
-                input_dimension = self.config[action_meta['input_dimension']] \
-                    if isinstance(action_meta['input_dimension'], str) else action_meta['input_dimension']
+            with tf.variable_scope('gen_model_weights'):
+                for action_idx, action_meta in enumerate(action_metas):
+                    name = action_meta['name']
+                    function_name = 'f_' + name
+                    input_dimension = self.config[action_meta['input_dimension']] \
+                        if isinstance(action_meta['input_dimension'], str) else action_meta['input_dimension']
 
-                mlp_dim = h_size * m_size
+                    mlp_dim = h_size * m_size
 
-                if action_meta['type'] == 'add_node':
-                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_node')
+                    if action_meta['type'] == 'add_node':
+                        self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_node')
 
-                elif action_meta['type'] == 'add_edge':
-                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_edge')
+                    elif action_meta['type'] == 'add_edge':
+                        self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_edge')
 
-                elif action_meta['type'] == 'add_edge_to':
-                    self.weights[function_name] = utils.MLP(h_size * 2, input_dimension, [], 'sigmoid', 'add_edge_to')
+                    elif action_meta['type'] == 'add_edge_to':
+                        self.weights[function_name] = utils.MLP(h_size * 2, input_dimension, [], 'sigmoid', 'add_edge_to')
 
-                elif action_meta['type'] == 'add_function':
-                    self.weights[function_name] = utils.MLP(h_size * m_size, input_dimension, [], 'sigmoid', 'add_function')
+                    elif action_meta['type'] == 'add_function':
+                        self.weights[function_name] = utils.MLP(h_size * m_size, input_dimension, [], 'sigmoid', 'add_function')
 
-                elif action_meta['type'] == 'add_basic_block':
-                    self.weights[function_name] = utils.MLP(h_size * m_size * 2, input_dimension, [], 'sigmoid', 'add_basic_block')
+                    elif action_meta['type'] == 'add_basic_block':
+                        self.weights[function_name] = utils.MLP(h_size * m_size * 2, input_dimension, [], 'sigmoid', 'add_basic_block')
 
 
 class DeepGMGCell(object):
@@ -91,17 +92,31 @@ class DeepGMGCell(object):
         self.placeholders['embeddings_to_graph_mappings'] \
             = tf.placeholder(tf.int32, [None], name='embeddings_to_graph_mappings')
         embeddings_to_graph_mappings = self.placeholders['embeddings_to_graph_mappings']
-        num_graphs = tf.math.reduce_max(embeddings_to_graph_mappings) + 1                                   # Scalar
+        num_graphs = tf.reduce_max(embeddings_to_graph_mappings) + 1                                   # Scalar
 
         # Embeddings to graph mappings. Only embeddings that really exists are mapped here. All others are -1.
         self.placeholders['embeddings_to_graph_mappings_existent'] \
             = tf.placeholder(tf.int32, [None], name='embeddings_to_graph_mappings_existent')
         embeddings_to_graph_mappings_existent = self.placeholders['embeddings_to_graph_mappings_existent']
 
+        # Embeddings to graph mappings. Only embeddings that really exists are mapped here. Without -1's.
+        minus_one_vector = tf.fill(dims=tf.shape(embeddings_to_graph_mappings_existent), value=-1)
+        bool_mask = tf.not_equal(embeddings_to_graph_mappings_existent, minus_one_vector)
+        embeddings_to_graph_mappings_existent_without_minus_ones = tf.boolean_mask(embeddings_to_graph_mappings_existent, bool_mask)
+
         # Last added node indices of graphs
         self.placeholders['embeddings_last_added_node_idxs'] \
             = tf.placeholder(tf.int32, [None], name='embeddings_last_added_node_idxs')
         embeddings_last_added_node_idxs = self.placeholders['embeddings_last_added_node_idxs']
+
+        self.placeholders['embeddings_last_added_node_idxs_with_minus_ones'] \
+            = tf.placeholder(tf.int32, [None], name='embeddings_last_added_node_idxs_with_minus_ones')
+        embeddings_last_added_node_idxs_with_minus_ones = self.placeholders['embeddings_last_added_node_idxs_with_minus_ones']
+
+        # Last added node indices of graphs without -1's
+        minus_one_vector = tf.fill(dims=tf.shape(embeddings_last_added_node_idxs_with_minus_ones), value=-1)
+        bool_mask = tf.not_equal(embeddings_last_added_node_idxs_with_minus_ones, minus_one_vector)
+        embeddings_last_added_node_idxs_without_minus_ones = tf.boolean_mask(embeddings_last_added_node_idxs_with_minus_ones, bool_mask)
 
         # Actions
         self.placeholders['actions'] = tf.placeholder(tf.int32, [None], name='actions')
@@ -143,7 +158,7 @@ class DeepGMGCell(object):
                 action_0 = actions_transposed[0]                                                                # [b]
                 mask_action_0 = tf.gather(action_0, embeddings_to_graph_mappings)                               # [b*v]
 
-                last_added_node_idxs_onehot = tf.sparse_to_dense(sparse_indices=embeddings_last_added_node_idxs,
+                last_added_node_idxs_onehot = tf.sparse_to_dense(sparse_indices=embeddings_last_added_node_idxs_without_minus_ones,
                                                                  output_shape=[tf.shape(mask_action_0)[0]],
                                                                  sparse_values=1)                               # [b*v]
 
@@ -256,7 +271,8 @@ class DeepGMGCell(object):
                                                               segment_ids=embeddings_to_graph_mappings_existent,
                                                               num_segments=num_graphs)                          # [b, e]
                             s_u_max = tf.reduce_max(s_u_max, axis=1)                                            # [b]
-                            s_u_max = tf.broadcast_to(s_u_max, tf.shape(s_u))                                   # [b*v, e]
+                            s_u_max = tf.gather(s_u_max, embeddings_to_graph_mappings)                          # [b*v]
+                            s_u_max = tf.expand_dims(s_u_max, axis=1)                                           # [b*v, 1]
                             s_u_normalized = s_u - s_u_max                                                      # [b*v, e]
 
                             # - Build exponents
@@ -268,7 +284,8 @@ class DeepGMGCell(object):
                                                               num_segments=num_graphs)                          # [b, e]
 
                             es_sum = tf.reduce_sum(es_sum, axis=1)                                              # [b]
-                            es_sum = tf.broadcast_to(es_sum, tf.shape(es))                                      # [b*v, e]
+                            es_sum = tf.gather(es_sum, embeddings_to_graph_mappings)                            # [b*v]
+                            es_sum = tf.expand_dims(es_sum, axis=1)                                             # [b*v, 1]
 
                             # - Build softmax
                             f_nodes = es / es_sum                                                               # [b*v, e]

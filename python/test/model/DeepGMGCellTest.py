@@ -76,6 +76,7 @@ def setup_deepgmg_cell_prediction_and_fetch_op(action_ids: list, op_to_fetch: st
                      deepgmg_cell.placeholders['embeddings_to_graph_mappings']: test_data['embeddings_to_graph_mappings'],
                      deepgmg_cell.placeholders['embeddings_to_graph_mappings_existent']: test_data['embeddings_to_graph_mappings'],
                      deepgmg_cell.placeholders['embeddings_last_added_node_idxs']: test_data['embeddings_last_added_node_idxs'],
+                     deepgmg_cell.placeholders['embeddings_last_added_node_idxs_with_minus_ones']: test_data['embeddings_last_added_node_idxs'],
                      deepgmg_cell.placeholders['last_added_node_types']: test_data['last_added_node_types']}
 
         result = session.run(fetch_list, feed_dict=feed_dict)
@@ -113,6 +114,7 @@ def setup_deepgmg_cell_training_and_fetch_op(action_ids: list, ops_to_fetch: lis
                      deepgmg_cell.placeholders['embeddings_to_graph_mappings']: test_data['embeddings_to_graph_mappings'],
                      deepgmg_cell.placeholders['embeddings_to_graph_mappings_existent']: test_data['embeddings_to_graph_mappings'],
                      deepgmg_cell.placeholders['embeddings_last_added_node_idxs']: test_data['embeddings_last_added_node_idxs'],
+                     deepgmg_cell.placeholders['embeddings_last_added_node_idxs_with_minus_ones']: test_data['embeddings_last_added_node_idxs'],
                      deepgmg_cell.placeholders['last_added_node_types']: test_data['last_added_node_types'],
                      deepgmg_cell.placeholders['a1_labels']: test_data['a1_labels'],
                      deepgmg_cell.placeholders['a2_labels']: test_data['a2_labels'],
