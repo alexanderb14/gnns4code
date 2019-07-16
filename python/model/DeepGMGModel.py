@@ -9,7 +9,6 @@ import time
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.python import debug as tf_debug
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
@@ -46,7 +45,6 @@ class DeepGMGState(object):
         tf_config = tf.ConfigProto()
         tf_config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=self.graph, config=tf_config)
-        # self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
 
         self.best_epoch_weights = None
 
@@ -184,7 +182,6 @@ class DeepGMGModel(object):
                 if action and utils.AE.LAST_ADDED_NODE_ID in action:
                     batch_data['last_added_node_idxs'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
                     batch_data['last_added_node_idxs_with_minus_ones'].append(sum(graph_sizes[0:graph_idx]) + num_nodes_current)
-#                    print(sum(graph_sizes[0:graph_idx]), num_nodes_current, sum(graph_sizes[0:graph_idx]) + num_nodes_current)
                 else:
                     batch_data['last_added_node_idxs'].append(0)
                     batch_data['last_added_node_idxs_with_minus_ones'].append(-1)
@@ -300,14 +297,18 @@ class DeepGMGGenerator(DeepGMGModel):
         self.cells.append(deepgmg_cell)
 
     def __add_node_to_graph(self, add_node):
-        # Add sampled node to graph
+        """
+        Add sampled node to graph
+        """
         apply_action_to_graph(self.current_graph, {
             utils.AE.ACTION:      utils.A.ADD_NODE,
             utils.L.LABEL_0:      add_node
         })
 
     def __add_edge_to_graph(self, node, edge_type):
-        # Add sampled edge to graph
+        """
+        Add sampled edge to graph
+        """
         apply_action_to_graph(self.current_graph, {
             utils.AE.ACTION:                  utils.A.ADD_EDGE_TO,
             utils.AE.LAST_ADDED_NODE_ID:      self.last_added_node_id,
@@ -316,6 +317,9 @@ class DeepGMGGenerator(DeepGMGModel):
         })
 
     def __do_init_node_action(self):
+        """
+        Apply init node action to current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.INIT_NODE,
@@ -338,6 +342,9 @@ class DeepGMGGenerator(DeepGMGModel):
         utils.action_pretty_print(action)
 
     def __sample_add_node_action(self):
+        """
+        Sample add node action from current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.ADD_NODE,
@@ -370,6 +377,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return node_type, p_addnode_norm
 
     def __sample_add_edge_action(self):
+        """
+        Sample add edge action from current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.ADD_EDGE,
@@ -401,6 +411,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return add_edge, p_addedge
 
     def __sample_add_edge_to_action(self):
+        """
+        Sample add edge to action from current model state
+        """
         # Prepare
         action = {
             utils.AE.ACTION:                    utils.A.ADD_EDGE_TO,
@@ -441,6 +454,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return node, edge_type, p_nodes_limited_reshaped[node][edge_type]
 
     def generate(self):
+        """
+        Generate a default graph using the pre-trained model
+        """
         is_first_node = True
         utils.action_pretty_print_header()
 
@@ -482,6 +498,9 @@ class DeepGMGGenerator(DeepGMGModel):
         return self.current_graph
 
     def generate_clang(self, node_types):
+        """
+        Generate a clang graph using the pre-trained model
+        """
         is_first_node = True
         utils.action_pretty_print_header()
 
@@ -655,6 +674,9 @@ class DeepGMGTrainer(DeepGMGModel):
         self.state.sess.run(tf.local_variables_initializer())
 
     def __run_batch(self, feed_dict, iteration):
+        """
+        Train model with one batch and retrieve result
+        """
         fetch_list = [self.ops['loss'], self.ops['losses'], self.ops['train_step'],
                       self.ops['loss_an'], self.ops['loss_ae'], self.ops['loss_nodes']]
         if self.with_gradient_monitoring:
@@ -666,6 +688,9 @@ class DeepGMGTrainer(DeepGMGModel):
         return result
 
     def train(self, train_datas) -> None:
+        """
+        Train model with training set in multiple epochs
+        """
         actions_by_graphs = []
 
         # Extract actions

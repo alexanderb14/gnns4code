@@ -273,7 +273,6 @@ class DeepGMGCell(object):
                             s_u_max = tf.reduce_max(s_u_max, axis=1)                                            # [b]
                             s_u_max = tf.gather(s_u_max, embeddings_to_graph_mappings)                          # [b*v]
                             s_u_max = tf.expand_dims(s_u_max, axis=1)                                           # [b*v, 1]
-#                            s_u_max = tf.broadcast_to(s_u_max, tf.shape(s_u))                                   # [b*v, e]
                             s_u_normalized = s_u - s_u_max                                                      # [b*v, e]
 
                             # - Build exponents
@@ -287,7 +286,6 @@ class DeepGMGCell(object):
                             es_sum = tf.reduce_sum(es_sum, axis=1)                                              # [b]
                             es_sum = tf.gather(es_sum, embeddings_to_graph_mappings)                            # [b*v]
                             es_sum = tf.expand_dims(es_sum, axis=1)                                             # [b*v, 1]
-#                            es_sum = tf.broadcast_to(es_sum, tf.shape(es))                                      # [b*v, e]
 
                             # - Build softmax
                             f_nodes = es / es_sum                                                               # [b*v, e]
