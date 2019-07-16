@@ -182,7 +182,6 @@ def test_train_save_load_and_gen_defaultgraph():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
-    MODEL_PATH = '/tmp/model.pickle'
 
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
@@ -222,8 +221,10 @@ def test_train_save_load_and_gen_defaultgraph():
     trainer = DeepGMGTrainer(config, state)
     trainer.train(train_datas)
 
+    model_path = trainer.model_file
+
     # Save weights to disk
-    state.save_weights_to_disk(MODEL_PATH)
+    state.save_weights_to_disk(model_path)
 
     # Reset objects
     state = None
@@ -232,7 +233,7 @@ def test_train_save_load_and_gen_defaultgraph():
     # Create state and generator by loading weights from disk
     state = DeepGMGState(config)
     generator = DeepGMGGenerator(config, state)
-    state.restore_weights_from_disk(MODEL_PATH)
+    state.restore_weights_from_disk(model_path)
 
     num_graphs_equal = 0
     for _ in range(NUM_GRAPHS_TO_GENERATE):

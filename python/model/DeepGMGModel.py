@@ -573,8 +573,9 @@ class DeepGMGTrainer(DeepGMGModel):
         if os.path.exists(out_dir):
             shutil.rmtree(out_dir)
 
-        self.model_save_dir = out_dir + '/model'
-        os.makedirs(self.model_save_dir, exist_ok=True)
+        model_path = out_dir + '/model'
+        os.makedirs(model_path, exist_ok=True)
+        self.model_file = os.path.join(model_path, 'model.pickle')
 
         self.tensorboard_dir = out_dir + '/tensorboard'
         os.makedirs(self.tensorboard_dir, exist_ok=True)
@@ -745,33 +746,67 @@ class DeepGMGTrainer(DeepGMGModel):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('command', help='Subcommand to run')
+    subparsers = parser.add_subparsers()
 
-    parser.add_argument('--config_file')
-    parser.add_argument('--config_additional_params')
+    # Parse command
+    command_arg = parser.parse_args(sys.argv[1:2])
+    if not hasattr(command_arg, 'command'):
+        print('Unrecognized command')
+        parser.print_help()
+        exit(1)
 
-    args = parser.parse_args()
+    # Train command
+    if command_arg.command == 'train':
+        # Parse args
+        parser_train = subparsers.add_parser('train')
+        parser_train.add_argument('--config_file')
+        parser_train.add_argument('--config_additional_params')
+        args = parser_train.parse_args(sys.argv[2:])
 
-    # Build Config
-    with open(os.path.join(SCRIPT_DIR, args.config_file)) as f:
-        config = json.load(f)
-    if args.config_additional_params is not None:
-        config.update(json.loads(args.config_additional_params))
-    print('Training starting with following parameters:\n%s' % json.dumps(config))
+        # Build Config
+        with open(os.path.join(SCRIPT_DIR, args.config_file)) as f:
+            config = json.load(f)
+        if args.config_additional_params is not None:
+            config.update(json.loads(args.config_additional_params))
+        print('Config: %s' % json.dumps(config))
 
-    # Load data
-    with open(SCRIPT_DIR + '/' + config['train_file'], 'r') as f:
-        train_data = json.load(f, object_hook=utils.json_keys_to_int)
-    utils.get_data_stats(train_data)
+        # Load data
+        with open(SCRIPT_DIR + '/' + config['train_file'], 'r') as f:
+            train_data = json.load(f, object_hook=utils.json_keys_to_int)
+        utils.get_data_stats(train_data)
 
-    # Create objects
-    state = DeepGMGState(config)
-    trainer = DeepGMGTrainer(config, state)
+        # Create objects
+        state = DeepGMGState(config)
+        trainer = DeepGMGTrainer(config, state)
 
-    # Train
-    trainer.train(train_data)
+        # Train
+        trainer.train(train_data)
 
-    # Save
-    state.save_weights_to_disk(os.path.join(trainer.model_save_dir, 'model.pickle'))
+        # Save weights
+        state.save_weights_to_disk(trainer.model_file)
+
+    # Generate command
+    if command_arg.command == 'generate':
+        # Parse args
+        parser_generate = subparsers.add_parser('generate')
+        parser_generate.add_argument('--artifact_path')
+        parser_generate.add_argument('--num_generate')
+        args = parser_generate.parse_args(sys.argv[2:])
+
+        # Restore Config
+        with open(os.path.join(args.artifact_path, 'config.json')) as f:
+            config = json.load(f)
+
+        # Create objects
+        state = DeepGMGState(config)
+        generator = DeepGMGGenerator(config, state)
+        state.restore_weights_from_disk(os.path.join(args.artifact_path, 'model', 'model.pickle'))
+
+        # Generate
+        for i in range(0, int(args.num_generate)):
+            generated_graph = generator.generate()
+
 
 if __name__ == '__main__':
     main()
