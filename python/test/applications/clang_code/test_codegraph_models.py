@@ -30,8 +30,8 @@ def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
     if is_open_cl_code:
         ret = subprocess.call([utils.CLANG_MINER_EXECUTABLE,
                                '-extra-arg-before=-xcl',
-                               '-extra-arg=-I/Users/alex/clgen-0.4.0/clgen/data/libclc',
-                               '-extra-arg=-include/Users/alex/clgen-0.4.0/clgen/data/include/opencl-shim.h',
+                               '-extra-arg=-I' + utils.LIBCLC_DIR,
+                               '-extra-arg=-include' + utils.OPENCL_SHIM_FILE,
                                os.path.join(datadir, c_file),
                                '-o', graph_out_file])
     else:
@@ -43,7 +43,7 @@ def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
     # Python graph
     with open(graph_out_file) as f:
         jRoot = json.load(f)
-    graph = codegraph_models.codegraph_create_from_miner_output(jRoot)
+    graph = codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     # Save dot graph
     #codegraph_models.save_dot_graph(graph, graph_out_file + '.png', 'png', True)

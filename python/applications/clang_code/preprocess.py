@@ -10,6 +10,7 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/../..')
 import applications.clang_code.codegraph_models as codegraph_models
 import applications.utils as app_utils
+import utils
 
 
 def get_files_by_file_size(dirname, reverse=False):
@@ -40,7 +41,7 @@ def get_files_by_file_size(dirname, reverse=False):
 
 def delete_and_create_folder(path):
     if os.path.isdir(path):
-        os.remove(path)
+        shutil.rmtree(path)
     os.mkdir(path)
 
 def opencl_kernel_c_code_to_llvm_graph(c_code:str):
@@ -80,9 +81,9 @@ def main():
     for idx, filename_absolute in enumerate(files):
         filename = ntpath.basename(filename_absolute)
 
-        print('------------------------------------------------------')
+        utils.print_dash()
         print('Processing:', filename, 'Filesize:', os.path.getsize(os.path.join(args.code_dir, filename)))
-        print('------------------------------------------------------')
+        utils.print_dash()
 
         cmd = [app_utils.CLANG_MINER_EXECUTABLE,
                '-extra-arg-before=-xcl',

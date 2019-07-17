@@ -1,4 +1,10 @@
 import os
+import subprocess
+
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+import utils
 
 
 def get_env_or_default(vairable_name, default_name):
@@ -6,6 +12,37 @@ def get_env_or_default(vairable_name, default_name):
         return os.environ[vairable_name]
 
     return default_name
+
+
+def print_process_stdout_continuously(process, prefix):
+    while True:
+        line = process.stdout.readline()
+        if not line:
+            break
+        print(prefix + ': ' + str(line.rstrip(), 'utf-8'))
+
+    process.wait()
+    print(prefix + ' RETURNCODE: ' + str(process.returncode))
+
+
+def build_with_cmake(project_path, target):
+    utils.print_dash()
+    print('Build with cmake and make. Target: %s, Project path: %s' % (target, project_path))
+    utils.print_dash()
+
+    build_path = os.path.join(project_path, 'build')
+
+    if not os.path.exists(build_path):
+        subprocess.Popen(['mkdir', build_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=project_path)
+
+        process = subprocess.Popen(['cmake', '..'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
+        print_process_stdout_continuously(process, 'CMAKE')
+
+    process = subprocess.Popen(['make', '-j', '4', target], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
+    print_process_stdout_continuously(process, 'MAKE')
+
+    target_executable = os.path.join(build_path, target)
+    return target_executable
 
 
 CLANG_EXECUTABLE = \
@@ -30,15 +67,9 @@ MINER_PASS_SHARED_LIBRARY = \
         'MINER_PASS_SHARED_LIBRARY',
         '/devel/git/ML-CodeGraph/c/miner_llvm_pass/build/lib/libminer_pass.so')
 CLANG_MINER_EXECUTABLE = \
-    get_env_or_default(
-        'CLANG_MINER_EXECUTABLE',
-        '/devel/git/ML-CodeGraph/c/clang_miner/build/clang_miner')
+    build_with_cmake(os.path.join(SCRIPT_DIR, '..', '..', 'c', 'clang_miner'), 'clang_miner')
 
 LIBCLC_DIR = \
-    get_env_or_default(
-        'LIBCLC_DIR',
-        '/home/alex/clgen/lib/python3.6/site-packages/CLgen-0.4.1-py3.6.egg/clgen/data/libclc')
+    os.path.join(SCRIPT_DIR, '..', '..', 'c', '3rd_party', 'libclc')
 OPENCL_SHIM_FILE = \
-    get_env_or_default(
-        'OPENCL_SHIM_FILE',
-        '/home/alex/clgen/lib/python3.6/site-packages/CLgen-0.4.1-py3.6.egg/clgen/data/include/opencl-shim.h')
+    os.path.join(SCRIPT_DIR, '..', '..', 'c', '3rd_party', 'opencl-shim.h')
