@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <map>
 
 #include "clang/StaticAnalyzer/Frontend/AnalysisConsumer.h"
 #include "clang/StaticAnalyzer/Core/CheckerRegistry.h"
@@ -91,58 +92,12 @@ public:
     void operator=(ClangCodeGraph const &) = delete;
 
 public:
-    std::vector<NodeContainerPtr> GetAllStatements() {
-        std::vector<NodeContainerPtr> allStatements;
-
-        for(std::vector<FunctionContainerPtr>::iterator it = this->_functionContainers.begin();
-                it != this->_functionContainers.end(); ++it) {
-
-            std::stack<NodeContainerPtr> stmtStack;
-            stmtStack.push((*it)->_bodyRootStmt);
-
-            while (stmtStack.empty() == false) {
-                // Get and remove top element
-                NodeContainerPtr currentContainer = stmtStack.top();
-                stmtStack.pop();
-
-                allStatements.push_back(currentContainer);
-
-                // Add element's children to stack
-                for (std::vector<NodeContainerPtr>::iterator it = currentContainer->astRelations.begin();
-                     it != currentContainer->astRelations.end(); ++it) {
-                    stmtStack.push(*it);
-                }
-            }
-        }
-
-        return allStatements;
-    }
-
-    std::vector<NodeContainerPtr> GetAllFunctionArguments() {
-        std::vector<NodeContainerPtr> allArguments;
-
-        for (std::vector<FunctionContainerPtr>::iterator it = this->_functionContainers.begin();
-             it != this->_functionContainers.end(); ++it) {
-
-            std::vector<NodeContainerPtr> functionArguments = (*it)->_functionArguments;
-
-            for (std::vector<NodeContainerPtr>::iterator it = functionArguments.begin();
-                 it != functionArguments.end(); ++it) {
-
-                allArguments.push_back(*it);
-            }
-        }
-
-        return allArguments;
-    }
-
     NodeContainerPtr GetNodeContainerByClangStmt(const Stmt *clangStmt) {
-        std::vector<NodeContainerPtr> allStatements = GetAllStatements();
+        std::map<const Stmt*, NodeContainerPtr>::iterator it;
+        it = _allStmts.find(clangStmt);
 
-        for (std::vector<NodeContainerPtr>::iterator it = allStatements.begin(); it != allStatements.end(); ++it) {
-            if ((*it)->stmtInfo->clangStmt == clangStmt) {
-                return *it;
-            }
+        if(it != _allStmts.end()) {
+            return it->second;
         }
 
         std::cerr << "No NodeContainer has been found for clangStmt: " << clangStmt->getStmtClassName() << std::endl;
@@ -150,22 +105,11 @@ public:
     }
 
     NodeContainerPtr GetNodeContainerByClangDecl(const ValueDecl *clangDecl) {
-        std::vector<NodeContainerPtr> allStatements = GetAllStatements();
-        for (std::vector<NodeContainerPtr>::iterator it = allStatements.begin();
-                it != allStatements.end(); ++it) {
+        std::map<const ValueDecl*, NodeContainerPtr>::iterator it;
+        it = _allDecls.find(clangDecl);
 
-            if ((*it)->declInfo && (*it)->declInfo->clangDecl == clangDecl) {
-                return *it;
-            }
-        }
-
-        std::vector<NodeContainerPtr> allArguments = GetAllFunctionArguments();
-        for (std::vector<NodeContainerPtr>::iterator it = allArguments.begin();
-                it != allArguments.end(); ++it) {
-
-            if ((*it)->declInfo->clangDecl == clangDecl) {
-                return *it;
-            }
+        if(it != _allDecls.end()) {
+            return it->second;
         }
 
         std::cerr << "No NodeContainer has been found for clangDecl: " << clangDecl->getDeclName().getAsString() << std::endl;
@@ -300,6 +244,14 @@ public:
         return jRoot;
     }
 
+    void addStmt(NodeContainerPtr sInfo) {
+        _allStmts.insert(std::pair<const Stmt*, NodeContainerPtr>(sInfo->stmtInfo->clangStmt, sInfo));
+    }
+
+    void addDecl(NodeContainerPtr sInfo) {
+        _allDecls.insert(std::pair<const ValueDecl*, NodeContainerPtr>(sInfo->declInfo->clangDecl, sInfo));
+    }
+
 private:
     void AssignNodeIds() {
         for (std::vector<FunctionContainerPtr>::iterator it = _functionContainers.begin();
@@ -331,6 +283,9 @@ private:
 
 public:
     std::vector<FunctionContainerPtr> _functionContainers;
+
+    std::map<const Stmt*, NodeContainerPtr> _allStmts;
+    std::map<const ValueDecl*, NodeContainerPtr> _allDecls;
 
     int _numFunctions = 0;
 
@@ -382,6 +337,7 @@ public:
                 }
 
                 fnInfo->_functionArguments.push_back(sInfo);
+                ClangCodeGraph::getInstance().addDecl(sInfo);
             }
 
             // 2. Extract body
@@ -400,6 +356,8 @@ public:
             sInfo->stmtInfo->name = sInfo->stmtInfo->clangStmt->getStmtClassName();
 
             fnInfo->_bodyRootStmt = sInfo;
+            ClangCodeGraph::getInstance().addStmt(sInfo);
+
             stmtStack.push(sInfo);
 
             while (stmtStack.empty() == false) {
@@ -433,7 +391,10 @@ public:
                                         }
 
                                         stmtStack.push(sInfo);
+
                                         currentContainer->astRelations.push_back(sInfo);
+                                        ClangCodeGraph::getInstance().addDecl(sInfo);
+                                        ClangCodeGraph::getInstance().addStmt(sInfo);
                                     }
                                 }
                             }
@@ -475,6 +436,7 @@ public:
 
                             stmtStack.push(sInfo);
                             currentContainer->astRelations.push_back(sInfo);
+                            ClangCodeGraph::getInstance().addStmt(sInfo);
                         }
                     }
                 }
