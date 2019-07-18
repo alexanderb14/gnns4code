@@ -45,6 +45,14 @@ def build_with_cmake(project_path, target):
     return target_executable
 
 
+def format_c_code(c_code:str):
+    cmd = [CLANG_FORMAT_EXECUTABLE]
+    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate(c_code.encode('utf-8'))
+
+    return stdout.decode("utf-8")
+
+
 CLANG_EXECUTABLE = \
     get_env_or_default(
         'CLANG_EXECUTABLE',

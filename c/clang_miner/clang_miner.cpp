@@ -559,13 +559,15 @@ int main(int argc, const char **argv) {
         return 1;
     }
 
-    // Dump information to console
-    llvm::errs() << ClangCodeGraph::getInstance().ToJson().dump(4);
+    // Dump codegraph as JSON to console
+    llvm::outs() << ClangCodeGraph::getInstance().ToJson().dump(4);
 
-    // Dump information to file
-    std::ofstream jsonOutFile(outFileName);
-    jsonOutFile << ClangCodeGraph::getInstance().ToJson().dump(4);
-    jsonOutFile.close();
+    // Optinal: Dump codegraph as JSON to file
+    if(!outFileName.getValue().empty()) {
+        std::ofstream jsonOutFile(outFileName);
+        jsonOutFile << ClangCodeGraph::getInstance().ToJson().dump(4);
+        jsonOutFile.close();
+    }
 
     return 0;
 }

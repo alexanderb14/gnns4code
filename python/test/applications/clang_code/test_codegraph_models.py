@@ -28,33 +28,36 @@ def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
 
     # Clang tool C -> Graph
     if is_open_cl_code:
-        ret = subprocess.call([utils.CLANG_MINER_EXECUTABLE,
-                               '-extra-arg-before=-xcl',
-                               '-extra-arg=-I' + utils.LIBCLC_DIR,
-                               '-extra-arg=-include' + utils.OPENCL_SHIM_FILE,
-                               os.path.join(datadir, c_file),
-                               '-o', graph_out_file])
-    else:
-        ret = subprocess.call([utils.CLANG_MINER_EXECUTABLE,
-                               os.path.join(datadir, c_file),
-                               '-o', graph_out_file])
-    assert ret == 0
+        cmd = [utils.CLANG_MINER_EXECUTABLE,
+               '-extra-arg-before=-xcl',
+               '-extra-arg=-I' + utils.LIBCLC_DIR,
+               '-extra-arg=-include' + utils.OPENCL_SHIM_FILE,
+               os.path.join(datadir, c_file)]
 
-    # Python graph
-    with open(graph_out_file) as f:
-        jRoot = json.load(f)
-    graph = codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
+    else:
+        cmd = [utils.CLANG_MINER_EXECUTABLE,
+               os.path.join(datadir, c_file)]
+
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+
+    assert process.returncode == 0
+
+    # Parse graph
+    graph_str = stdout.decode('utf-8')
+    graph_j = json.loads(graph_str)
+    graph = codegraph_models.codegraphs_create_from_miner_output(graph_j)[0]
 
     # Save dot graph
-    #codegraph_models.save_dot_graph(graph, graph_out_file + '.png', 'png', True)
-    #subprocess.call(['open', graph_out_file + '.png'])
+    codegraph_models.save_dot_graph(graph, graph_out_file + '.png', 'png', True)
+    # subprocess.call(['open', graph_out_file + '.png'])
 
     # Transform graph:
     codegraph_models.transform_graph(graph)
 
     # Save reduced dot graph
     codegraph_models.save_dot_graph(graph, graph_out_file + '.reduced' + '.png', 'png', True)
-    #subprocess.call(['open', graph_out_file + '.reduced' + '.png'])
+    # subprocess.call(['open', graph_out_file + '.reduced' + '.png'])
 
     return graph
 
@@ -74,10 +77,15 @@ def compile_code(tmpdir, code, c_file_basename):
 
     # Compile c code and save stdout, stderr to file
     with open(clang_stdout_stderr_filename, 'w') as file:
-        p = subprocess.run(['clang', '-c', c_out_filename, '-o', c_out_filename + '.a'],
-                            stdout=file, stderr=file)
+        cmd = ['clang', '-c', c_out_filename, '-o', c_out_filename + '.a']
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        return p.returncode == 0
+        if process.returncode != 0:
+            stdout, stderr = process.communicate()
+            print('stdout: ' + stdout.decode('utf-8'))
+            print('stderr: ' + stderr.decode('utf-8'))
+
+        return process.returncode == 0
 
 def gen_and_compile_graph(tmpdir, datadir, c_file, is_open_cl_code: bool=False):
     shutil.copyfile(os.path.join(datadir, c_file), os.path.join(tmpdir, c_file))
@@ -90,8 +98,7 @@ def gen_and_compile_graph(tmpdir, datadir, c_file, is_open_cl_code: bool=False):
     code = generate_code(graph)
     compile_ok = compile_code(tmpdir, code, c_file_basename)
 
-    # For debug
-    print(code)
+    print(utils.format_c_code(code))
 
     return compile_ok
 

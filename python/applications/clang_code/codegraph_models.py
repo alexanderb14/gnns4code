@@ -670,7 +670,6 @@ class CodeGenVisitor(VisitorBase):
                body_str
 
     def _inc_and_check_num_visits(self):
-        print(self.num_visits)
         self.num_visits += 1
         if self.num_visits > self.num_visits_limit:
             raise Exception('num_visits_limit exceeded: %i' % self.num_visits)
