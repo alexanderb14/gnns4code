@@ -1,0 +1,577 @@
+typedef uchar u8; typedef ushort u16; typedef uint u32; typedef ulong u64; typedef uchar u8x; typedef uint u32x; typedef ulong u64x; inline bool A(const u32 a) {
+  return a;
+}
+
+inline u32 B(const u32 a, const u32 b) {
+  return amd_bitalign(a, a, b);
+}
+
+inline u32 C(const u32 a, const u32 b) {
+  return rotate(a, b);
+}
+
+inline u32 D(u64 a) {
+  const u32 b = (uint)(a);
+
+  return b;
+}
+
+inline u32 E(u64 a) {
+  a >>= 32;
+
+  const u32 b = (uint)(a);
+
+  return b;
+}
+
+inline u64 F(const u32 a, const u32 b) {
+  return __builtin_astype((uint2)(b, a), ulong);
+}
+
+inline u64 G(const u64 a, const u32 b) {
+  uint2 c = __builtin_astype(a, uint2);
+
+  uint2 d;
+
+  d.s0 = (b >= 32) ? amd_bitalign(c.s0, c.s1, b - 32) : amd_bitalign(c.s1, c.s0, b);
+  d.s1 = (b >= 32) ? amd_bitalign(c.s1, c.s0, b - 32) : amd_bitalign(c.s0, c.s1, b);
+
+  return __builtin_astype(d, ulong);
+}
+
+inline u64 H(const u64 a, const u32 b) {
+  return G(a, 64 - b);
+}
+typedef struct {
+} digest_t;
+
+typedef struct {
+  u32 salt_buf[16];
+  u32 salt_buf_pc[8];
+
+  u32 salt_len;
+  u32 salt_iter;
+  u32 salt_sign[2];
+
+  u32 keccak_mdlen;
+  u32 truecrypt_mdlen;
+
+  u32 digests_cnt;
+  u32 digests_done;
+
+  u32 digests_offset;
+
+  u32 scrypt_N;
+  u32 scrypt_r;
+  u32 scrypt_p;
+  u32 scrypt_tmto;
+  u32 scrypt_phy;
+
+} salt_t;
+
+typedef struct {
+  int V;
+  int R;
+  int P;
+
+  int enc_md;
+
+  u32 id_buf[8];
+  u32 u_buf[32];
+  u32 o_buf[32];
+
+  int id_len;
+  int o_len;
+  int u_len;
+
+  u32 rc4key[2];
+  u32 rc4data[2];
+
+} pdf_t;
+
+typedef struct {
+  u32 pke[25];
+  u32 eapol[64];
+  int eapol_size;
+  int keyver;
+
+} wpa_t;
+
+typedef struct {
+  u32 cry_master_buf[64];
+  u32 ckey_buf[64];
+  u32 public_key_buf[64];
+
+  u32 cry_master_len;
+  u32 ckey_len;
+  u32 public_key_len;
+
+} bitcoin_wallet_t;
+
+typedef struct {
+  u32 salt_buf[30];
+  u32 salt_len;
+
+  u32 esalt_buf[38];
+  u32 esalt_len;
+
+} sip_t;
+
+typedef struct { u32 data[384]; } androidfde_t;
+
+typedef struct {
+  u32 nr_buf[16];
+  u32 nr_len;
+
+  u32 msg_buf[128];
+  u32 msg_len;
+
+} ikepsk_t;
+
+typedef struct {
+  u32 user_len;
+  u32 domain_len;
+  u32 srvchall_len;
+  u32 clichall_len;
+
+  u32 userdomain_buf[64];
+  u32 chall_buf[256];
+
+} netntlm_t;
+
+typedef struct {
+  u32 user[16];
+  u32 realm[16];
+  u32 salt[32];
+  u32 timestamp[16];
+  u32 checksum[4];
+
+} krb5pa_t;
+
+typedef struct {
+  u32 salt_buf[16];
+  u32 data_buf[112];
+  u32 keyfile_buf[16];
+
+} tc_t;
+
+typedef struct { u32 salt_buf[16]; } pbkdf2_md5_t;
+
+typedef struct { u32 salt_buf[16]; } pbkdf2_sha1_t;
+
+typedef struct { u32 salt_buf[16]; } pbkdf2_sha256_t;
+
+typedef struct { u32 salt_buf[32]; } pbkdf2_sha512_t;
+
+typedef struct {
+  u32 salt_buf[128];
+  u32 salt_len;
+
+} rakp_t;
+
+typedef struct {
+  u32 data_len;
+  u32 data_buf[512];
+
+} cloudkey_t;
+
+typedef struct {
+  u32 encryptedVerifier[4];
+  u32 encryptedVerifierHash[5];
+
+  u32 keySize;
+
+} office2007_t;
+
+typedef struct {
+  u32 encryptedVerifier[4];
+  u32 encryptedVerifierHash[8];
+
+} office2010_t;
+
+typedef struct {
+  u32 encryptedVerifier[4];
+  u32 encryptedVerifierHash[8];
+
+} office2013_t;
+
+typedef struct {
+  u32 version;
+  u32 encryptedVerifier[4];
+  u32 encryptedVerifierHash[4];
+  u32 rc4key[2];
+
+} oldoffice01_t;
+
+typedef struct {
+  u32 version;
+  u32 encryptedVerifier[4];
+  u32 encryptedVerifierHash[5];
+  u32 rc4key[2];
+
+} oldoffice34_t;
+
+typedef struct {
+  u32x digest[4];
+  u32x out[4];
+
+} pdf14_tmp_t;
+
+typedef struct {
+  union {
+    u32 dgst32[16];
+    u64 dgst64[8];
+  };
+
+  u32 dgst_len;
+  u32 W_len;
+
+} pdf17l8_tmp_t;
+
+typedef struct { u32x digest_buf[4]; } phpass_tmp_t;
+
+typedef struct { u32x digest_buf[4]; } md5crypt_tmp_t;
+
+typedef struct {
+  u32x alt_result[8];
+
+  u32x p_bytes[4];
+  u32x s_bytes[4];
+
+} sha256crypt_tmp_t;
+
+typedef struct {
+  u64x l_alt_result[8];
+
+  u64x l_p_bytes[2];
+  u64x l_s_bytes[2];
+
+} sha512crypt_tmp_t;
+
+typedef struct {
+  u32x ipad[5];
+  u32x opad[5];
+
+  u32x dgst[10];
+  u32x out[10];
+
+} wpa_tmp_t;
+
+typedef struct { u64x dgst[8]; } bitcoin_wallet_tmp_t;
+
+typedef struct {
+  u32x ipad[5];
+  u32x opad[5];
+
+  u32x dgst[5];
+  u32x out[4];
+
+} dcc2_tmp_t;
+
+typedef struct {
+  u32x P[18];
+
+  u32x S0[256];
+  u32x S1[256];
+  u32x S2[256];
+  u32x S3[256];
+
+} bcrypt_tmp_t;
+
+typedef struct {
+  u32x digest[2];
+
+  u32x P[18];
+
+  u32x S0[256];
+  u32x S1[256];
+  u32x S2[256];
+  u32x S3[256];
+
+} pwsafe2_tmp_t;
+
+typedef struct { u32x digest_buf[8]; } pwsafe3_tmp_t;
+
+typedef struct { u32x digest_buf[5]; } androidpin_tmp_t;
+
+typedef struct {
+  u32x ipad[5];
+  u32x opad[5];
+
+  u32x dgst[10];
+  u32x out[10];
+
+} androidfde_tmp_t;
+
+typedef struct {
+  u32x ipad[16];
+  u32x opad[16];
+
+  u32x dgst[64];
+  u32x out[64];
+
+} tc_tmp_t;
+
+typedef struct {
+  u64x ipad[8];
+  u64x opad[8];
+
+  u64x dgst[32];
+  u64x out[32];
+
+} tc64_tmp_t;
+
+typedef struct {
+  u32x ipad[4];
+  u32x opad[4];
+
+  u32x dgst[32];
+  u32x out[32];
+
+} pbkdf2_md5_tmp_t;
+
+typedef struct {
+  u32x ipad[5];
+  u32x opad[5];
+
+  u32x dgst[32];
+  u32x out[32];
+
+} pbkdf2_sha1_tmp_t;
+
+typedef struct {
+  u32x ipad[8];
+  u32x opad[8];
+
+  u32x dgst[32];
+  u32x out[32];
+
+} pbkdf2_sha256_tmp_t;
+
+typedef struct {
+  u64x ipad[8];
+  u64x opad[8];
+
+  u64x dgst[16];
+  u64x out[16];
+
+} pbkdf2_sha512_tmp_t;
+
+typedef struct { u64x out[8]; } ecryptfs_tmp_t;
+
+typedef struct {
+  u64x ipad[8];
+  u64x opad[8];
+
+  u64x dgst[16];
+  u64x out[16];
+
+} oraclet_tmp_t;
+
+typedef struct {
+  u32x ipad[5];
+  u32x opad[5];
+
+  u32x dgst[5];
+  u32x out[5];
+
+} agilekey_tmp_t;
+
+typedef struct {
+  u32 ipad[5];
+  u32 opad[5];
+
+  u32 dgst1[5];
+  u32 out1[5];
+
+  u32 dgst2[5];
+  u32 out2[5];
+
+} mywallet_tmp_t;
+
+typedef struct {
+  u32x ipad[5];
+  u32x opad[5];
+
+  u32x dgst[5];
+  u32x out[5];
+
+} sha1aix_tmp_t;
+
+typedef struct {
+  u32x ipad[8];
+  u32x opad[8];
+
+  u32x dgst[8];
+  u32x out[8];
+
+} sha256aix_tmp_t;
+
+typedef struct {
+  u64x ipad[8];
+  u64x opad[8];
+
+  u64x dgst[8];
+  u64x out[8];
+
+} sha512aix_tmp_t;
+
+typedef struct {
+  u32x ipad[8];
+  u32x opad[8];
+
+  u32x dgst[8];
+  u32x out[8];
+
+} lastpass_tmp_t;
+
+typedef struct { u64x digest_buf[8]; } drupal7_tmp_t;
+
+typedef struct {
+  u32x ipad[5];
+  u32x opad[5];
+
+  u32x dgst[5];
+  u32x out[5];
+
+} lotus8_tmp_t;
+
+typedef struct { u32x out[5]; } office2007_tmp_t;
+
+typedef struct { u32x out[5]; } office2010_tmp_t;
+
+typedef struct { u64x out[8]; } office2013_tmp_t;
+
+typedef struct { u32x digest_buf[5]; } saph_sha1_tmp_t;
+
+typedef struct {
+  u32x block[16];
+
+  u32x dgst[8];
+
+  u32x block_len;
+  u32x final_len;
+
+} seven_zip_tmp_t;
+
+typedef struct {
+  u32x Kc[16];
+  u32x Kd[16];
+
+  u32x iv[2];
+
+} bsdicrypt_tmp_t;
+
+typedef struct { u32 dgst[17][5]; } rar3_tmp_t;
+
+typedef struct { u32 user[16]; } cram_md5_t;
+
+typedef struct {
+  u32 iv_buf[4];
+  u32 iv_len;
+
+  u32 salt_buf[4];
+  u32 salt_len;
+
+  u32 crc;
+
+  u32 data_buf[96];
+  u32 data_len;
+
+  u32 unpack_size;
+
+} seven_zip_t;
+
+typedef struct {
+  u32 key;
+  u64 val;
+
+} hcstat_table_t;
+
+typedef struct {
+  u32 cs_buf[0x100];
+  u32 cs_len;
+
+} cs_t;
+
+typedef struct { u32 cmds[15]; } gpu_rule_t;
+typedef struct {
+  u32 gidvid;
+  u32 il_pos;
+
+} plain_t;
+
+typedef struct {
+  u32x i[64];
+
+  u32 pw_len;
+  u32 alignment_placeholder_1;
+  u32 alignment_placeholder_2;
+  u32 alignment_placeholder_3;
+
+} pw_t;
+
+typedef struct { u32 i; } bf_t;
+
+typedef struct {
+  u32 i[8];
+
+  u32 pw_len;
+
+} comb_t;
+
+typedef struct { u32 b[32]; } bs_word_t;
+
+typedef struct { uint4 P[64]; } scrypt_tmp_t;
+
+__kernel void __attribute__((reqd_work_group_size(64, 1, 1))) I(__global pw_t* a, __global pw_t* b, __global gpu_rule_t* c, __global comb_t* d, __global bf_t* e, const u32 f, const u32 g) {
+  const u32 h = get_global_id(0);
+
+  if (h >= g)
+    return;
+
+  const u32 i = a[h].pw_len;
+
+  u32x j[4];
+  u32x k[4];
+  u32x l[4];
+  u32x m[4];
+
+  j[0] = a[h].i[0];
+  j[1] = a[h].i[1];
+  j[2] = a[h].i[2];
+  j[3] = a[h].i[3];
+  k[0] = a[h].i[4];
+  k[1] = a[h].i[5];
+  k[2] = a[h].i[6];
+  k[3] = a[h].i[7];
+  l[0] = a[h].i[8];
+  l[1] = a[h].i[9];
+  l[2] = a[h].i[10];
+  l[3] = a[h].i[11];
+  m[0] = a[h].i[12];
+  m[1] = a[h].i[13];
+  m[2] = a[h].i[14];
+  m[3] = a[h].i[15];
+
+  const u32 n = e[0].i;
+
+  b[h].i[0] = j[0] | n;
+  b[h].i[1] = j[1];
+  b[h].i[2] = j[2];
+  b[h].i[3] = j[3];
+  b[h].i[4] = k[0];
+  b[h].i[5] = k[1];
+  b[h].i[6] = k[2];
+  b[h].i[7] = k[3];
+  b[h].i[8] = l[0];
+  b[h].i[9] = l[1];
+  b[h].i[10] = l[2];
+  b[h].i[11] = l[3];
+  b[h].i[12] = m[0];
+  b[h].i[13] = m[1];
+  b[h].i[14] = m[2];
+  b[h].i[15] = m[3];
+
+  b[h].pw_len = i;
+}
