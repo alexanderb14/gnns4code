@@ -3,13 +3,14 @@ import json
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
+import progressbar
 import shutil
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/../..')
-import graphgen.utils as utils
-from applications.clang_code.codegraph_models import codegraph_create_from_miner_output, save_dot_graph, \
+import utils
+from applications.clang_code.codegraph_models import codegraphs_create_from_miner_output, save_dot_graph, \
     transform_graph, create_action_sequence, is_graph_in_statement_names_whitelist, \
     NodeTypeIdCreateVisitor, StatisticsVisitor, StmtNameQueryVisitor
 
@@ -57,6 +58,10 @@ def main():
                         help="minimum number of nodes for filter")
     parser.add_argument("--num_nodes_max", type=int,
                         help="maximum number of nodes for filter")
+    parser.add_argument("--num_actions_min", type=int,
+                        help="minimum number of actions for filter")
+    parser.add_argument("--num_actions_max", type=int,
+                        help="maximum number of actions for filter")
     parser.add_argument("--statement_name_whitelist_filter",
                         help="filter based on whitelist", action='store_true')
     parser.add_argument("--complex_types_filter",
@@ -83,8 +88,13 @@ def main():
     args = parser.parse_args()
 
     # 1: Create graphs from json files in graph_dir
+    graph_files = os.listdir(os.path.join(SCRIPT_DIR, args.graph_dir))
+    len_graph_files = len(graph_files)
     graphs = []
-    for i, filename in enumerate(os.listdir(os.path.join(SCRIPT_DIR, args.graph_dir))):
+
+    for i, filename in enumerate(graph_files):
+        utils.printProgressBar(i, len_graph_files, prefix='Parsing:', suffix='Complete', length=50)
+
         if args.clip_at:
             if int(args.clip_at) == i:
                 break
@@ -97,33 +107,47 @@ def main():
         with open(dir_and_filename) as json_data:
             jRoot = json.load(json_data)
             try:
-                graph = codegraph_create_from_miner_output(jRoot)
+                graph = codegraphs_create_from_miner_output(jRoot)[0]
                 graph.name = filename
                 graphs.append(graph)
             except:
                 pass
+
+
     print('size of data set:', len(graphs))
 
     # 2: Transform graphs
+    len_graphs = len(graphs)
     graphs_transformed = []
-    for graph in graphs:
+
+    for i, graph in enumerate(graphs):
+        utils.printProgressBar(i, len_graphs, prefix='Transforming:', suffix='Complete', length=50)
+
         graphs_transformed.append(transform_graph(graph))
+    len_graphs_transformed = len(graphs_transformed)
 
     # 3a: Get statistics and perform filtering
     graphs_filtered = []
-    for graph in graphs_transformed:
+    for i, graph in enumerate(graphs_transformed):
+        utils.printProgressBar(i, len_graphs_transformed, prefix='Filtering by number of nodes:', suffix='Complete', length=50)
+
+        num_functions = len(graph.functions)
+        print(num_functions)
+
         stats_vstr = StatisticsVisitor()
         graph.accept(stats_vstr)
-
-        num_functions = stats_vstr.num_functions
-        print(num_functions)
         num_nodes = stats_vstr.num_nodes
 
         ok = True
-        if num_nodes < args.num_nodes_min or num_nodes > args.num_nodes_max:
-            ok = False
+        if args.num_nodes_min:
+            if num_nodes < args.num_nodes_min:
+                ok = False
 
-        if num_functions != 2:
+        if args.num_nodes_max:
+            if num_nodes > args.num_nodes_max:
+                ok = False
+
+        if num_functions != 1:
             ok = False
 
         if args.statement_name_whitelist_filter:
@@ -147,12 +171,47 @@ def main():
     # 3: Create node type ids
     nic_vstr = NodeTypeIdCreateVisitor()
 
-    # 4: Gather stats and create action sequences of graphs
+    # 4: Filter based on number of actions
+    num_graphs_filtered = len(graphs_filtered)
+    graphs_filtered_by_num_actions = []
+
+    num_actions_max = 0
+    for i, graph in enumerate(graphs_filtered):
+        utils.printProgressBar(i, num_graphs_filtered, prefix='Filtering by number of actions:', suffix='Complete', length=50)
+
+        # Create action sequence
+        graph.accept(nic_vstr)
+        actions = create_action_sequence(graph, args.debug)
+        num_actions = len(actions)
+
+        if num_actions > num_actions_max:
+            num_actions_max = num_actions
+
+        # Filter based on number of actions
+        ok = True
+        if args.num_actions_min:
+            if num_actions < args.num_actions_min:
+                ok = False
+
+        if args.num_actions_max:
+            if num_actions > args.num_actions_max:
+                ok = False
+
+        if ok:
+            graphs_filtered_by_num_actions.append(graph)
+
+    # 5: Create action sequences and gather stats
+    nic_vstr = NodeTypeIdCreateVisitor()
+
+    num_graphs_filtered_by_num_actions = len(graphs_filtered_by_num_actions)
     num_nodes_max = 0
+
     preprocessed = []
 
-    len_actions_max = 0
-    for i, graph in enumerate(graphs_filtered):
+    num_actions_max = 0
+    for i, graph in enumerate(graphs_filtered_by_num_actions):
+        utils.printProgressBar(i, num_graphs_filtered_by_num_actions, prefix='Actionizing:', suffix='Complete', length=50)
+
         # Number of nodes
         stats_vstr = StatisticsVisitor()
         graph.accept(stats_vstr)
@@ -162,24 +221,38 @@ def main():
         # Action sequence
         graph.accept(nic_vstr)
         actions = create_action_sequence(graph, args.debug)
-        if len(actions) > len_actions_max:
-            len_actions_max = len(actions)
+        num_actions = len(actions)
 
-        preprocessed.append({
-            utils.AE.GRAPH_IDX: i,
-            utils.AE.ACTIONS: actions
-        })
+        if num_actions > num_actions_max:
+            num_actions_max = num_actions
+
+        # Filter based on number of actions
+        ok = True
+        if args.num_actions_min:
+            if num_actions < args.num_actions_min:
+                ok = False
+
+        if args.num_actions_max:
+            if num_actions > args.num_actions_max:
+                ok = False
+
+        if ok:
+            preprocessed.append({
+                utils.AE.GRAPH_IDX: i,
+                utils.AE.ACTIONS: actions
+            })
 
     # Print node types and stats
     node_types = nic_vstr.node_type_ids_by_statements
-    utils.pretty_print_dict(node_types)
+#    utils.pretty_print_dict(node_types)
 
     # Save node types
     with open('../../node_types.json', 'w') as outfile:
         json.dump(node_types, outfile)
 
-    print('len_actions_max:', len_actions_max)
+    print('num_actions_max:', num_actions_max)
     print('num_nodes_max:', num_nodes_max)
+    print('num_node_types:', len(node_types))
     print('num_graphs:', len(preprocessed))
 
     # Optional: Dump graphs as c files

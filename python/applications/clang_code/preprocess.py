@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import json
 import ntpath
 import os
@@ -70,20 +71,18 @@ def main():
                         help="directory to write graphs to")
     parser.add_argument("--bad_code_dir", type=str,
                         help="directory to write c files that produced errors to")
+    parser.add_argument("--error_log_dir", type=str,
+                        help="directory to write errors to")
     args = parser.parse_args()
 
+    delete_and_create_folder(args.out_dir)
     delete_and_create_folder(args.bad_code_dir)
+    delete_and_create_folder(args.error_log_dir)
 
-    files = get_files_by_file_size(args.code_dir, True)
+    files = get_files_by_file_size(args.code_dir, False)
 
-    num_ok = 0
-    num_not_ok = 0
-    for idx, filename_absolute in enumerate(files):
+    def fnc(filename_absolute):
         filename = ntpath.basename(filename_absolute)
-
-        utils.print_dash()
-        print('Processing:', filename, 'Filesize:', os.path.getsize(os.path.join(args.code_dir, filename)))
-        utils.print_dash()
 
         cmd = [app_utils.CLANG_MINER_EXECUTABLE,
                '-extra-arg-before=-xcl',
@@ -91,18 +90,59 @@ def main():
                 '-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE,
                 os.path.join(args.code_dir, filename),
                '-o', os.path.join(args.out_dir, filename + '.json')]
-        print(' '.join(cmd))
 
-        ret = subprocess.call(cmd)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        if ret == 0:
-            num_ok += 1
-        else:
-            print('ERROR. ret: %i' % ret)
+        stdout, stderr = process.communicate()
+        result = process.returncode
+
+        # In case of an error
+        if result != 0:
+            # write error report file containing source, stdout, stderr
+            report = ''
+
+            report += 'SOURCE:' + '\n'
+            report += utils.get_dash() + '\n'
+            with open(os.path.join(args.code_dir, filename), 'r') as f:
+                try:
+                    report += f.read() + '\n'
+                except:
+                    pass
+
+            report += 'STDOUT:' + '\n'
+            report += utils.get_dash() + '\n'
+            report += stdout.decode('utf-8') + '\n'
+
+            report += 'STDERR:' + '\n'
+            report += utils.get_dash() + '\n'
+            report += stderr.decode('utf-8') + '\n'
+
+            num_files = len([name for name in os.listdir(args.error_log_dir)])
+
+            report_filename = os.path.join(
+                args.error_log_dir,
+                str(num_files) + '_' + filename + '.txt')
+            with open(report_filename, 'w+') as f:
+                f.write(report)
+
+            # file that produced it
             shutil.copyfile(filename_absolute, os.path.join(args.bad_code_dir, filename))
-            num_not_ok += 1
 
-        print('num_ok: %i, num_not_ok: %i, idx: %i' % (num_ok, num_not_ok, idx))
+        return result
+
+    num_ok = 0
+    num_not_ok = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        for result in executor.map(fnc, files):
+            if result == 0:
+                num_ok += 1
+            else:
+                num_not_ok += 1
+
+            completed = num_ok + num_not_ok
+            todo = len(files) - completed
+            progress = float(completed) / float(len(files))
+            print('ok: %i, not_ok: %i, completed: %i, todo: %i, progress: %.2f' % (num_ok, num_not_ok, completed, todo, progress))
 
 if __name__ == "__main__":
     main()

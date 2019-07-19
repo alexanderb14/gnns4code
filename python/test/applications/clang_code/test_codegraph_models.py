@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 import os
 import shutil
@@ -24,7 +25,6 @@ def get_filenames_from_directory(directory):
 
 def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
     graph_out_file = os.path.join(tmpdir, c_file + '.json')
-    print(graph_out_file)
 
     # Clang tool C -> Graph
     if is_open_cl_code:
@@ -48,16 +48,16 @@ def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
     graph_j = json.loads(graph_str)
     graph = codegraph_models.codegraphs_create_from_miner_output(graph_j)[0]
 
-    # Save dot graph
-    codegraph_models.save_dot_graph(graph, graph_out_file + '.png', 'png', True)
-    # subprocess.call(['open', graph_out_file + '.png'])
+    # # Save dot graph
+    # codegraph_models.save_dot_graph(graph, graph_out_file + '.png', 'png', True)
+    # # subprocess.call(['open', graph_out_file + '.png'])
 
     # Transform graph:
     codegraph_models.transform_graph(graph)
 
-    # Save reduced dot graph
-    codegraph_models.save_dot_graph(graph, graph_out_file + '.reduced' + '.png', 'png', True)
-    # subprocess.call(['open', graph_out_file + '.reduced' + '.png'])
+    # # Save reduced dot graph
+    # codegraph_models.save_dot_graph(graph, graph_out_file + '.reduced' + '.png', 'png', True)
+    # # subprocess.call(['open', graph_out_file + '.reduced' + '.png'])
 
     return graph
 
@@ -82,62 +82,68 @@ def compile_code(tmpdir, code, c_file_basename):
 
         if process.returncode != 0:
             stdout, stderr = process.communicate()
-            print('stdout: ' + stdout.decode('utf-8'))
-            print('stderr: ' + stderr.decode('utf-8'))
 
-        return process.returncode == 0
+        return process.returncode == 0, stdout.decode('utf-8'), stderr.decode('utf-8')
 
 def gen_and_compile_graph(tmpdir, datadir, c_file, is_open_cl_code: bool=False):
     shutil.copyfile(os.path.join(datadir, c_file), os.path.join(tmpdir, c_file))
     with open(os.path.join(datadir, c_file), 'r') as f:
-        print(f.read())
+        c_file_str = f.read()
 
     c_file_basename, _ = os.path.splitext(c_file)
 
     graph = make_graph(c_file, datadir, tmpdir, is_open_cl_code)
     code = generate_code(graph)
-    compile_ok = compile_code(tmpdir, code, c_file_basename)
+    compile_ok, compile_stdout, compile_stderr = compile_code(tmpdir, code, c_file_basename)
 
-    print(utils.format_c_code(code))
+    format_stdout = utils.format_c_code(code)
+
+    return compile_ok, compile_stdout, compile_stderr, format_stdout
+
+def format_gen_and_compile_graph_result(result):
+    compile_ok, compile_stdout, compile_stderr, format_stdout = result
+
+    print('compile_stdout: ' + compile_stdout)
+    print('compile_stderr: ' + compile_stderr)
+    print('format_stdout:  ' + format_stdout)
 
     return compile_ok
-
 
 # CodeGen Tests: Test data
 def test_gen_and_compile_add(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
-    assert gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'add.c') == True
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'add.c')) == True
 
 def test_gen_and_compile_forward_decl(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
-    assert gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'forward_decl.c') == True
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'forward_decl.c')) == True
 
 def test_gen_and_compile_function_call(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
-    assert gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'function_call.c') == True
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'function_call.c')) == True
 
 def test_gen_and_compile_max(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
-    assert gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'max.c') == True
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'max.c')) == True
 
 def test_gen_and_compile_sum_array(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
-    assert gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'sum_array.c') == True
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'sum_array.c')) == True
 
 def test_gen_and_compile_sum_vector(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
-    assert gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'sum_vector.c') == True
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'sum_vector.c')) == True
 
 def test_gen_and_compile_sum_vector_2(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
-    assert gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'sum_vector_2.c') == True
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'sum_vector_2.c')) == True
 
 
 # CodeGen Tests: Real data
@@ -157,21 +163,26 @@ def test_gen_compile_all(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
 
-    DATA_DIR = '/devel/datasets/opencl_kernels_10..30'
+    DATA_DIR = os.path.join(SCRIPT_DIR, '..', '..', '..', '..', 'data', 'c')
+#    DATA_DIR = '/devel/datasets/opencl_kernels_10..30'
 
-    ok = 0
-    not_ok = 0
+    data = os.listdir(DATA_DIR)
 
-    for c_file in os.listdir(DATA_DIR):
-        print('-------------------------------------------')
+    def fnc(c_file):
+        result = gen_and_compile_graph(tmpdir, DATA_DIR, c_file, True)
+        return result
 
-        compile_ok = gen_and_compile_graph(tmpdir, DATA_DIR, c_file, True)
-        if compile_ok:
-            ok += 1
-        else:
-            not_ok += 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        ok = 0
+        not_ok = 0
+        for result in executor.map(fnc, data):
+            compile_ok = format_gen_and_compile_graph_result(result)
+            if compile_ok:
+                ok += 1
+            else:
+                not_ok += 1
 
-        print('>>>>>>>>>>>>>>>> ok: %i, not_ok: %i' % (ok, not_ok))
+            print('>>>>>>>>>>>>>>>> ok: %i, not_ok: %i, total: %i' % (ok, not_ok, len(data)))
 
 # Actionizer tests
 def test_actionize(tmpdir_factory):

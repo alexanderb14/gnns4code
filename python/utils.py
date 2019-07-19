@@ -88,8 +88,12 @@ def action_pretty_print(action, id=0):
         str(action[AE.ADJ_LIST]).replace('\n      ', '')))
 
 
+def get_dash():
+    return '-' * 40
+
+
 def print_dash():
-    print('-' * 200)
+    print(get_dash())
 
 
 def action_pretty_print_header():
@@ -304,6 +308,36 @@ def get_data_stats(data):
     print("- num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
     print("- node_types (max of it): %i" % (max(node_types)))
     print("- edge_types (max of it): %i" % (max(edge_types)))
+
+
+def freeze_dict(d):
+    if isinstance(d, dict):
+        return frozenset((key, freeze_dict(value)) for key, value in d.items())
+    elif isinstance(d, list):
+        return tuple(freeze_dict(value) for value in d)
+    return d
+
+
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█'):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('%s |%s| %s%% %s' % (prefix, bar, percent, suffix))
+    # Print New Line on Complete
+    if iteration == total:
+        print()
+
 
 # Classes
 #########

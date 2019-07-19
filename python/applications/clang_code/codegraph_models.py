@@ -581,6 +581,8 @@ class CodeGenVisitor(VisitorBase):
 
         if isinstance(obj, Statement):
             if obj.name == 'ArraySubscriptExpr':
+                pos = self._get_and_increment_statement_position('ArraySubscriptExpr_%i' % id(obj))
+
                 self.body.append('[')
 
             elif obj.name == 'BinaryOperator':
