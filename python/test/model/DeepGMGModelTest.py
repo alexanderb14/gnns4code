@@ -315,7 +315,6 @@ def test_train_and_gen_defaultgraph_small_2():
 
     train_generate_and_validate_default_graphs([training_graph], config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
-
 @pytest.mark.performance
 def test_train_and_gen_defaultgraph_medium_1():
     # Config
