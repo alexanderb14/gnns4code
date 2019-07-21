@@ -10,7 +10,7 @@ from model.DeepGMGModel import  DeepGMGModel, GGNNModelLayer, DeepGMGCell
 import applications.utils_llvm as app_utils
 import utils as general_utils
 import tensorflow as tf
-from utils import SMALL_NUMBER, VERY_SMALL_NUMBER, LABEL_OFFSET, ACTION_OFFSET, AE, A, L, T
+from utils import SMALL_NUMBER, MODERATELY_SMALL_NUMBER, LABEL_OFFSET, ACTION_OFFSET, AE, A, L, T
 
 def get_class_key(class_to_get, class_value):
     class_dict = class_to_get.__dict__
@@ -3171,7 +3171,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if label == 1:
             self.active_llvm_container = LLVM_Container(self.internal_llvm_graph)
@@ -3187,7 +3188,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             print("\tChoose br edge: " + str(second_edge))
@@ -3202,7 +3204,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             print("\tChoose function: " + str(function.id) + " (" + function.name + ")")
@@ -3216,7 +3219,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             if not stop:
@@ -3231,7 +3235,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             if is_static:
@@ -3254,7 +3259,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if node != None:
             self.append_active_node(label)
@@ -3277,7 +3283,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             print("Add struct: " + ("yes " if label == 1 else "no ") + self.get_active_node_string())
@@ -3289,7 +3296,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             print("Add global: " + ("yes " if label == 1 else "no ") + self.get_active_node_string())
@@ -3307,7 +3315,8 @@ class GraphActionizer():
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
                 AE.SUBGRAPH_START: 0,
-                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+                AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
             }
         pseudo_text = " [pseudo node]"
         if not is_pseudo_node:
@@ -3326,7 +3335,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
 
         if self.debug:
@@ -3345,7 +3355,8 @@ class GraphActionizer():
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
                 AE.SUBGRAPH_START: 0,
-                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+                AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
             }
 
         if self.debug and not is_deterministic:
@@ -3362,7 +3373,8 @@ class GraphActionizer():
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
                 AE.SUBGRAPH_START: 0,
-                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+                AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
             }
         if not is_pseudo_edge:
             pseudo_text = ""
@@ -3380,7 +3392,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             print("\tChoose local function: " + str(end_node) + " " + self.get_active_node_string())
@@ -3392,7 +3405,8 @@ class GraphActionizer():
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
             AE.SUBGRAPH_START: 0,
-            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug:
             print("\tChoose struct-node: " + str(end_node) + " " + self.get_active_node_string())
@@ -3405,7 +3419,8 @@ class GraphActionizer():
                 AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
                 AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
                 AE.SUBGRAPH_START: 0,
-                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0]
+                AE.ADJ_LIST : self.internal_llvm_graph.to_adj_list()[0],
+                AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
             }
 
         if self.debug and not is_deterministic:
@@ -3460,6 +3475,19 @@ class GraphGenerator(DeepGMGModel):
             return
         readable_debug_action = make_action_readable(debug_action)
         readable_real_action = make_action_readable(real_action)
+        try:
+            print("R.A: " + readable_debug_action["ACTION"])
+            print("D.A: " + readable_debug_action["ACTION"])
+            if "LABEL_0" in readable_debug_action and "LABEL_0" in readable_real_action:
+                print("R.L_0: " + readable_debug_action["LABEL_0"])
+                print("D.L_0: " + readable_debug_action["LABEL_0"])
+            if "LABEL_1" in readable_debug_action and "LABEL_1" in readable_real_action:
+                print("R.L_1: " + readable_debug_action["LABEL_1"])
+                print("D.L_1: " + readable_debug_action["LABEL_1"])
+            print("------------------------")
+            print()
+        except Exception as e:
+            pass
         a = 3
 
     def __make_model(self):
@@ -3490,7 +3518,8 @@ class GraphGenerator(DeepGMGModel):
             AE.ACTION:                    action_type,
             AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES :                self.internal_llvm_graph.get_num_nodes()
         }
 
 
@@ -3507,7 +3536,7 @@ class GraphGenerator(DeepGMGModel):
         p_addnode = result[1][0]
 
         # Sample if to add node
-        p_addnode_norm = p_addnode / (np.sum(p_addnode) + SMALL_NUMBER)   # Normalize to sum up to 1
+        p_addnode_norm = p_addnode / (np.sum(p_addnode) + MODERATELY_SMALL_NUMBER)   # Normalize to sum up to 1
         node_type = np.random.multinomial(1, p_addnode_norm)                    # Sample categorial
         node_type = np.argmax(node_type)                                        # One hot -> integer
 
@@ -3529,7 +3558,8 @@ class GraphGenerator(DeepGMGModel):
             AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
             L.LABEL_1:                    init_number,
-            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES :                self.internal_llvm_graph.get_num_nodes()
         }
         if self.debug_actions:
             self.compare_actions(self.get_next_debug_action(), action)
@@ -3558,7 +3588,8 @@ class GraphGenerator(DeepGMGModel):
             AE.ACTION:                    action_type,
             AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES :                self.internal_llvm_graph.get_num_nodes()
         }
 
 
@@ -3575,7 +3606,7 @@ class GraphGenerator(DeepGMGModel):
         p_addedge = result[1][0]
 
         # Sample if to add edge
-        p_addedge_norm = p_addedge / (np.sum(p_addedge) + utils.SMALL_NUMBER)
+        p_addedge_norm = p_addedge / (np.sum(p_addedge) + MODERATELY_SMALL_NUMBER)
         add_edge = np.random.multinomial(1, p_addedge_norm)                          # Sample bernoulli
         add_edge = np.argmax(add_edge)                                          # One hot -> integer
 
@@ -3599,7 +3630,8 @@ class GraphGenerator(DeepGMGModel):
             AE.ACTION:                    action_type,
             AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST:                  self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES :                self.internal_llvm_graph.get_num_nodes()
         }
 
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
@@ -3630,7 +3662,7 @@ class GraphGenerator(DeepGMGModel):
 
 
         p_nodes_limited = np.reshape(p_nodes_limited, (-1))
-        p_nodes_limited = p_nodes_limited / (np.sum(p_nodes_limited) + SMALL_NUMBER)  # Normalize to sum up to 1
+        p_nodes_limited = p_nodes_limited / (np.sum(p_nodes_limited) + MODERATELY_SMALL_NUMBER)  # Normalize to sum up to 1
         p_nodes_limited_reshaped = np.reshape(p_nodes_limited, (-1, self.config['num_edge_types']))
 
         v_t = np.random.multinomial(1, p_nodes_limited)                         # Sample categorial
@@ -3660,7 +3692,8 @@ class GraphGenerator(DeepGMGModel):
             AE.ACTION: action_type,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.ADJ_LIST: self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST: self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
 
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
@@ -3686,7 +3719,8 @@ class GraphGenerator(DeepGMGModel):
             AE.ACTION: A.CHOOSE_FUNCTION,
             AE.LAST_ADDED_NODE_ID: self.last_added_node_id,
             AE.LAST_ADDED_NODE_TYPE: self.last_added_node_type,
-            AE.ADJ_LIST: self.internal_llvm_graph.to_adj_list()[0]
+            AE.ADJ_LIST: self.internal_llvm_graph.to_adj_list()[0],
+            AE.NUM_NODES : self.internal_llvm_graph.get_num_nodes()
         }
 
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
@@ -3700,7 +3734,7 @@ class GraphGenerator(DeepGMGModel):
         # Update/Extract
         self.embeddings = result[0]
         p_choose_function = result[1][0]
-        chosen_function = chosen_function / (np.sum(chosen_function) + SMALL_NUMBER)
+        p_choose_function = p_choose_function / (np.sum(p_choose_function) + MODERATELY_SMALL_NUMBER)
         chosen_function = np.random.multinomial(1, p_choose_function)  # Sample bernoulli
         chosen_function = np.argmax(chosen_function)
 

@@ -223,7 +223,7 @@ class DeepGMGModel(object):
 
                         mat = np.zeros((num_nodes, num_edge_types))
 
-                        if action and utils.L.LABEL_0 in action and utils.L.LABEL_1 in action: #TODO: and action[utils.AE.ACTION] != utils.A.INIT_NODE:
+                        if action and utils.L.LABEL_0 in action and utils.L.LABEL_1 in action and action[utils.AE.ACTION] != utils.A.INIT_NODE:
 
                             node = action[utils.L.LABEL_0]
                             edge_type = action[utils.L.LABEL_1]
@@ -732,20 +732,23 @@ class DeepGMGTrainer(DeepGMGModel):
         Train model with training set in multiple epochs
         """
         actions_by_graphs = []
-
+        train_llvm = 'train_llvm' in self.config and self.config['train_llvm']
         # Extract actions
         for train_data in train_datas:
             actions = train_data[utils.AE.ACTIONS]
-            utils.enrich_action_sequence_with_adj_list_data(actions)
+            if not train_llvm:
+                utils.enrich_action_sequence_with_adj_list_data(actions)
             actions_by_graphs.append(actions)
 
         # Extract graph sizes
         graph_sizes = []
         for train_data in train_datas:
             actions = train_data[utils.AE.ACTIONS]
-            action_last = actions[len(actions) - 1]
-
-            graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID] + 1)
+            current_size = 0
+            for action_key in actions:
+                if actions[action_key][utils.AE.LAST_ADDED_NODE_ID] + 1 > current_size:
+                    current_size = actions[action_key][utils.AE.LAST_ADDED_NODE_ID] + 1
+            graph_sizes.append(current_size)
 
         best_epoch_loss = sys.maxsize
         best_epoch_count = 0

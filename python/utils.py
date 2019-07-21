@@ -7,6 +7,8 @@ from typing import Tuple, Dict
 
 
 # Constants
+
+MODERATELY_SMALL_NUMBER= 1e-4
 SMALL_NUMBER = 1e-7
 VERY_SMALL_NUMBER = 1e-30
 

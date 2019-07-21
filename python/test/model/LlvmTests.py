@@ -1,11 +1,12 @@
 import json
+import pytest
 import applications.code.codegraph_models as codegraph_models
 import applications.code.llvm_utils as llvm_utils
 import applications.code.preprocess as preprocess
 import test.model.DeepGMGModelTest as DeepGMGModelTest
 from model.DeepGMGModel import DeepGMGState, DeepGMGTrainer
 
-KERNEL_SMALL=\
+KERNEL_SMALL_0=\
     "__kernel void A(__global int* a) {\
         if ((2 == 0)) {\
             int b = 1;\
@@ -16,7 +17,13 @@ KERNEL_SMALL=\
         }\
     }"
 
-KERNEL_MEDIUM=\
+KERNEL_SMALL_1=\
+    "__kernel void A(__global char* a, __global char* b) {\
+        int c = get_global_id(0);\
+        int d = c + 1;\
+    }"
+
+KERNEL_MEDIUM_0=\
     "__kernel void A(__global int* a) {\
         __local int b, c;\
         b = 0;\
@@ -25,6 +32,13 @@ KERNEL_MEDIUM=\
         atomic_add(&c, 1);\
         a[0] = b;\
         a[1] = c;\
+    }"
+
+KERNEL_MEDIUM_1=\
+    "kernel void A(global int* a, local int* b) {\
+        event_t c = async_work_group_copy(b, a, get_local_size(0), 0);\
+        int d = 3;\
+        a[get_local_size(0) - d - 1] = d;\
     }"
 
 action_metas = \
@@ -145,6 +159,7 @@ config.update({
         'hidden_size': 16,
         "gen_num_node_max": 200,
         'extended_init': True,
+        'train_llvm': True,
         'choose_function_dims': 920,
         'add_instruction_node_input_dims' : len(llvm_utils.LLVM_NODE_TYPES.instruction_node_types),
         'add_type_node_input_dims' : len(llvm_utils.LLVM_NODE_TYPES.type_node_types),
@@ -163,12 +178,10 @@ def run_llvm_pipeline(kernel, num_graphs_to_generate, epochs):
     local_config = {}
     local_config.update(config)
     local_config.update({"num_epochs": epochs, "num_training_unroll": len(graph_actionizer.actions)})
-
-    actions_by_graphs = [graph_actionizer.actions]
-    graph_sizes = [graph_actionizer.internal_llvm_graph.get_num_nodes()]
+    train_data = [{llvm_utils.AE.ACTIONS : graph_actionizer.actions}]
     state = DeepGMGState(local_config)
     trainer = DeepGMGTrainer(local_config, state)
-    trainer.train(actions_by_graphs, graph_sizes)
+    trainer.train(train_data)
     generator = llvm_utils.GraphGenerator(config=local_config, state=state)
 
     num_graphs_equal = 0
@@ -188,20 +201,44 @@ def run_llvm_pipeline(kernel, num_graphs_to_generate, epochs):
 
     return num_graphs_equal
 
-def test_llvm_pipeline_small():
+
+@pytest.mark.acceptance
+def test_llvm_pipeline_small_0():
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
 
-    num_graphs_equal = run_llvm_pipeline(kernel=KERNEL_SMALL, num_graphs_to_generate=NUM_GRAPHS_TO_GENERATE, epochs=1000)
+    num_graphs_equal = run_llvm_pipeline(kernel=KERNEL_SMALL_0, num_graphs_to_generate=NUM_GRAPHS_TO_GENERATE, epochs=1000)
 
     assert num_graphs_equal > NUM_GRAPHS_TO_BE_EQUAL
 
-def test_llvm_pipeline_medium():
+
+@pytest.mark.acceptance
+def test_llvm_pipeline_small_1():
     NUM_GRAPHS_TO_GENERATE = 10
     NUM_GRAPHS_TO_BE_EQUAL = 5
 
-    num_graphs_equal = run_llvm_pipeline(kernel=KERNEL_MEDIUM, num_graphs_to_generate=NUM_GRAPHS_TO_GENERATE, epochs=2000)
+    num_graphs_equal = run_llvm_pipeline(kernel=KERNEL_SMALL_1, num_graphs_to_generate=NUM_GRAPHS_TO_GENERATE,
+                                         epochs=1000)
 
     assert num_graphs_equal > NUM_GRAPHS_TO_BE_EQUAL
+
+@pytest.mark.performance
+def test_llvm_pipeline_medium_0():
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    num_graphs_equal = run_llvm_pipeline(kernel=KERNEL_MEDIUM_0, num_graphs_to_generate=NUM_GRAPHS_TO_GENERATE, epochs=2000)
+
+    assert num_graphs_equal > NUM_GRAPHS_TO_BE_EQUAL
+
+@pytest.mark.performance
+def test_llvm_pipeline_medium_1():
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    num_graphs_equal = run_llvm_pipeline(kernel=KERNEL_MEDIUM_1, num_graphs_to_generate=NUM_GRAPHS_TO_GENERATE, epochs=2000)
+
+    assert num_graphs_equal > NUM_GRAPHS_TO_BE_EQUAL
+
 
 
