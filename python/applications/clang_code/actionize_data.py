@@ -3,7 +3,6 @@ import json
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
-import progressbar
 import shutil
 import sys
 
@@ -246,10 +245,6 @@ def main():
     node_types = nic_vstr.node_type_ids_by_statements
 #    utils.pretty_print_dict(node_types)
 
-    # Save node types
-    with open('../../node_types.json', 'w') as outfile:
-        json.dump(node_types, outfile)
-
     print('num_actions_max:', num_actions_max)
     print('num_nodes_max:', num_nodes_max)
     print('num_node_types:', len(node_types))
@@ -325,7 +320,12 @@ def main():
     # Optional: Dump actions to disk
     if args.json_out:
         with open(args.json_out, 'w') as outfile:
-            json.dump(preprocessed, outfile)
+            data = {
+                'graphs': preprocessed,
+                'types': node_types
+            }
+
+            json.dump(data, outfile)
 
     # Optional: Create png images of graphs
     if args.create_pngs:

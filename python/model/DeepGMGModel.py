@@ -711,6 +711,8 @@ class DeepGMGTrainer(DeepGMGModel):
         best_epoch_count = 0
 
         for epoch in range(0, self.config['num_epochs']):
+            epoch_start_time = time.time()
+
             # Partition into batches
             batch_size = self.config['batch_size']
 
@@ -759,7 +761,11 @@ class DeepGMGTrainer(DeepGMGModel):
                     best_epoch_count = 0
 
             epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
-            print('epoch: %i, instances/sec: %.2f, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_loss))
+
+            epoch_end_time = time.time()
+            epoch_time = epoch_end_time - epoch_start_time
+
+            print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss))
 
             # Logging
             summary = tf.Summary()
@@ -798,7 +804,11 @@ def main():
 
         # Load data
         with open(SCRIPT_DIR + '/' + config['train_file'], 'r') as f:
-            train_data = json.load(f, object_hook=utils.json_keys_to_int)
+            data = json.load(f)
+            train_data = data['graphs']
+
+            train_data = json.loads(json.dumps(train_data), object_hook=utils.json_keys_to_int)
+
         utils.get_data_stats(train_data)
 
         # Create objects

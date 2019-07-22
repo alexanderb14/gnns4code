@@ -69,6 +69,8 @@ def main():
                         help="directory of c code files")
     parser.add_argument("--out_dir", type=str,
                         help="directory to write graphs to")
+    parser.add_argument("--good_code_dir", type=str,
+                        help="directory to write c files that are successfully processed to")
     parser.add_argument("--bad_code_dir", type=str,
                         help="directory to write c files that produced errors to")
     parser.add_argument("--error_log_dir", type=str,
@@ -77,6 +79,7 @@ def main():
 
     delete_and_create_folder(args.out_dir)
     delete_and_create_folder(args.bad_code_dir)
+    delete_and_create_folder(args.good_code_dir)
     delete_and_create_folder(args.error_log_dir)
 
     files = get_files_by_file_size(args.code_dir, False)
@@ -125,8 +128,10 @@ def main():
             with open(report_filename, 'w+') as f:
                 f.write(report)
 
-            # file that produced it
             shutil.copyfile(filename_absolute, os.path.join(args.bad_code_dir, filename))
+        else:
+            shutil.copyfile(filename_absolute, os.path.join(args.good_code_dir, filename))
+
 
         return result
 
