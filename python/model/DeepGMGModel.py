@@ -169,6 +169,9 @@ class DeepGMGModel(object):
                         'last_added_node_types': []
                     }
 
+                    if self.config['use_edge_bias'] == 1:
+                        batch_data_by_cell[cell_idx]['num_incoming_edges_dicts_per_type'] = []
+
                     for action_idx in range(0, len(self.config['actions'])):
                         batch_data_by_cell[cell_idx]['a%i_labels' % action_idx] = []
 
@@ -213,10 +216,19 @@ class DeepGMGModel(object):
                         else:
                             batch_data[label_name].append(0)
 
-                # Graph model
+                # Graph model: Adj list
                 adj_lists = action[utils.AE.ADJ_LIST] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'])[0]
                 for idx, adj_list in adj_lists.items():
                     batch_data['adjacency_lists'][idx].append(adj_list)
+
+                if self.config['use_edge_bias'] == 1:
+                    # Graph model: Incoming edge numbers
+                    num_incoming_edges_dicts_per_type = action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'])[0]
+                    num_incoming_edges_per_type = np.zeros((num_nodes, num_edge_types))
+                    for (e_type, num_incoming_edges_per_type_dict) in num_incoming_edges_dicts_per_type.items():
+                        for (node_id, edge_count) in num_incoming_edges_per_type_dict.items():
+                            num_incoming_edges_per_type[node_id, e_type] = edge_count
+                    batch_data['num_incoming_edges_dicts_per_type'].append(num_incoming_edges_per_type)
 
                 graph_mappings_all = np.full(num_nodes, graph_idx)
                 batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
@@ -230,13 +242,18 @@ class DeepGMGModel(object):
         #
         feed_dict = {}
         for cell_idx, cell_data in batch_data_by_cell.items():
-            # Graph model
+            # Graph model: Adj list
             for idx, adj_list in enumerate(self.ggnn_layers[cell_idx].placeholders['adjacency_lists']):
                 feed_dict[adj_list] = np.array(cell_data['adjacency_lists'][idx])
                 if len(feed_dict[adj_list]) == 0:
                     feed_dict[adj_list] = np.zeros((0, 2), dtype=np.int32)
                 else:
                     feed_dict[adj_list] = feed_dict[adj_list][0]
+
+            if self.config['use_edge_bias'] == 1:
+                # Graph model: Incoming edge numbers
+                feed_dict[self.ggnn_layers[cell_idx].placeholders['num_incoming_edges_per_type']] \
+                    = np.concatenate(cell_data['num_incoming_edges_dicts_per_type'], axis=0)
 
             # Generative model
             feed_dict[self.cells[cell_idx].placeholders['actions']] = cell_data['actions']
@@ -328,7 +345,8 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.ACTION:                    utils.A.INIT_NODE,
             utils.AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
+            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0],
+            utils.AE.NUMS_INCOMING_EDGES_BY_TYPE:utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
         }
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
@@ -356,6 +374,10 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
             utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
         }
+        if self.config['use_edge_bias'] == 1:
+            action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] \
+                = utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
+
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
 
@@ -394,6 +416,10 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
             utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
         }
+        if self.config['use_edge_bias'] == 1:
+            action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] \
+                = utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
+
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
 
@@ -429,6 +455,10 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
             utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
         }
+        if self.config['use_edge_bias'] == 1:
+            action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] \
+                = utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
+
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
 

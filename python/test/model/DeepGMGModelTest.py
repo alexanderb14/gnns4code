@@ -28,8 +28,10 @@ CONFIG_DEFAULTGRAPH = {
     'batch_size': 100,
     "num_epochs": 100,
 
-    "out_dir": '/tmp',
     'tie_fwd_bkwd': 1,
+    "use_edge_bias": 0,
+
+    "out_dir": '/tmp',
     "debug": 1,
 
     'actions': [
@@ -259,6 +261,38 @@ def test_train_save_load_and_gen_defaultgraph():
 
     print(NUM_GRAPHS_TO_GENERATE, num_graphs_equal)
     assert num_graphs_equal > NUM_GRAPHS_TO_BE_EQUAL
+
+
+@pytest.mark.acceptance
+def test_train_and_gen_defaultgraph_with_edge_bias():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'hidden_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 14,
+        "run_id": "one_defaultgraph_small_1",
+
+        "num_node_types": 3,
+        "num_edge_types": 5,
+
+        "num_epochs": 500,
+        "gen_num_node_max": 5,
+
+        "use_edge_bias": 1,
+    })
+
+    nodes = [1, 2, 1]
+    edges = [(2, 1, 1), (2, 0, 0)]
+    training_graph = {utils.T.NODES: nodes, utils.T.EDGES: edges}
+
+    train_generate_and_validate_default_graphs([training_graph], config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+
 
 
 @pytest.mark.acceptance

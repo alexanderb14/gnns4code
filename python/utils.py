@@ -23,8 +23,9 @@ class AE:
     SKIP_NEXT, \
     SUBGRAPH_START, \
     NUM_NODES, \
-    PROBABILITY \
-    = range(0, 15)
+    PROBABILITY, \
+    NUMS_INCOMING_EDGES_BY_TYPE \
+    = range(0, 16)
 
 
 # Labels
@@ -233,11 +234,13 @@ def enrich_action_sequence_with_adj_list_data(actions:dict, tie_fwd_bkwd) -> dic
     graph_current = {T.NODES: [], T.EDGES: []}
 
     for action_idx, action in actions.items():
-        adj_list, _ = graph_to_adjacency_lists(graph_current[T.EDGES], tie_fwd_bkwd)
+        adj_list, nums_incoming_edges_dicts_per_type \
+            = graph_to_adjacency_lists(graph_current[T.EDGES], tie_fwd_bkwd)
         apply_action_to_graph(graph_current, action)
 
         action[AE.ADJ_LIST] = adj_list
         action[AE.NUM_NODES] = len(graph_current[T.NODES])
+        action[AE.NUMS_INCOMING_EDGES_BY_TYPE] = nums_incoming_edges_dicts_per_type
 
 
 def apply_action_to_graph(graph:dict, action:dict) -> None:

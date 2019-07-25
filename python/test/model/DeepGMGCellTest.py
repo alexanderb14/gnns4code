@@ -17,6 +17,8 @@ CONFIG = {
     'num_node_types': 2,
     'num_edge_types': 2,
 
+    'use_edge_bias': 0,
+
     'actions': [
         {
             'name': 'init_node',

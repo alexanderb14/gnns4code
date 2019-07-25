@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 from model.layer.PropagationModelLayer import PropagationModelLayer
@@ -19,6 +20,10 @@ class GGNNModelLayerState(object):
         edge_weights = tf.Variable(glorot_init([num_edge_types * h_dim, h_dim]),
                                                    name='edge_weights')
         self.weights['edge_weights'] = tf.reshape(edge_weights, [num_edge_types, h_dim, h_dim])
+
+        if self.config['use_edge_bias'] == 1:
+            self.weights['edge_biases'] = tf.Variable(np.zeros([num_edge_types, h_dim], dtype=np.float32),
+                                                            name='gnn_edge_biases')
 
         cell_type = self.config['graph_rnn_cell'].lower()
         activation_fun = tf.nn.tanh
@@ -59,6 +64,10 @@ class GGNNModelLayer(PropagationModelLayer):
         self.placeholders['adjacency_lists'] = [tf.placeholder(tf.int32, [None, 2], name='adjacency_e%s' % e)
                                                 for e in range(num_edge_types)]
 
+        if self.config['use_edge_bias'] == 1:
+            self.placeholders['num_incoming_edges_per_type'] = tf.placeholder(tf.float32, [None, num_edge_types],
+                                                                              name='num_incoming_edges_per_type')
+
     def compute_embeddings(self, embeddings: tf.Tensor) -> tf.Tensor:
         """
         Uses the model layer to process embeddings to new embeddings. All embeddings are in one dimension.
@@ -96,6 +105,10 @@ class GGNNModelLayer(PropagationModelLayer):
             messages = tf.unsorted_segment_sum(data=messages,
                                                segment_ids=edge_targets,
                                                num_segments=num_nodes)              # [v, h]
+
+            if self.config['use_edge_bias'] == 1:
+                embeddings += tf.matmul(self.placeholders['num_incoming_edges_per_type'],
+                                        self.state.weights['edge_biases'])
 
             # pass updated vertex features into RNN cell
             embeddings = self.state.weights['rnn_cells'](messages, embeddings)[1]     # [v, h]
