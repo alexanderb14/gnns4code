@@ -14,6 +14,7 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
 
 import utils
+import applications.utils as app_utils
 import applications.clang_code.codegraph_models as clang_codegraph_models
 from model.cell.DeepGMGCell import DeepGMGCell, DeepGMGCellState
 from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
@@ -270,8 +271,10 @@ class DeepGMGGenerator(DeepGMGModel):
     """
     Implementation of the generation process.
     """
-    def __init__(self, config: dict, state: DeepGMGState):
+    def __init__(self, config: dict, state: DeepGMGState, debug):
         super().__init__(config, state)
+
+        self.debug = debug
 
         self.num_nodes_max = config['gen_num_node_max']
 
@@ -339,7 +342,8 @@ class DeepGMGGenerator(DeepGMGModel):
         self.embeddings = result[0]
 
         # Print
-        utils.action_pretty_print(action)
+        if self.debug:
+            utils.action_pretty_print(action)
 
     def __sample_add_node_action(self):
         """
@@ -363,16 +367,19 @@ class DeepGMGGenerator(DeepGMGModel):
         # Update/Extract
         self.embeddings = result[0]
         p_addnode = result[1][0]
+        p_addnode = p_addnode.astype('float64')
 
         # Sample if to add node
-        p_addnode_norm = p_addnode / (np.sum(p_addnode) + utils.SMALL_NUMBER)   # Normalize to sum up to 1
+        p_addnode_norm = p_addnode / np.sum(p_addnode)                          # Normalize to sum up to 1
+
         node_type = np.random.multinomial(1, p_addnode_norm)                    # Sample categorial
         node_type = np.argmax(node_type)                                        # One hot -> integer
 
         # Print
         action[utils.L.LABEL_0] = node_type
         action[utils.AE.PROBABILITY] = p_addnode_norm[node_type]
-        utils.action_pretty_print(action)
+        if self.debug:
+            utils.action_pretty_print(action)
 
         return node_type, p_addnode_norm
 
@@ -406,7 +413,8 @@ class DeepGMGGenerator(DeepGMGModel):
         # Print
         action[utils.L.LABEL_0] = add_edge
         action[utils.AE.PROBABILITY] = p_addedge[add_edge]
-        utils.action_pretty_print(action)
+        if self.debug:
+            utils.action_pretty_print(action)
 
         return add_edge, p_addedge
 
@@ -432,11 +440,12 @@ class DeepGMGGenerator(DeepGMGModel):
         # Update/Extract
         self.embeddings = result[0]
         p_nodes = result[1]
+        p_nodes = p_nodes.astype('float64')
 
         # Sample where to add edge to
         p_nodes_limited = p_nodes[0:len(self.current_graph[utils.T.NODES]) - 1] # Limit choice of sampling
         p_nodes_limited = np.reshape(p_nodes_limited, (-1))
-        p_nodes_limited = p_nodes_limited / (np.sum(p_nodes_limited) + utils.SMALL_NUMBER)  # Normalize to sum up to 1
+        p_nodes_limited = p_nodes_limited / np.sum(p_nodes_limited)             # Normalize to sum up to 1
         p_nodes_limited_reshaped = np.reshape(p_nodes_limited, (-1, self.config['num_edge_types']))
 
         v_t = np.random.multinomial(1, p_nodes_limited)                         # Sample categorial
@@ -449,7 +458,8 @@ class DeepGMGGenerator(DeepGMGModel):
         action[utils.L.LABEL_0] = node
         action[utils.L.LABEL_1] = edge_type
         action[utils.AE.PROBABILITY] = p_nodes_limited_reshaped[node][edge_type]
-        utils.action_pretty_print(action)
+        if self.debug:
+            utils.action_pretty_print(action)
 
         return node, edge_type, p_nodes_limited_reshaped[node][edge_type]
 
@@ -458,7 +468,8 @@ class DeepGMGGenerator(DeepGMGModel):
         Generate a default graph using the pre-trained model
         """
         is_first_node = True
-        utils.action_pretty_print_header()
+        if self.debug:
+            utils.action_pretty_print_header()
 
         # Context
         self.current_graph = {utils.T.NODES: [], utils.T.EDGES: []}
@@ -502,7 +513,8 @@ class DeepGMGGenerator(DeepGMGModel):
         Generate a clang graph using the pre-trained model
         """
         is_first_node = True
-        utils.action_pretty_print_header()
+        if self.debug:
+            utils.action_pretty_print_header()
 
         # Application model context
         current_code_graph = clang_codegraph_models.CodeGraph()
@@ -515,9 +527,12 @@ class DeepGMGGenerator(DeepGMGModel):
         self.last_added_node_type = 0
         self.embeddings = np.ones((self.num_nodes_max, self.config['hidden_size']))
 
+        p_codegraph = []
+
         # GO!
         # Sample add node
         node_type, p_addnode = self.__sample_add_node_action()
+        p_codegraph.append(p_addnode[node_type])
 
         while self.last_added_node_id < self.num_nodes_max:
             self.last_added_node_type = node_type
@@ -529,33 +544,41 @@ class DeepGMGGenerator(DeepGMGModel):
 
             current_function.apply_action({
                 utils.AE.ACTION: utils.A.ADD_NODE,
-                utils.L.LABEL_0: node_type
+                utils.L.LABEL_0: node_type,
+                utils.AE.PROBABILITY: p_addnode
             }, node_types)
 
             self.__do_init_node_action()
 
             # Sample add edge
             add_edge, p_addedge = self.__sample_add_edge_action()
+            p_codegraph.append(p_addedge[add_edge])
+
             while add_edge == 1:
                 # Sample add edge to
                 node, edge_type, p_nodes = self.__sample_add_edge_to_action()
+                p_codegraph.append(p_nodes)
+
                 self.__add_edge_to_graph(node, edge_type)
 
                 current_function.apply_action({
                     utils.AE.ACTION: utils.A.ADD_EDGE_TO,
                     utils.L.LABEL_0: node,
-                    utils.L.LABEL_1: edge_type,
+                    utils.L.LABEL_1: edge_type
                 }, node_types)
 
                 # Sample add edge
                 add_edge, p_addedge = self.__sample_add_edge_action()
+                p_codegraph.append(p_addedge[add_edge])
 
             # Sample add node
             node_type, p_addnode = self.__sample_add_node_action()
+            p_codegraph.append(p_addnode[node_type])
+
             if node_type == 0:
                 break
 
-        return current_code_graph
+        return current_code_graph, np.sum(p_codegraph) / len(p_codegraph), np.min(p_codegraph)
 
 
 class DeepGMGTrainer(DeepGMGModel):
@@ -576,30 +599,30 @@ class DeepGMGTrainer(DeepGMGModel):
         # Configure directories and save model configuration
         SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
         if 'out_dir' in self.config:
-            out_dir = self.config['out_dir'] + '/_out/'
+            self.out_dir = self.config['out_dir'] + '/_out/'
         else:
-            out_dir = SCRIPT_DIR + '/..' + '/_out/'
+            self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
 
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
 
         if 'run_id' in self.config:
             self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
         else:
             self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
 
-        out_dir += str(len(next(os.walk(out_dir))[1])) + '_' + self.run_id
-        if os.path.exists(out_dir):
-            shutil.rmtree(out_dir)
+        self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
+        if os.path.exists(self.out_dir):
+            shutil.rmtree(self.out_dir)
 
-        model_path = out_dir + '/model'
+        model_path = self.out_dir + '/model'
         os.makedirs(model_path, exist_ok=True)
         self.model_file = os.path.join(model_path, 'model.pickle')
 
-        self.tensorboard_dir = out_dir + '/tensorboard'
+        self.tensorboard_dir = self.out_dir + '/tensorboard'
         os.makedirs(self.tensorboard_dir, exist_ok=True)
 
-        with open(out_dir + '/config.json', 'w') as fp:
+        with open(self.out_dir + '/config.json', 'w') as fp:
             json.dump(self.config, fp)
 
         # Configure TensorBoard
@@ -815,6 +838,10 @@ def main():
         state = DeepGMGState(config)
         trainer = DeepGMGTrainer(config, state)
 
+        # Save node types
+        with open(trainer.out_dir + '/node_types.json', 'w') as f:
+            json.dump(data['types'], f)
+
         # Train
         trainer.train(train_data)
 
@@ -827,6 +854,10 @@ def main():
         parser_generate = subparsers.add_parser('generate')
         parser_generate.add_argument('--artifact_path')
         parser_generate.add_argument('--num_generate')
+        parser_generate.add_argument("--create_pngs")
+        parser_generate.add_argument('--save_graphs_to_file')
+        parser_generate.add_argument('--debug')
+
         args = parser_generate.parse_args(sys.argv[2:])
 
         # Restore Config
@@ -835,13 +866,64 @@ def main():
 
         # Create objects
         state = DeepGMGState(config)
-        generator = DeepGMGGenerator(config, state)
+        generator = DeepGMGGenerator(config, state, args.debug)
         state.restore_weights_from_disk(os.path.join(args.artifact_path, 'model', 'model.pickle'))
 
         # Generate
-        for i in range(0, int(args.num_generate)):
-            generated_graph = generator.generate()
+        graphs = []
+        graphs_valid = []
 
+        for i in range(0, int(args.num_generate)):
+            if config['type'] == 'clang':
+                # Restore node types
+                with open(os.path.join(args.artifact_path, 'node_types.json'), 'r') as f:
+                    node_types = json.load(f)
+
+                graph, p_codegraph, p_min = generator.generate_clang(node_types)
+                graphs.append(graph)
+
+                # Optional: Write dot graphs
+                if args.create_pngs:
+                    try:
+                        clang_codegraph_models.save_dot_graph(
+                            graph, os.path.join(args.create_pngs, 'graph_%i.png' % i), 'png', node_types, True)
+                    except RecursionError:
+                        pass
+
+                # Optional: Validate
+                try:
+                    # Generate code
+                    cg_vstr = clang_codegraph_models.CodeGenVisitor(500)
+                    graph.accept(cg_vstr, clang_codegraph_models.sort_edges_conforming_c_syntax)
+
+                    # Format code
+                    code = cg_vstr.get_code_as_str()
+                    code_formatted, returncode_format = app_utils.format_c_code(code)
+
+                    _, returncode_compile = app_utils.compile_to_bytecode(code)
+
+                    if returncode_format == 0 and returncode_compile == 0:
+                        print('C Code:')
+                        print(code_formatted)
+
+                        graph.c_code = code_formatted
+                        graphs_valid.append(graph)
+
+                except:
+                    pass
+
+                print('p_codegraph: %.4f, p_min: %.4f' % (p_codegraph, p_min))
+                print('Number generated: %i, Number valid: %i, Percent valid: %.4f' % (
+                    i, len(graphs_valid), len(graphs_valid) / len(graphs)))
+                utils.print_dash()
+
+            else:
+                graph = generator.generate()
+
+        # Optional: Save generated kernels
+        if args.save_graphs_to_file:
+            with open(args.save_graphs_to_file, 'wb') as f:
+                pickle.dump(graphs, f, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
     main()

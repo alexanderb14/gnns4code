@@ -96,7 +96,7 @@ def gen_and_compile_graph(tmpdir, datadir, c_file, is_open_cl_code: bool=False):
     code = generate_code(graph)
     compile_ok, compile_stdout, compile_stderr = compile_code(tmpdir, code, c_file_basename)
 
-    format_stdout = utils.format_c_code(code)
+    format_stdout, _ = utils.format_c_code(code)
 
     return compile_ok, compile_stdout, compile_stderr, format_stdout
 

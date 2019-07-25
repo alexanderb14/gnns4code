@@ -257,7 +257,7 @@ def main():
             shutil.rmtree(dump_dir)
         os.makedirs(dump_dir)
 
-        for graph in graphs_filtered:
+        for graph in graphs_filtered_by_num_actions:
             filename, _ = os.path.splitext(graph.name)
 
             shutil.copyfile(

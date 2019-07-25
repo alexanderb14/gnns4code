@@ -1,3 +1,4 @@
+import collections
 import os
 import pydot
 import sys
@@ -93,6 +94,7 @@ class Function(object):
         self.edges = []
 
         self.function_node_type = -1
+        self.node_id = -1
 
         self.is_first = True
 
@@ -150,6 +152,8 @@ class Function(object):
 
                 stmt = Statement(node_type)
                 stmt.specifics = specifics
+                stmt.probability = action[utils.AE.PROBABILITY]
+                stmt.p_pick = action[utils.AE.PROBABILITY][node_type_id]
 
                 stmt.step_idx = len(self.all_statements)
 
@@ -385,9 +389,10 @@ class DotGraphVisitor(VisitorBase):
     """
     Visitor for creating a PNG dot-graph
     """
-    def __init__(self, debug: int = False):
+    def __init__(self, node_types, debug: int = False):
         super(DotGraphVisitor, self).__init__()
         self.debug = debug
+        self.node_types = node_types
 
         self.rank_subraphs = {}
 
@@ -413,7 +418,7 @@ class DotGraphVisitor(VisitorBase):
                 else:
                     color = "black"
 
-                self.dot.add_edge(pydot.Edge(from_name, to_name, color=color, xlabel=str(edge.idx)))
+                self.dot.add_edge(pydot.Edge(from_name, to_name, color=color))
 
         if isinstance(obj, Statement):
             # Get or create subgraph
@@ -466,19 +471,43 @@ class DotGraphVisitor(VisitorBase):
             if hasattr(obj, 'step_idx'):
                 ret = 'step_idx: ' + str(obj.step_idx) + '\l' + ret
 
+            if hasattr(obj, 'p_pick'):
+                ret = 'p_pick: ' + '%.2f' % obj.p_pick + '\l' + ret
+
+            # Print top most likely node types
+            if hasattr(obj, 'probability'):
+                # Convert probability array to indexed dict and sort it
+                p = {k: v for k, v in enumerate(obj.probability)}
+                p_sorted_keys = sorted(p.items(), key=lambda kv: kv[1], reverse=True)
+                p_sorted = collections.OrderedDict(p_sorted_keys)
+
+                top_p_str = ''
+                pos = 0
+                for i, p in p_sorted.items():
+                    pos += 1
+                    if pos == 5:
+                        break
+
+                    node_type_name = ''
+                    for _, nt in self.node_types.items():
+                        if nt['id'] == i:
+                            node_type_name = nt['name']
+                            break
+                    top_p_str += '%.2f %s\l' % (p, node_type_name)
+
+                ret = top_p_str + ret
+
         return ret
 
     def save_to(self, filename: str, filetype: str) -> None:
-        try:
-            self.dot.write_raw('/tmp/graph.dot')
-            (graph,) = pydot.graph_from_dot_file('/tmp/graph.dot')
+        self.dot.write_raw('/tmp/graph.dot')
+        (graph,) = pydot.graph_from_dot_file('/tmp/graph.dot')
 
-            if filetype == 'png':
-                graph.write_png(filename)
-            elif filetype == 'pdf':
-                graph.write_pdf(filename)
-        except:
-            print('except')
+        if filetype == 'png':
+            graph.write_png(filename)
+        elif filetype == 'pdf':
+            graph.write_pdf(filename)
+
 
 class CodeGenVisitor(VisitorBase):
     """
@@ -892,7 +921,7 @@ def transform_graph(graph: object) -> object:
 
     return graph
 
-def save_dot_graph(graph: object, filename: str, filetype: str, debug: bool = False):
+def save_dot_graph(graph: object, filename: str, filetype: str, node_types: dict, debug: bool = False):
     # Assign node ids
     assign_node_ids_in_bfs_order(graph)
 
@@ -907,7 +936,7 @@ def save_dot_graph(graph: object, filename: str, filetype: str, debug: bool = Fa
     rnkn_vstr = RankNeighborsCreateVisitor()
     graph.accept(rnkn_vstr)
 
-    dg_vstr = DotGraphVisitor(debug)
+    dg_vstr = DotGraphVisitor(node_types, debug)
     graph.accept(dg_vstr)
     dg_vstr.save_to(filename, filetype)
 

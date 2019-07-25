@@ -19,6 +19,7 @@
 
     "save_best_model_interval": 20,
     "gen_num_node_max": 100,
+    "type": "clang",
 
     "actions": [
         {

@@ -318,7 +318,7 @@ def freeze_dict(d):
     return d
 
 
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█'):
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = 'X'):
     """
     Call in a loop to create terminal progress bar
     @params:

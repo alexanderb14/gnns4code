@@ -45,12 +45,28 @@ def build_with_cmake(project_path, target):
     return target_executable
 
 
+def compile_to_bytecode(c_code:str, optimize_for_size=False):
+    cmd_start = [MINER_PASS_CLANG,
+                 '-I' + LIBCLC_DIR,
+                 '-include', OPENCL_SHIM_FILE]
+    cmd_optimize = ['-Oz'] if optimize_for_size else ['-O0']
+    cmd_end = ['-emit-llvm', '-x', 'cl', '-c', '-', '-o', '-']
+    cmd = cmd_start + cmd_optimize + cmd_end
+
+    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate(c_code.encode('utf-8'))
+
+    return stdout, process.returncode
+
+
 def format_c_code(c_code:str):
     cmd = [CLANG_FORMAT_EXECUTABLE]
     process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate(c_code.encode('utf-8'))
 
-    return stdout.decode("utf-8")
+    process.wait()
+
+    return stdout.decode("utf-8"), process.returncode
 
 
 CLANG_EXECUTABLE = \
