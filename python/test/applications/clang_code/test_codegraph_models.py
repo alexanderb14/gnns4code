@@ -45,6 +45,7 @@ def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
 
     # Parse graph
     graph_str = stdout.decode('utf-8')
+    print(graph_str)
     graph_j = json.loads(graph_str)
     graph = codegraph_models.codegraphs_create_from_miner_output(graph_j)[0]
 

@@ -14,7 +14,7 @@ def get_test_data(config: dict, num_graphs: int) -> (np.ndarray, dict, list, lis
 
     if num_graphs == 1:
         node_features = np.ones((v_dim, h_dim))
-        adjacency_lists = graph_to_adjacency_lists(ONE_GRAPH)[0]
+        adjacency_lists = graph_to_adjacency_lists(ONE_GRAPH, False)[0]
         embeddings_to_graph_mappings = [0, 0, 0]
         embeddings_last_added_node_idxs = [2]
         last_added_node_types = [1]
@@ -24,7 +24,7 @@ def get_test_data(config: dict, num_graphs: int) -> (np.ndarray, dict, list, lis
 
     elif num_graphs == 2:
         node_features = np.ones((v_dim * 2, h_dim))
-        adjacency_lists = graph_to_adjacency_lists(TWO_GRAPHS)[0]
+        adjacency_lists = graph_to_adjacency_lists(TWO_GRAPHS, False)[0]
         embeddings_to_graph_mappings = [0, 0, 0, 1, 1, 1]
         embeddings_last_added_node_idxs = [2, 5]
         last_added_node_types = [1, 2]

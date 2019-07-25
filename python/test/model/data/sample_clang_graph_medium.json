@@ -1,165 +1,169 @@
 {
-    "num_functions": 1,
-    "arguments": [
+    "functions": [
         {
-            "name": "FunctionArgument",
-            "type": 0
-        },
-        {
-            "liveness_relations": [
-                14
+            "arguments": [
+                {
+                    "name": "FunctionArgument",
+                    "type": 0
+                },
+                {
+                    "liveness_relations": [
+                        14
+                    ],
+                    "name": "FunctionArgument",
+                    "type": 5
+                }
             ],
-            "name": "FunctionArgument",
+            "body": [
+                {
+                    "ast_relations": [
+                        19,
+                        17,
+                        4,
+                        1
+                    ],
+                    "is_root": true,
+                    "name": "CompoundStmt"
+                },
+                {
+                    "ast_relations": [
+                        2
+                    ],
+                    "is_root": false,
+                    "name": "ReturnStmt"
+                },
+                {
+                    "ast_relations": [
+                        3
+                    ],
+                    "is_root": false,
+                    "name": "ImplicitCastExpr"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                },
+                {
+                    "ast_relations": [
+                        12,
+                        5
+                    ],
+                    "is_root": false,
+                    "name": "WhileStmt"
+                },
+                {
+                    "ast_relations": [
+                        8,
+                        6
+                    ],
+                    "is_root": false,
+                    "name": "CompoundStmt"
+                },
+                {
+                    "ast_relations": [
+                        7
+                    ],
+                    "is_root": false,
+                    "name": "UnaryOperator",
+                    "operator": "++"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                },
+                {
+                    "ast_relations": [
+                        11,
+                        9
+                    ],
+                    "is_root": false,
+                    "name": "CompoundAssignOperator",
+                    "operator": "+="
+                },
+                {
+                    "ast_relations": [
+                        10
+                    ],
+                    "is_root": false,
+                    "name": "ImplicitCastExpr"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                },
+                {
+                    "ast_relations": [
+                        15,
+                        13
+                    ],
+                    "is_root": false,
+                    "name": "BinaryOperator",
+                    "operator": "<"
+                },
+                {
+                    "ast_relations": [
+                        14
+                    ],
+                    "is_root": false,
+                    "name": "ImplicitCastExpr"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                },
+                {
+                    "ast_relations": [
+                        16
+                    ],
+                    "is_root": false,
+                    "name": "ImplicitCastExpr"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                },
+                {
+                    "ast_relations": [
+                        18
+                    ],
+                    "is_root": false,
+                    "liveness_relations": [
+                        7,
+                        16
+                    ],
+                    "name": "DeclStmt",
+                    "type": 5
+                },
+                {
+                    "is_root": false,
+                    "name": "IntegerLiteral",
+                    "value": "0"
+                },
+                {
+                    "ast_relations": [
+                        20
+                    ],
+                    "is_root": false,
+                    "liveness_relations": [
+                        3,
+                        10,
+                        11
+                    ],
+                    "name": "DeclStmt",
+                    "type": 5
+                },
+                {
+                    "is_root": false,
+                    "name": "IntegerLiteral",
+                    "value": "0"
+                }
+            ],
             "type": 5
         }
     ],
-    "body": [
-        {
-            "ast_relations": [
-                19,
-                17,
-                4,
-                1
-            ],
-            "is_root": true,
-            "name": "CompoundStmt"
-        },
-        {
-            "ast_relations": [
-                2
-            ],
-            "is_root": false,
-            "name": "ReturnStmt"
-        },
-        {
-            "ast_relations": [
-                3
-            ],
-            "is_root": false,
-            "name": "ImplicitCastExpr"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        },
-        {
-            "ast_relations": [
-                12,
-                5
-            ],
-            "is_root": false,
-            "name": "WhileStmt"
-        },
-        {
-            "ast_relations": [
-                8,
-                6
-            ],
-            "is_root": false,
-            "name": "CompoundStmt"
-        },
-        {
-            "ast_relations": [
-                7
-            ],
-            "is_root": false,
-            "name": "UnaryOperator",
-            "operator": "++"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        },
-        {
-            "ast_relations": [
-                11,
-                9
-            ],
-            "is_root": false,
-            "name": "CompoundAssignOperator",
-            "operator": "+="
-        },
-        {
-            "ast_relations": [
-                10
-            ],
-            "is_root": false,
-            "name": "ImplicitCastExpr"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        },
-        {
-            "ast_relations": [
-                15,
-                13
-            ],
-            "is_root": false,
-            "name": "BinaryOperator",
-            "operator": "<"
-        },
-        {
-            "ast_relations": [
-                14
-            ],
-            "is_root": false,
-            "name": "ImplicitCastExpr"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        },
-        {
-            "ast_relations": [
-                16
-            ],
-            "is_root": false,
-            "name": "ImplicitCastExpr"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        },
-        {
-            "ast_relations": [
-                18
-            ],
-            "is_root": false,
-            "liveness_relations": [
-                7,
-                16
-            ],
-            "name": "DeclStmt",
-            "type": 5
-        },
-        {
-            "is_root": false,
-            "name": "IntegerLiteral",
-            "value": "0"
-        },
-        {
-            "ast_relations": [
-                20
-            ],
-            "is_root": false,
-            "liveness_relations": [
-                3,
-                10,
-                11
-            ],
-            "name": "DeclStmt",
-            "type": 5
-        },
-        {
-            "is_root": false,
-            "name": "IntegerLiteral",
-            "value": "0"
-        }
-    ],
-    "type": 5
+    "num_functions": 1
 }

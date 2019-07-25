@@ -50,8 +50,8 @@ class DeepGMGState(object):
         self.best_epoch_weights = None
 
         with self.graph.as_default():
-            self.ggnn_layer_state = GGNNModelLayerState(config, self)
-            self.deepgmg_cell_state = DeepGMGCellState(config, self)
+            self.ggnn_layer_state = GGNNModelLayerState(config)
+            self.deepgmg_cell_state = DeepGMGCellState(config)
 
     def __get_weights(self):
         """
@@ -214,7 +214,7 @@ class DeepGMGModel(object):
                             batch_data[label_name].append(0)
 
                 # Graph model
-                adj_lists = action[utils.AE.ADJ_LIST] if action else utils.graph_to_adjacency_lists([])[0]
+                adj_lists = action[utils.AE.ADJ_LIST] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'])[0]
                 for idx, adj_list in adj_lists.items():
                     batch_data['adjacency_lists'][idx].append(adj_list)
 
@@ -271,10 +271,10 @@ class DeepGMGGenerator(DeepGMGModel):
     """
     Implementation of the generation process.
     """
-    def __init__(self, config: dict, state: DeepGMGState, debug):
+    def __init__(self, config: dict, state: DeepGMGState):
         super().__init__(config, state)
 
-        self.debug = debug
+        self.debug = self.config['debug'] == 1
 
         self.num_nodes_max = config['gen_num_node_max']
 
@@ -328,7 +328,7 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.ACTION:                    utils.A.INIT_NODE,
             utils.AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES])[0]
+            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
         }
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
@@ -354,7 +354,7 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.ACTION:                    utils.A.ADD_NODE,
             utils.AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES])[0]
+            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
         }
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
@@ -392,7 +392,7 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.ACTION:                    utils.A.ADD_EDGE,
             utils.AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES])[0]
+            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
         }
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
@@ -427,7 +427,7 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.ACTION:                    utils.A.ADD_EDGE_TO,
             utils.AE.LAST_ADDED_NODE_ID:        self.last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE:      self.last_added_node_type,
-            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES])[0]
+            utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0]
         }
         feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
@@ -719,7 +719,7 @@ class DeepGMGTrainer(DeepGMGModel):
         # Extract actions
         for train_data in train_datas:
             actions = train_data[utils.AE.ACTIONS]
-            utils.enrich_action_sequence_with_adj_list_data(actions)
+            utils.enrich_action_sequence_with_adj_list_data(actions, self.config['tie_fwd_bkwd'] == 1)
             actions_by_graphs.append(actions)
 
         # Extract graph sizes

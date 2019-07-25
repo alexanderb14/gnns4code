@@ -29,6 +29,8 @@ CONFIG_DEFAULTGRAPH = {
     "num_epochs": 100,
 
     "out_dir": '/tmp',
+    'tie_fwd_bkwd': 1,
+    "debug": 1,
 
     'actions': [
         {
@@ -84,7 +86,7 @@ def are_graphs_equal(training_graph, generated_graph):
 
 def train_generate_and_validate_default_graphs(training_graphs, config, num_graphs_to_gen, num_graphs_to_be_equal):
     # Actionize
-    actions = utils.actionize_default_graphs(training_graphs)
+    actions = utils.actionize_default_graphs(training_graphs, False)
 
     # Build train data
     train_datas = []
@@ -135,7 +137,7 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
 
     # Actionize
     actions = clang_codegraph_models.create_action_sequence(training_graph)
-    utils.enrich_action_sequence_with_adj_list_data(actions)
+    utils.enrich_action_sequence_with_adj_list_data(actions, False)
     utils.action_sequence_pretty_print(actions)
 
     # Build train data
@@ -157,7 +159,7 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
     num_graphs_equal = 0
     for _ in range(num_graphs_to_gen):
         try:
-            generated_graph = generator.generate_clang(node_types)
+            generated_graph = generator.generate_clang(node_types)[0]
         except:
             print(sys.exc_info()[0])
 
@@ -169,8 +171,9 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
                 print('-> TRAIN AND GEN GRAPH DIFFERENT')
 
         except:
-            print('-> GEN GRAPH DEFECT')
-            pass
+           print(sys.exc_info()[0])
+           print('-> GEN GRAPH DEFECT')
+           pass
 
     print(num_graphs_to_gen, num_graphs_equal)
     assert(num_graphs_equal > num_graphs_to_be_equal)
@@ -206,7 +209,7 @@ def test_train_save_load_and_gen_defaultgraph():
     training_graphs = [{utils.T.NODES: nodes, utils.T.EDGES: edges}]
 
     # Actionize
-    actions = utils.actionize_default_graphs(training_graphs)
+    actions = utils.actionize_default_graphs(training_graphs, False)
 
     # Build train data
     train_datas = []
@@ -559,7 +562,7 @@ def test_train_and_gen_clang_codegraph_small():
     with open(os.path.join(SCRIPT_DIR, 'data', 'sample_clang_graph_small.json')) as json_data:
         jRoot = json.load(json_data)
 
-    training_graph = clang_codegraph_models.codegraph_create_from_miner_output(jRoot)
+    training_graph = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     train_generate_and_validate_clang_graph(training_graph, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
@@ -590,7 +593,7 @@ def test_train_and_gen_clang_codegraph_medium():
     with open(os.path.join(SCRIPT_DIR, 'data', 'sample_clang_graph_medium.json')) as json_data:
         jRoot = json.load(json_data)
 
-    training_graph = clang_codegraph_models.codegraph_create_from_miner_output(jRoot)
+    training_graph = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     training_graph_2 = clang_codegraph_models.transform_graph(training_graph)
     clang_codegraph_models.save_dot_graph(training_graph_2, '/tmp/out.png', 'png')
@@ -624,6 +627,6 @@ def test_train_and_gen_clang_codegraph_large():
     with open(os.path.join(SCRIPT_DIR, 'data', 'sample_clang_graph_large.json')) as json_data:
         jRoot = json.load(json_data)
 
-    training_graph = clang_codegraph_models.codegraph_create_from_miner_output(jRoot)
+    training_graph = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     train_generate_and_validate_clang_graph(training_graph, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)

@@ -125,14 +125,14 @@ def glorot_init(shape):
     return np.random.uniform(low=-initialization_range, high=initialization_range, size=shape).astype(np.float32)
 
 
-def actionize_default_graphs(graphs, verbose=False):
+def actionize_default_graphs(graphs, tie_fwd_bkwd, verbose=False):
     # Load data
     action_datas = []
     for graph in graphs:
         action_data = graph_to_action_sequence(graph[T.EDGES], graph[T.NODES], 0)
 
         enrich_action_sequence_with_graph_data(action_data, graph)
-        enrich_action_sequence_with_adj_list_data(action_data)
+        enrich_action_sequence_with_adj_list_data(action_data, tie_fwd_bkwd)
 
         action_datas.append(action_data)
 
@@ -229,11 +229,11 @@ def enrich_action_sequence_with_graph_data(actions:dict, graph: dict) -> dict:
         action[AE.GRAPH] = graph
 
 
-def enrich_action_sequence_with_adj_list_data(actions:dict) -> dict:
+def enrich_action_sequence_with_adj_list_data(actions:dict, tie_fwd_bkwd) -> dict:
     graph_current = {T.NODES: [], T.EDGES: []}
 
     for action_idx, action in actions.items():
-        adj_list, _ = graph_to_adjacency_lists(graph_current[T.EDGES])
+        adj_list, _ = graph_to_adjacency_lists(graph_current[T.EDGES], tie_fwd_bkwd)
         apply_action_to_graph(graph_current, action)
 
         action[AE.ADJ_LIST] = adj_list
@@ -256,7 +256,7 @@ def apply_action_to_graph(graph:dict, action:dict) -> None:
         ])
 
 
-def graph_to_adjacency_lists(graph) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
+def graph_to_adjacency_lists(graph, tie_fwd_bkwd) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
     adj_lists = defaultdict(list)
     num_incoming_edges_dicts_per_type = defaultdict(lambda: defaultdict(lambda: 0))
     for src, e, dest in graph:
@@ -264,8 +264,9 @@ def graph_to_adjacency_lists(graph) -> (Dict[int, np.ndarray], Dict[int, Dict[in
         adj_lists[fwd_edge_type].append((src, dest))
         num_incoming_edges_dicts_per_type[fwd_edge_type][dest] += 1
 
-#        adj_lists[fwd_edge_type].append((dest, src))
-#        num_incoming_edges_dicts_per_type[fwd_edge_type][src] += 1
+        if tie_fwd_bkwd:
+            adj_lists[fwd_edge_type].append((dest, src))
+            num_incoming_edges_dicts_per_type[fwd_edge_type][src] += 1
 
     final_adj_lists = {e: np.array(sorted(lm), dtype=np.int32)
                        for e, lm in adj_lists.items()}

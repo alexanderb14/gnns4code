@@ -1,67 +1,72 @@
 {
-    "num_functions": 1,
-    "arguments": [
+    "functions": [
         {
-            "liveness_relations": [
-                6
+            "arguments": [
+                {
+                    "liveness_relations": [
+                        6
+                    ],
+                    "name": "FunctionArgument",
+                    "type": 5
+                },
+                {
+                    "liveness_relations": [
+                        4
+                    ],
+                    "name": "FunctionArgument",
+                    "type": 5
+                }
             ],
-            "name": "FunctionArgument",
-            "type": 5
-        },
-        {
-            "liveness_relations": [
-                4
+            "body": [
+                {
+                    "ast_relations": [
+                        1
+                    ],
+                    "is_root": true,
+                    "name": "CompoundStmt"
+                },
+                {
+                    "ast_relations": [
+                        2
+                    ],
+                    "is_root": false,
+                    "name": "ReturnStmt"
+                },
+                {
+                    "ast_relations": [
+                        5,
+                        3
+                    ],
+                    "is_root": false,
+                    "name": "BinaryOperator",
+                    "operator": "+"
+                },
+                {
+                    "ast_relations": [
+                        4
+                    ],
+                    "is_root": false,
+                    "name": "ImplicitCastExpr"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                },
+                {
+                    "ast_relations": [
+                        6
+                    ],
+                    "is_root": false,
+                    "name": "ImplicitCastExpr"
+                },
+                {
+                    "is_root": false,
+                    "name": "DeclRefExpr"
+                }
             ],
-            "name": "FunctionArgument",
+            "name": "add",
             "type": 5
         }
     ],
-    "body": [
-        {
-            "ast_relations": [
-                1
-            ],
-            "is_root": true,
-            "name": "CompoundStmt"
-        },
-        {
-            "ast_relations": [
-                2
-            ],
-            "is_root": false,
-            "name": "ReturnStmt"
-        },
-        {
-            "ast_relations": [
-                5,
-                3
-            ],
-            "is_root": false,
-            "name": "BinaryOperator",
-            "operator": "+"
-        },
-        {
-            "ast_relations": [
-                4
-            ],
-            "is_root": false,
-            "name": "ImplicitCastExpr"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        },
-        {
-            "ast_relations": [
-                6
-            ],
-            "is_root": false,
-            "name": "ImplicitCastExpr"
-        },
-        {
-            "is_root": false,
-            "name": "DeclRefExpr"
-        }
-    ],
-    "type": 5
+    "num_functions": 1
 }
