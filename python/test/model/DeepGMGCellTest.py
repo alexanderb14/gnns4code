@@ -18,6 +18,7 @@ CONFIG = {
     'num_edge_types': 2,
 
     'use_edge_bias': 0,
+    "use_edge_msg_avg_aggregation": 0,
 
     'actions': [
         {

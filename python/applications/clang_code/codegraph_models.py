@@ -1205,6 +1205,7 @@ def codegraphs_create_from_miner_output(jRoot: dict) -> list:
 
         # Create function
         function = Function()
+        function.name = jFunction['name']
         if jFunction['type'] == -1:
             function.specifics['type'] = 'void'
         else:

@@ -24,8 +24,9 @@ class AE:
     SUBGRAPH_START, \
     NUM_NODES, \
     PROBABILITY, \
-    NUMS_INCOMING_EDGES_BY_TYPE \
-    = range(0, 16)
+    NUMS_INCOMING_EDGES_BY_TYPE, \
+    KERNEL_NAME \
+    = range(0, 17)
 
 
 # Labels

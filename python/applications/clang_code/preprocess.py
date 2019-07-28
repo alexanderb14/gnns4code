@@ -2,7 +2,10 @@ import argparse
 import concurrent.futures
 import json
 import ntpath
+import numpy as np
 import os
+import pandas as pd
+import pickle
 import shutil
 import subprocess
 import sys
@@ -12,6 +15,14 @@ sys.path.append(SCRIPT_DIR + '/../..')
 import applications.clang_code.codegraph_models as codegraph_models
 import applications.utils as app_utils
 import utils
+
+
+def get_kernel_names_from_df(A):
+    A["group"] = ["A"] * len(A)
+
+    benchmark_names = list(set(A['benchmark']))
+
+    return benchmark_names
 
 
 def get_files_by_file_size(dirname, reverse=False):
@@ -36,14 +47,26 @@ def get_files_by_file_size(dirname, reverse=False):
 
     # Re-populate list with just filenames
     for i in range(len(filepaths)):
-        filepaths[i] = filepaths[i][0]
+        filepaths[i] = os.path.join(dirname, filepaths[i][0])
 
     return filepaths
 
+
+def get_files_by_extension(dirname, extension):
+    filepaths = []
+
+    for root, dirs, files in os.walk(dirname):
+        for file in files:
+            if file.endswith(extension):
+                filepaths.append(os.path.join(root, file))
+
+    return filepaths
+
+
 def delete_and_create_folder(path):
-    if os.path.isdir(path):
-        shutil.rmtree(path)
-    os.mkdir(path)
+    shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path)
+
 
 def opencl_kernel_c_code_to_llvm_graph(c_code:str):
     # Code to json file
@@ -63,36 +86,23 @@ def opencl_kernel_c_code_to_llvm_graph(c_code:str):
         graph = codegraph_models.codegraph_create_from_miner_output(json.loads(f.read()))
         return graph
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--code_dir", type=str,
-                        help="directory of c code files")
-    parser.add_argument("--out_dir", type=str,
-                        help="directory to write graphs to")
-    parser.add_argument("--good_code_dir", type=str,
-                        help="directory to write c files that are successfully processed to")
-    parser.add_argument("--bad_code_dir", type=str,
-                        help="directory to write c files that produced errors to")
-    parser.add_argument("--error_log_dir", type=str,
-                        help="directory to write errors to")
-    args = parser.parse_args()
 
-    delete_and_create_folder(args.out_dir)
-    delete_and_create_folder(args.bad_code_dir)
-    delete_and_create_folder(args.good_code_dir)
-    delete_and_create_folder(args.error_log_dir)
+def process_files(files, out_dir, good_code_dir, bad_code_dir, error_log_dir, substract_str=None):
+    def fnc(filename):
+        if substract_str:
+            out_filename = filename.replace(substract_str + '/', '') + '.json'
+            out_filename = os.path.join(out_dir, out_filename)
 
-    files = get_files_by_file_size(args.code_dir, False)
-
-    def fnc(filename_absolute):
-        filename = ntpath.basename(filename_absolute)
+            delete_and_create_folder(os.path.dirname(out_filename))
+        else:
+            out_filename = filename
 
         cmd = [app_utils.CLANG_MINER_EXECUTABLE,
                '-extra-arg-before=-xcl',
-                '-extra-arg=-I' + app_utils.LIBCLC_DIR,
-                '-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE,
-                os.path.join(args.code_dir, filename),
-               '-o', os.path.join(args.out_dir, filename + '.json')]
+               '-extra-arg=-I' + app_utils.LIBCLC_DIR,
+               '-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE,
+               filename,
+               '-o', out_filename]
 
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -106,7 +116,8 @@ def main():
 
             report += 'SOURCE:' + '\n'
             report += utils.get_dash() + '\n'
-            with open(os.path.join(args.code_dir, filename), 'r') as f:
+
+            with open(filename, 'r') as f:
                 try:
                     report += f.read() + '\n'
                 except:
@@ -120,18 +131,17 @@ def main():
             report += utils.get_dash() + '\n'
             report += stderr.decode('utf-8') + '\n'
 
-            num_files = len([name for name in os.listdir(args.error_log_dir)])
+            num_files = len([name for name in os.listdir(error_log_dir)])
 
             report_filename = os.path.join(
-                args.error_log_dir,
-                str(num_files) + '_' + filename + '.txt')
+                error_log_dir,
+                str(num_files) + '_' + os.path.basename(out_filename) + '.txt')
             with open(report_filename, 'w+') as f:
                 f.write(report)
 
-            shutil.copyfile(filename_absolute, os.path.join(args.bad_code_dir, filename))
+            shutil.copyfile(filename, os.path.join(bad_code_dir, os.path.basename(filename)))
         else:
-            shutil.copyfile(filename_absolute, os.path.join(args.good_code_dir, filename))
-
+            shutil.copyfile(filename, os.path.join(good_code_dir, os.path.basename(filename)))
 
         return result
 
@@ -147,7 +157,121 @@ def main():
             completed = num_ok + num_not_ok
             todo = len(files) - completed
             progress = float(completed) / float(len(files))
-            print('ok: %i, not_ok: %i, completed: %i, todo: %i, progress: %.2f' % (num_ok, num_not_ok, completed, todo, progress))
+            print('ok: %i, not_ok: %i, completed: %i, todo: %i, progress: %.2f' % (
+            num_ok, num_not_ok, completed, todo, progress))
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', help='Subcommand to run')
+    subparsers = parser.add_subparsers()
+
+    # Parse arguments
+    parser.add_argument("--code_dir", type=str,
+                        help="directory of c code files")
+    parser.add_argument("--out_dir", type=str,
+                        help="directory to write graphs to")
+    parser.add_argument("--good_code_dir", type=str,
+                        help="directory to write c files that are successfully processed to")
+    parser.add_argument("--bad_code_dir", type=str,
+                        help="directory to write c files that produced errors to")
+    parser.add_argument("--error_log_dir", type=str,
+                        help="directory to write errors to")
+
+    parser.add_argument('--cgo17_benchmarks_csv', type=str)
+    parser.add_argument("--pickle_out", type=str,
+                        help="file to write to")
+
+    args = parser.parse_args(sys.argv[1:])
+
+    # Parse command
+    command_arg = parser.parse_args(sys.argv[1:2])
+    if not hasattr(command_arg, 'command'):
+        print('Unrecognized command')
+        parser.print_help()
+        exit(1)
+
+    # delete_and_create_folder(args.out_dir)
+    # delete_and_create_folder(args.bad_code_dir)
+    # delete_and_create_folder(args.good_code_dir)
+    # delete_and_create_folder(args.error_log_dir)
+
+    # Generative command
+    if command_arg.command == 'generative':
+        filenames = get_files_by_file_size(args.code_dir, False)
+
+        process_files(filenames, args.out_dir, args.good_code_dir,
+                      args.bad_code_dir, args.error_log_dir)
+
+    # Predictive command
+    if command_arg.command == 'predictive':
+        # Find all .cl files and extract code graphs from them
+        # files = get_files_by_extension(args.code_dir, '.cl')
+        #
+        # process_files(files, args.out_dir, args.good_code_dir,
+        #               args.bad_code_dir, args.error_log_dir, args.code_dir)
+
+        # Extract oracle from the cgo17 dataframe
+        preprocessed = []
+        num_nodes = []
+
+        df_benchmarks = pd.read_csv(args.cgo17_benchmarks_csv)
+        filenames = get_files_by_extension(args.out_dir, '.json')
+
+        for filename in filenames:
+            relative_filename = filename.replace(args.out_dir + '/', '')
+
+            benchmark_suite_name = relative_filename.split('/')[0]
+            benchmark_name = relative_filename.split('/')[-2]
+
+            with open(filename) as f:
+                jRoot = json.load(f)
+            graphs = codegraph_models.codegraphs_create_from_miner_output(jRoot)
+            for graph_idx, graph in enumerate(graphs):
+                function_name = graph.functions[0].name
+
+                # Find this kernel in the cgo17 dataframe
+                for idx, row in df_benchmarks.iterrows():
+                    b = row['benchmark']
+                    o = row['oracle']
+
+                    function_name_cgo17 = b.split('-')[-1]
+                    benchmark_name_cgo17 = b.split('-')[-2]
+                    benchmark_suite_name_cgo17 = b.split('-')[0]
+
+                    if function_name_cgo17 == function_name \
+                            and benchmark_name_cgo17 in benchmark_name \
+                            and benchmark_suite_name_cgo17 in benchmark_suite_name:
+
+                        jRoot['functions'][graph_idx][utils.AE.KERNEL_NAME] = b
+                        jRoot['functions'][graph_idx][utils.L.LABEL_0] = o
+
+                        # Transform
+                        graph = codegraph_models.transform_graph(graph)
+
+                        # Add information to graph
+                        graph.name = b
+                        graph.oracle = o
+
+                        # Stats: Number of nodes
+                        stats_vstr = codegraph_models.StatisticsVisitor()
+                        graph.accept(stats_vstr)
+                        num_nodes.append(stats_vstr.num_nodes)
+
+                        preprocessed.append(graph)
+
+                        print(benchmark_suite_name, benchmark_name, function_name, o, stats_vstr.num_nodes)
+
+                        # TODO: Work group size!
+                        break
+
+        print('num_nodes_max:', np.max(num_nodes))
+        print('num_nodes_mean:', np.mean(num_nodes))
+        print('num_graphs:', len(preprocessed))
+
+        with open(args.pickle_out, 'wb') as outfile:
+            pickle.dump(preprocessed, outfile, pickle.HIGHEST_PROTOCOL)
+
 
 if __name__ == "__main__":
     main()
