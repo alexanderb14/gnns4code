@@ -283,7 +283,7 @@ def main():
             # Extract node types
             ne_vstr = codegraph_models.NodeTypesExtractionVisitor()
             graph.accept(ne_vstr)
-            node_types = ne_vstr.node_types()
+            nodes = ne_vstr.node_types()
 
             # Extract edges
             ee_vstr = codegraph_models.EdgeExtractionVisitor()
@@ -291,15 +291,25 @@ def main():
             edges = ee_vstr.edges
 
             graph_export = {
-                'nodes': node_types,
-                'edges': edges,
-                'oracle:': graph.oracle
+                utils.T.NODES: nodes,
+                utils.T.EDGES: edges
             }
+            if graph.oracle == 'CPU':
+                graph_export[utils.L.LABEL_0] = 0
+            elif graph.oracle == 'GPU':
+                graph_export[utils.L.LABEL_0] = 1
+            else:
+                raise Exception()
+
             graphs_export.append(graph_export)
 
         # Write to file
         with open(args.json_out, 'w') as f:
-            json.dump(graphs_export, f)
+            data = {
+                'node_types': node_types,
+                'graphs': graphs_export
+            }
+            json.dump(data, f)
 
 if __name__ == "__main__":
     main()

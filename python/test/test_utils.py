@@ -18,6 +18,7 @@ def get_test_data(config: dict, num_graphs: int) -> (np.ndarray, dict, list, lis
         embeddings_to_graph_mappings = [0, 0, 0]
         embeddings_last_added_node_idxs = [2]
         last_added_node_types = [1]
+        labels = np.array([1])
         a1_labels = np.array([1])
         a2_labels = np.array([1])
         a3_labels = np.array([[0, 1], [0, 0], [0, 0]])
@@ -28,6 +29,7 @@ def get_test_data(config: dict, num_graphs: int) -> (np.ndarray, dict, list, lis
         embeddings_to_graph_mappings = [0, 0, 0, 1, 1, 1]
         embeddings_last_added_node_idxs = [2, 5]
         last_added_node_types = [1, 2]
+        labels = np.array([1, 0])
         a1_labels = np.array([1])
         a2_labels = np.array([1])
         a3_labels = np.array([[0, 0], [1, 0], [0, 0], [0, 0], [0, 0], [1, 0]])
@@ -38,6 +40,8 @@ def get_test_data(config: dict, num_graphs: int) -> (np.ndarray, dict, list, lis
         'embeddings_to_graph_mappings': embeddings_to_graph_mappings,
         'embeddings_last_added_node_idxs': embeddings_last_added_node_idxs,
         'last_added_node_types': last_added_node_types,
+
+        'labels': labels,
 
         'a1_labels': a1_labels,
         'a2_labels': a2_labels,
