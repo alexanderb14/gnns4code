@@ -237,7 +237,7 @@ class PredictionModelTrainer(PredictionModel):
         """
         Train model with one batch and retrieve result
         """
-        fetch_list = [self.ops['loss']]
+        fetch_list = [self.ops['loss'], self.ops['train_step']]
         if self.with_gradient_monitoring:
             offset = len(fetch_list)
             fetch_list.extend([self.ops['gradients'], self.ops['clipped_gradients']])
@@ -269,7 +269,7 @@ class PredictionModelTrainer(PredictionModel):
             batch_size = self.config['batch_size']
 
             lst = list(zip(graphs, graph_sizes))
-            random.shuffle(lst)
+#            random.shuffle(lst)
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
 
@@ -298,7 +298,7 @@ class PredictionModelTrainer(PredictionModel):
 
                 epoch_losses.append(result[0])
 
-            epoch_loss = np.mean(epoch_losses)
+            epoch_loss = np.sum(epoch_losses)
             if epoch_loss < best_epoch_loss:
                 best_epoch_loss = epoch_loss
 

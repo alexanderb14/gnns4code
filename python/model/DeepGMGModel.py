@@ -803,7 +803,7 @@ class DeepGMGTrainer(DeepGMGModel):
 
                 epoch_losses.append(result[0])
 
-            epoch_loss = np.mean(epoch_losses)
+            epoch_loss = np.sum(epoch_losses)
             if epoch_loss < best_epoch_loss:
                 best_epoch_loss = epoch_loss
 
