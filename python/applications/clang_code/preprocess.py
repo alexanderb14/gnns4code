@@ -65,7 +65,7 @@ def get_files_by_extension(dirname, extension):
 
 def delete_and_create_folder(path):
     shutil.rmtree(path, ignore_errors=True)
-    os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
 
 
 def opencl_kernel_c_code_to_llvm_graph(c_code:str):
@@ -181,6 +181,8 @@ def main():
     parser.add_argument('--cgo17_benchmarks_csv', type=str)
     parser.add_argument("--pickle_out", type=str,
                         help="file to write to")
+    parser.add_argument("--json_out", type=str,
+                        help="file to write to")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -191,10 +193,10 @@ def main():
         parser.print_help()
         exit(1)
 
-    # delete_and_create_folder(args.out_dir)
-    # delete_and_create_folder(args.bad_code_dir)
-    # delete_and_create_folder(args.good_code_dir)
-    # delete_and_create_folder(args.error_log_dir)
+    delete_and_create_folder(args.out_dir)
+    delete_and_create_folder(args.bad_code_dir)
+    delete_and_create_folder(args.good_code_dir)
+    delete_and_create_folder(args.error_log_dir)
 
     # Generative command
     if command_arg.command == 'generative':
@@ -206,10 +208,10 @@ def main():
     # Predictive command
     if command_arg.command == 'predictive':
         # Find all .cl files and extract code graphs from them
-        # files = get_files_by_extension(args.code_dir, '.cl')
-        #
-        # process_files(files, args.out_dir, args.good_code_dir,
-        #               args.bad_code_dir, args.error_log_dir, args.code_dir)
+        files = get_files_by_extension(args.code_dir, '.cl')
+
+        process_files(files, args.out_dir, args.good_code_dir,
+                      args.bad_code_dir, args.error_log_dir, args.code_dir)
 
         # Extract oracle from the cgo17 dataframe
         preprocessed = []
@@ -269,9 +271,35 @@ def main():
         print('num_nodes_mean:', np.mean(num_nodes))
         print('num_graphs:', len(preprocessed))
 
-        with open(args.pickle_out, 'wb') as outfile:
-            pickle.dump(preprocessed, outfile, pickle.HIGHEST_PROTOCOL)
+        # CodeGraph -> graph
+        nic_vstr = codegraph_models.NodeTypeIdCreateVisitor()
+        for graph in preprocessed:
+            graph.accept(nic_vstr)
+        node_types = nic_vstr.node_type_ids_by_statements
+        print('num_node_types:', len(node_types))
 
+        graphs_export = []
+        for graph in preprocessed:
+            # Extract node types
+            ne_vstr = codegraph_models.NodeTypesExtractionVisitor()
+            graph.accept(ne_vstr)
+            node_types = ne_vstr.node_types()
+
+            # Extract edges
+            ee_vstr = codegraph_models.EdgeExtractionVisitor()
+            graph.accept(ee_vstr)
+            edges = ee_vstr.edges
+
+            graph_export = {
+                'nodes': node_types,
+                'edges': edges,
+                'oracle:': graph.oracle
+            }
+            graphs_export.append(graph_export)
+
+        # Write to file
+        with open(args.json_out, 'w') as f:
+            json.dump(graphs_export, f)
 
 if __name__ == "__main__":
     main()

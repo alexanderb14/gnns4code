@@ -152,8 +152,10 @@ class Function(object):
 
                 stmt = Statement(node_type)
                 stmt.specifics = specifics
-                stmt.probability = action[utils.AE.PROBABILITY]
-                stmt.p_pick = action[utils.AE.PROBABILITY][node_type_id]
+
+                if utils.AE.PROBABILITY in action:
+                    stmt.probability = action[utils.AE.PROBABILITY]
+                    stmt.p_pick = action[utils.AE.PROBABILITY][node_type_id]
 
                 stmt.step_idx = len(self.all_statements)
 
@@ -730,7 +732,6 @@ class NodeTypeIdCreateVisitor(VisitorBase):
     """
     Visitor for assigning unique ids to nodes
     """
-
     def __init__(self, debug: int = False):
         super(NodeTypeIdCreateVisitor, self).__init__()
 
@@ -757,6 +758,49 @@ class NodeTypeIdCreateVisitor(VisitorBase):
 
             # Assign node id
             obj.node_type_id = self.node_type_ids_by_statements[key_hashed]['id']
+
+class EdgeExtractionVisitor(VisitorBase):
+    """
+    Visitor for extracting the edges of a CodeGraph
+    """
+    def __init__(self, debug: int = False):
+        super(EdgeExtractionVisitor, self).__init__()
+
+        self.edges = []
+
+    def visit(self, obj: object) -> None:
+        if isinstance(obj, Edge):
+            edge_info = (obj.src.node_id, get_id_for_edge_type(obj.type), obj.dest.node_id)
+
+            if edge_info not in self.edges:
+                self.edges.append(edge_info)
+
+class NodeTypesExtractionVisitor(VisitorBase):
+    """
+    Visitor for extracting the node types of a CodeGraph
+    """
+    def __init__(self, debug: int = False):
+        super(NodeTypesExtractionVisitor, self).__init__()
+
+        self.__node_types = {}
+
+    def visit(self, obj: object) -> None:
+        if isinstance(obj, Statement) or isinstance(obj, Function):
+            if obj.node_id not in self.__node_types:
+                self.__node_types[obj.node_id] = obj.node_type_id
+
+    def node_types(self):
+        ret = []
+        for idx, (node_id, node_type) in enumerate(self.__node_types.items()):
+            if idx not in self.__node_types:
+                raise Exception()
+
+            if len(ret) > idx:
+                raise Exception()
+
+            ret.append(self.__node_types[idx])
+
+        return ret
 
 class StmtNameQueryVisitor(VisitorBase):
     """
