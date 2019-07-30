@@ -69,7 +69,6 @@ typedef unsigned int uint32_t;
 #define BLK_Y 8
 #define BLOCK 32
 #define BLOCK_DIM 2
-// #define BLOCK_SIZE 64
 #define BLOCK_SIZE_WITH_PAD 64
 #define BLOCK_X 8
 #define BLOCK_Y 8
@@ -259,7 +258,6 @@ typedef unsigned int uint32_t;
 
 // NPB
 #define CLASS CLASS_A
-//#define M 1
 
 // Parboil
 #define MAX_POS 1

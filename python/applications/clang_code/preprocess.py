@@ -68,6 +68,10 @@ def delete_and_create_folder(path):
     os.makedirs(path, exist_ok=True)
 
 
+def create_folder(path):
+    os.makedirs(path, exist_ok=True)
+
+
 def opencl_kernel_c_code_to_llvm_graph(c_code:str):
     # Code to json file
     with open('/tmp/tmp.c', 'w') as f:
@@ -88,21 +92,25 @@ def opencl_kernel_c_code_to_llvm_graph(c_code:str):
 
 
 def process_files(files, out_dir, good_code_dir, bad_code_dir, error_log_dir, substract_str=None):
+    print(files)
     def fnc(filename):
         if substract_str:
             out_filename = filename.replace(substract_str + '/', '') + '.json'
             out_filename = os.path.join(out_dir, out_filename)
 
-            delete_and_create_folder(os.path.dirname(out_filename))
+            create_folder(os.path.dirname(out_filename))
         else:
             out_filename = filename
 
         cmd = [app_utils.CLANG_MINER_EXECUTABLE,
                '-extra-arg-before=-xcl',
-               '-extra-arg=-I' + app_utils.LIBCLC_DIR,
-               '-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE,
-               filename,
-               '-o', out_filename]
+               '-extra-arg=-I' + app_utils.LIBCLC_DIR]
+        cmd += ['-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE]
+        if 'npb' in filename:
+            cmd += ['-extra-arg=-DM=1']
+        if 'nvidia' in filename or ('rodinia' in filename and 'pathfinder' not in filename):
+            cmd += ['-extra-arg=-DBLOCK_SIZE=64']
+        cmd += [filename, '-o', out_filename]
 
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -135,7 +143,7 @@ def process_files(files, out_dir, good_code_dir, bad_code_dir, error_log_dir, su
 
             report_filename = os.path.join(
                 error_log_dir,
-                str(num_files) + '_' + os.path.basename(out_filename) + '.txt')
+                filename.replace('/', '_') + '.txt')
             with open(report_filename, 'w+') as f:
                 f.write(report)
 
@@ -145,6 +153,7 @@ def process_files(files, out_dir, good_code_dir, bad_code_dir, error_log_dir, su
 
         return result
 
+    # Process files
     num_ok = 0
     num_not_ok = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -182,6 +191,8 @@ def main():
     parser.add_argument("--pickle_out", type=str,
                         help="file to write to")
     parser.add_argument("--json_out", type=str,
+                        help="file to write to")
+    parser.add_argument("--cgo17_benchmarks_csv_out", type=str,
                         help="file to write to")
 
     args = parser.parse_args(sys.argv[1:])
@@ -224,7 +235,20 @@ def main():
             relative_filename = filename.replace(args.out_dir + '/', '')
 
             benchmark_suite_name = relative_filename.split('/')[0]
-            benchmark_name = relative_filename.split('/')[-2]
+            if benchmark_suite_name == 'parboil-0.2' or benchmark_suite_name == 'rodinia-3.1':
+                benchmark_name = relative_filename.split('/')[2].lower()
+            elif benchmark_suite_name == 'shoc-1.1.5':
+                benchmark_name = relative_filename.split('/')[4].upper()
+            elif benchmark_suite_name == 'polybench-gpu-1.0':
+                benchmark_name = relative_filename.split('/')[-2].lower()
+                if benchmark_name == 'covar':
+                    benchmark_name = 'covariance'
+                elif benchmark_name == 'corr':
+                    benchmark_name = 'correlation'
+                elif benchmark_name == 'gramschm':
+                    benchmark_name = 'gramschmidt'
+            else:
+                benchmark_name = relative_filename.split('/')[-2]
 
             with open(filename) as f:
                 jRoot = json.load(f)
@@ -242,7 +266,7 @@ def main():
                     benchmark_suite_name_cgo17 = b.split('-')[0]
 
                     if function_name_cgo17 == function_name \
-                            and benchmark_name_cgo17 in benchmark_name \
+                            and benchmark_name_cgo17.upper() in benchmark_name.upper() \
                             and benchmark_suite_name_cgo17 in benchmark_suite_name:
 
                         jRoot['functions'][graph_idx][utils.AE.KERNEL_NAME] = b
@@ -279,6 +303,8 @@ def main():
         print('num_node_types:', len(node_types))
 
         graphs_export = []
+        names_export = []
+
         for graph in preprocessed:
             # Extract node types
             ne_vstr = codegraph_models.NodeTypesExtractionVisitor()
@@ -302,14 +328,27 @@ def main():
                 raise Exception()
 
             graphs_export.append(graph_export)
+            names_export.append(graph.name)
 
         # Write to file
         with open(args.json_out, 'w') as f:
             data = {
                 'node_types': node_types,
-                'graphs': graphs_export
+                'graphs': graphs_export,
+                'names': names_export
             }
             json.dump(data, f)
+
+        # Write cgo17 benchmarks csv file
+        if args.cgo17_benchmarks_csv_out:
+            # Find this kernel in the cgo17 dataframe
+            for row_idx, row in df_benchmarks.iterrows():
+                for name, graph in zip(names_export, graphs_export):
+                    if row['benchmark'] == name:
+                        df_benchmarks.loc[row_idx, 'clang_graph'] = json.dumps(graph)
+
+            df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
+
 
 if __name__ == "__main__":
     main()
