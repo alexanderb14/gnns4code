@@ -17,6 +17,7 @@ import utils
 import applications.utils as app_utils
 import applications.clang_code.codegraph_models as clang_codegraph_models
 from model.cell.PredictionCell import PredictionCell, PredictionCellState
+from model.layer.EmbeddingLayer import EmbeddingLayer, EmbeddingLayerState
 from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
 
 
@@ -34,6 +35,7 @@ class PredictionModelState(object):
         self.best_epoch_weights = None
 
         with self.graph.as_default():
+            self.embedding_layer_state = EmbeddingLayerState(config)
             self.ggnn_layer_state = GGNNModelLayerState(config)
             self.prediction_cell_state = PredictionCellState(config)
 
@@ -98,7 +100,7 @@ class PredictionModel(object):
             graph_mappings_all = np.full(num_nodes, graph_idx)
             batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
 
-            nodes_one_hot = utils.get_one_hot(np.array(graph[utils.T.NODES]), self.config['hidden_size'])
+            nodes_one_hot = utils.get_one_hot(np.array(graph[utils.T.NODES]), self.config['hidden_size_orig'])
             batch_data['embeddings_in'].append(nodes_one_hot.astype(float))
 
         # Build feed dict
@@ -124,7 +126,6 @@ class PredictionModel(object):
 
         # Embeddings
         feed_dict[self.placeholders['embeddings_in']] = np.concatenate(batch_data['embeddings_in'], axis=0)
-        feed_dict[self.cells[0].placeholders['initial_embeddings']] = np.concatenate(batch_data['embeddings_in'], axis=0)
 
         return feed_dict
 
@@ -180,17 +181,22 @@ class PredictionModelTrainer(PredictionModel):
         """
         Create tf model
         """
-        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='embeddings_in')
+        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size_orig']], name='embeddings_in')
 
         # Create model: Unroll network and wire embeddings
-        embeddings = self.placeholders['embeddings_in']
+        embeddings_reduced = self.placeholders['embeddings_in']
 
-        # Create layer and propagate
+        # Create embedding layer
+        embedding_layer = EmbeddingLayer(self.config, self.state.embedding_layer_state)
+        embeddings = embedding_layer.compute_embeddings(embeddings_reduced)
+
+        # Create propagation layer
         ggnn_layer = GGNNModelLayer(self.config, self.state.ggnn_layer_state)
         embeddings = ggnn_layer.compute_embeddings(embeddings)
 
-        # Create cell and predict
+        # Create prediction cell
         prediction_cell = PredictionCell(self.config, True, self.state.prediction_cell_state)
+        prediction_cell.initial_embeddings = embeddings_reduced
         outputs = prediction_cell.compute_predictions(embeddings)
 
         self.ggnn_layers.append(ggnn_layer)

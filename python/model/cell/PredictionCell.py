@@ -11,13 +11,14 @@ class PredictionCellState(object):
         self.config = config
 
         h_size = self.config['hidden_size']
+        h_size_orig = self.config['hidden_size_orig']
         m_size = self.config['deepgmg_mlp_size']
         num_node_types = self.config['num_node_types']
 
         self.weights = {}
 
         self.weights['transform'] = utils.MLP(h_size, 1, [], 'relu', 'mlp_regression_transform')
-        self.weights['gate'] = utils.MLP(h_size * 2, 1, [], 'relu', 'mlp_regression_gate')
+        self.weights['gate'] = utils.MLP(h_size + h_size_orig, 1, [], 'relu', 'mlp_regression_gate')
 
 class PredictionCell(object):
     """
@@ -44,9 +45,9 @@ class PredictionCell(object):
 
         # Placeholders
         # #########################################
-        # Initial embeddings
-        self.placeholders['initial_embeddings'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='initial_embeddings')
-        initial_embeddings = self.placeholders['initial_embeddings']
+        # # Initial embeddings
+        # self.placeholders['initial_embeddings'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='initial_embeddings')
+        # initial_embeddings = self.placeholders['initial_embeddings']
 
         # Embeddings to graph mappings
         self.placeholders['embeddings_to_graph_mappings'] \
@@ -57,7 +58,7 @@ class PredictionCell(object):
         # Model
         # #########################################
         # Gate outputs
-        gate_input = tf.concat([embeddings, initial_embeddings], axis=-1)                                       # [b*v, 2h]
+        gate_input = tf.concat([embeddings, self.initial_embeddings], axis=-1)                                       # [b*v, 2h]
         gated_outputs = tf.nn.sigmoid(self.state.weights['gate'](gate_input)) * self.state.weights['transform'](embeddings) # [b*v, 1]
 
         # Sum up all nodes per graph
