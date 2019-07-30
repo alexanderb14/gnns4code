@@ -185,7 +185,7 @@ class DeepGMGModel(object):
 
                 # Generative model
 
-                if utils.AE.ACTION in action:
+                if action and utils.AE.ACTION in action:
                     action_index = None
                     action_name = get_class_key(utils.A, action[utils.AE.ACTION]).lower()
                     for action_meta in self.config['actions']:
