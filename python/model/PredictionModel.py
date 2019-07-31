@@ -338,7 +338,7 @@ class PredictionModelTrainer(PredictionModel):
                 end_time = time.time()
 
                 # Log
-                instances_per_sec = len(graphs) / (end_time - start_time)
+                instances_per_sec = len(batch_graphs) / (end_time - start_time)
                 epoch_instances_per_secs.append(instances_per_sec)
 
                 epoch_losses.append(result[0])
