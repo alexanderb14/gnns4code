@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import json
+import os
 import sys
 from labm8 import fs
 from typing import List
@@ -793,7 +794,7 @@ class Grewe(HeterogemeousMappingModel):
             "clamp_gradient_norm": 1.0,
 
             "batch_size": 32,
-            "num_epochs": 2,
+            "num_epochs": 100,
             "out_dir": "/tmp",
 
             "tie_fwd_bkwd": 0,
