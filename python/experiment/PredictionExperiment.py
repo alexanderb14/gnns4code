@@ -7,6 +7,7 @@ import sys
 from labm8 import fs
 from typing import List
 from sklearn.model_selection import StratifiedKFold
+from sklearn import preprocessing
 from progressbar import ProgressBar
 import numpy as np
 import string
@@ -365,9 +366,17 @@ def grewe_features(df: pd.DataFrame) -> np.array:
 
 def auxiliary_inputs(df: pd.DataFrame) -> np.array:
     """ get dsize and wgsize auxiliary inputs """
+    transfer = df[["transfer"]].values
+    min_max_scaler = preprocessing.MinMaxScaler()
+    transfer_scaled = np.squeeze(min_max_scaler.fit_transform(transfer))
+
+    wgsize = df[["wgsize"]].values
+    min_max_scaler = preprocessing.MinMaxScaler()
+    wgsize_scaled = np.squeeze(min_max_scaler.fit_transform(wgsize))
+
     return np.array([
-        df["transfer"].values,
-        df["wgsize"].values,
+        transfer_scaled,
+        wgsize_scaled,
     ]).T
 
 
@@ -559,13 +568,12 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
             # if sequences is None:  # encode source codes if needed
             #     sequences = encode_srcs(df["src"].values)
 
-
             # train and cache a model
             model.init(seed=seed)
             model.train(df=df,
                         features=features[train_index],
                         aux_in=aux_in[train_index],
-                        clang_graphs=clang_graphs[train_index],
+                        clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
 #                        sequences=sequences[train_index],
                         y=y[train_index],
                         y_1hot=y_1hot[train_index],
@@ -575,7 +583,7 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
             p = model.predict(
                 features=features[test_index],
                 aux_in=aux_in[test_index],
-                clang_graphs=clang_graphs[train_index],
+                clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
                 # sequences=sequences[test_index],
                 y=y[test_index],
                 y_1hot=y_1hot[test_index],
@@ -818,8 +826,7 @@ class Grewe(HeterogemeousMappingModel):
 
     def train(self, **train):
         graphs = []
-        for str_graph, aux_in, y in zip(train["clang_graphs"], train["aux_in"], train["y"]):
-            graph = json.loads(str_graph, object_hook=utils.json_keys_to_int)
+        for graph, aux_in, y in zip(train["clang_graphs"], train["aux_in"], train["y"]):
             graph[utils.L.LABEL_0] = y
             graph[utils.I.AUX_IN_0] = aux_in
 
@@ -829,8 +836,7 @@ class Grewe(HeterogemeousMappingModel):
 
     def predict(self, **test):
         graphs = []
-        for str_graph, aux_in, y in zip(test["clang_graphs"], test["aux_in"], test["y"]):
-            graph = json.loads(str_graph, object_hook=utils.json_keys_to_int)
+        for graph, aux_in, y in zip(test["clang_graphs"], test["aux_in"], test["y"]):
             graph[utils.L.LABEL_0] = y
             graph[utils.I.AUX_IN_0] = aux_in
 
