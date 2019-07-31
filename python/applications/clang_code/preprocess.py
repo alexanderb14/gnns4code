@@ -16,7 +16,6 @@ import applications.clang_code.codegraph_models as codegraph_models
 import applications.utils as app_utils
 import utils
 
-
 def get_kernel_names_from_df(A):
     A["group"] = ["A"] * len(A)
 
@@ -111,6 +110,8 @@ def process_files(files, out_dir, good_code_dir, bad_code_dir, error_log_dir, su
         if 'nvidia' in filename or ('rodinia' in filename and 'pathfinder' not in filename):
             cmd += ['-extra-arg=-DBLOCK_SIZE=64']
         cmd += [filename, '-o', out_filename]
+
+        print(' '.join(cmd))
 
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -229,6 +230,9 @@ def main():
         num_nodes = []
 
         df_benchmarks = pd.read_csv(args.cgo17_benchmarks_csv)
+        df_benchmarks = df_benchmarks.drop(columns=['src'])
+        df_benchmarks = df_benchmarks.drop(columns=['seq'])
+
         filenames = get_files_by_extension(args.out_dir, '.json')
 
         for filename in filenames:
@@ -241,7 +245,11 @@ def main():
                 benchmark_name = relative_filename.split('/')[4].upper()
             elif benchmark_suite_name == 'polybench-gpu-1.0':
                 benchmark_name = relative_filename.split('/')[-2].lower()
-                if benchmark_name == 'covar':
+                if benchmark_name == '2dconv':
+                    benchmark_name = '2DConvolution'
+                elif benchmark_name == '3dconv':
+                    benchmark_name = '3DConvolution'
+                elif benchmark_name == 'covar':
                     benchmark_name = 'covariance'
                 elif benchmark_name == 'corr':
                     benchmark_name = 'correlation'

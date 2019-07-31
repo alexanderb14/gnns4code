@@ -791,7 +791,7 @@ class Grewe(HeterogemeousMappingModel):
             "graph_rnn_cell": "GRU",
 
             "num_timesteps": 4,
-            "hidden_size_orig": 400,
+            "hidden_size_orig": 420,
             "hidden_size": 16,
             "deepgmg_mlp_size": 2,
 
@@ -845,7 +845,7 @@ class Grewe(HeterogemeousMappingModel):
         p = self.predictor.predict(graphs)
         p = np.array(p)
 
-        indices = [np.argmax(x) for x in p]
+        indices = [1 if x > 0.5 else 0 for x in p]
         return indices
 
 
