@@ -129,16 +129,17 @@ class PredictionModel(object):
         feed_dict[self.cells[0].placeholders['aux_in']] = batch_data['aux_in']
 
         # Labels
-        feed_dict[self.cells[0].placeholders['labels']] = batch_data['labels']
-        feed_dict[self.cells[0].placeholders['embeddings_to_graph_mappings']] \
-            = np.concatenate(batch_data['embeddings_to_graph_mappings'], axis=0)
+        if 'labels' in self.cells[0].placeholders:
+            feed_dict[self.cells[0].placeholders['labels']] = utils.get_one_hot(np.array(batch_data['labels']), 2)
 
         # Embeddings
         feed_dict[self.placeholders['embeddings_in']] = np.concatenate(batch_data['embeddings_in'], axis=0)
+        feed_dict[self.cells[0].placeholders['embeddings_to_graph_mappings']] \
+            = np.concatenate(batch_data['embeddings_to_graph_mappings'], axis=0)
 
         return feed_dict
 
-    def _make_model(self) -> None:
+    def _make_model(self, enable_training) -> None:
         """
         Create tf model
         """
@@ -156,7 +157,7 @@ class PredictionModel(object):
         embeddings = ggnn_layer.compute_embeddings(embeddings)
 
         # Create prediction cell
-        prediction_cell = PredictionCell(self.config, True, self.state.prediction_cell_state)
+        prediction_cell = PredictionCell(self.config, enable_training, self.state.prediction_cell_state)
         prediction_cell.initial_embeddings = embeddings_reduced
         prediction_cell.compute_predictions(embeddings)
 
@@ -164,13 +165,14 @@ class PredictionModel(object):
         self.cells.append(prediction_cell)
 
         # Accumulate losses
-        losses = []
+        if enable_training:
+            losses = []
 
-        for cell in self.cells:
-            losses.append(cell.ops['loss'])
+            for cell in self.cells:
+                losses.append(cell.ops['loss'])
 
-        self.ops['losses'] = losses
-        self.ops['loss'] = tf.reduce_sum(losses)
+            self.ops['losses'] = losses
+            self.ops['loss'] = tf.reduce_sum(losses)
 
 
 class PredictionModelPredictor(PredictionModel):
@@ -182,7 +184,7 @@ class PredictionModelPredictor(PredictionModel):
 
         # Create model
         with self.state.graph.as_default():
-            self._make_model()
+            self._make_model(False)
 
     def predict(self, graphs):
         # Enrich graphs with adj list
@@ -198,10 +200,10 @@ class PredictionModelPredictor(PredictionModel):
         feed_dict = self._graphs_to_batch_feed_dict(graphs, graph_sizes)
 
         # Run
-        fetch_list = [self.ops['loss'], self.cells[0].ops['output']]
+        fetch_list = [self.cells[0].ops['output']]
         result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
 
-        return result[1]
+        return result[0]
 
 class PredictionModelTrainer(PredictionModel):
     """
@@ -214,7 +216,7 @@ class PredictionModelTrainer(PredictionModel):
 
         # Create and initialize model
         with self.state.graph.as_default():
-            self._make_model()
+            self._make_model(True)
             self._make_train_step()
             self._initialize_model()
 
