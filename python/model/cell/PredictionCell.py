@@ -20,7 +20,7 @@ class PredictionCellState(object):
         self.weights['mlp_g_m'] = utils.MLP(h_size + h_size_orig, h_size * m_size, [], 'relu', 'mlp_regression_gate')
 
         self.weights['mlp_reduce'] = utils.MLP(h_size * m_size + 2, 32, [], 'relu', 'mlp_reduce')
-        self.weights['mlp_reduce_2'] = utils.MLP(32, 2, [], 'sigmoid', 'mlp_reduce_2')
+        self.weights['mlp_reduce_2'] = utils.MLP(32, 2, [], 'relu', 'mlp_reduce_2')
 
 
 class PredictionCell(object):
@@ -52,6 +52,10 @@ class PredictionCell(object):
         # self.placeholders['initial_embeddings'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='initial_embeddings')
         # initial_embeddings = self.placeholders['initial_embeddings']
 
+        # Is training (for batch norm)
+        self.placeholders['is_training'] = tf.placeholder(tf.bool, None, name='is_training')
+        is_training = self.placeholders['is_training']
+
         # Embeddings to graph mappings
         self.placeholders['embeddings_to_graph_mappings'] \
             = tf.placeholder(tf.int32, [None], name='embeddings_to_graph_mappings')
@@ -78,13 +82,13 @@ class PredictionCell(object):
 
         h_G_and_aux_in = tf.concat([h_G, aux_in], axis=-1)                                                      # [b, 2h + 2]
 
-#        h_G_and_aux_in = tf.layers.batch_normalization(h_G_and_aux_in, training=self.enable_training)
+        h_G_and_aux_in = tf.layers.batch_normalization(h_G_and_aux_in, training=is_training)
 
         h_G_and_aux_in = self.state.weights['mlp_reduce'](h_G_and_aux_in)
 
         output = self.state.weights['mlp_reduce_2'](h_G_and_aux_in)                                             # [b, 2]
 
-        output = tf.nn.softmax(output)                                                                          # [b, 2]
+        output = tf.nn.sigmoid(output)                                                                          # [b, 2]
 
         # Training
         if self.enable_training:

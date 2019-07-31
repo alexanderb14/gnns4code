@@ -39,6 +39,70 @@ class PredictionModelState(object):
             self.ggnn_layer_state = GGNNModelLayerState(config)
             self.prediction_cell_state = PredictionCellState(config)
 
+    def __get_weights(self):
+        """
+        Get model weights
+        """
+        weights = {}
+        for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+            weights[variable.name] = self.sess.run(variable)
+
+        return weights
+
+    def __set_weights(self, weights):
+        """
+        Set model weights
+        """
+        variables_to_initialize = []
+        with tf.name_scope("restore"):
+            restore_ops = []
+            used_vars = set()
+            for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+                used_vars.add(variable.name)
+                if variable.name in weights:
+                    restore_ops.append(variable.assign(weights[variable.name]))
+                else:
+                    print('Freshly initializing %s since no saved value was found.' % variable.name)
+                    variables_to_initialize.append(variable)
+            for var_name in weights:
+                if var_name not in used_vars:
+                    print('Saved weights for %s not used by model.' % var_name)
+            self.sess.run(restore_ops)
+
+    def backup_best_weights(self):
+        """
+        Backup current state of the model
+        """
+        print('Backuping up best weights...')
+        self.best_epoch_weights = self.__get_weights()
+
+    def restore_best_weights(self):
+        """
+        Restore best state of the model
+        """
+        if self.best_epoch_weights:
+            print('Restoring best weights...')
+            self.__set_weights(self.best_epoch_weights)
+
+    def save_weights_to_disk(self, path):
+        """
+        Save model weights to given file
+        """
+        data = self.__get_weights()
+
+        with open(path, 'wb') as out_file:
+            pickle.dump(data, out_file, pickle.HIGHEST_PROTOCOL)
+
+    def restore_weights_from_disk(self, path):
+        """
+        Save model weights to given file
+        """
+        print("Restoring weights from file %s." % path)
+        with open(path, 'rb') as in_file:
+            data = pickle.load(in_file)
+
+        self.__set_weights(data)
+
 
 class PredictionModel(object):
     """
@@ -55,6 +119,46 @@ class PredictionModel(object):
             self.ops = {}
             self.placeholders = {}
 
+        self.with_gradient_monitoring = True if 'gradient_monitoring' in self.config and self.config['gradient_monitoring'] == 1 else False
+
+        # Create and initialize model
+        with self.state.graph.as_default():
+            self._make_model(True)
+            self._make_train_step()
+            self._initialize_model()
+
+        # Configure directories and save model configuration
+        SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+        if 'out_dir' in self.config:
+            self.out_dir = self.config['out_dir'] + '/_out/'
+        else:
+            self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
+
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+
+        if 'run_id' in self.config:
+            self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
+        else:
+            self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
+
+        self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
+        if os.path.exists(self.out_dir):
+            shutil.rmtree(self.out_dir)
+
+        model_path = self.out_dir + '/model'
+        os.makedirs(model_path, exist_ok=True)
+        self.model_file = os.path.join(model_path, 'model.pickle')
+
+        self.tensorboard_dir = self.out_dir + '/tensorboard'
+        os.makedirs(self.tensorboard_dir, exist_ok=True)
+
+        with open(self.out_dir + '/config.json', 'w') as fp:
+            json.dump(self.config, fp)
+
+        # Configure TensorBoard
+        self.train_writer = tf.summary.FileWriter(os.path.join(self.tensorboard_dir, 'train'), graph=self.state.graph)
+
     def _initialize_model(self) -> None:
         """
         Init tf model
@@ -63,7 +167,7 @@ class PredictionModel(object):
                            tf.local_variables_initializer())
         self.state.sess.run(init_op)
 
-    def _graphs_to_batch_feed_dict(self, graphs: list, graph_sizes: list, len_unroll=1) -> dict:
+    def _graphs_to_batch_feed_dict(self, graphs: list, graph_sizes: list, is_training: bool) -> dict:
         num_edge_types = self.config['num_edge_types']
 
         batch_data = {
@@ -72,7 +176,7 @@ class PredictionModel(object):
             'embeddings_to_graph_mappings': [],
             'aux_in': [],
             'labels': [],
-            'embeddings_in': []
+            'embeddings_in': [],
         }
 
         for graph_idx, graph in enumerate(graphs):
@@ -125,6 +229,9 @@ class PredictionModel(object):
             feed_dict[self.ggnn_layers[0].placeholders['num_incoming_edges_per_type']] \
                 = np.concatenate(batch_data['num_incoming_edges_dicts_per_type'], axis=0)
 
+        # Is training
+        feed_dict[self.cells[0].placeholders['is_training']] = is_training
+
         # Aux in
         feed_dict[self.cells[0].placeholders['aux_in']] = batch_data['aux_in']
 
@@ -174,108 +281,32 @@ class PredictionModel(object):
             self.ops['losses'] = losses
             self.ops['loss'] = tf.reduce_sum(losses)
 
-
-class PredictionModelPredictor(PredictionModel):
-    """
-    Implementation of the prediction process.
-    """
-    def __init__(self, config: dict, state: PredictionModelState):
-        super().__init__(config, state)
-
-        # Create model
-        with self.state.graph.as_default():
-            self._make_model(False)
-
-    def predict(self, graphs):
-        # Enrich graphs with adj list
-        for graph in graphs:
-            graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'] == 1)[0]
-
-        # Extract graph sizes
-        graph_sizes = []
-        for graph in graphs:
-            graph_sizes.append(len(graph[utils.T.NODES]))
-
-        # Graph info
-        feed_dict = self._graphs_to_batch_feed_dict(graphs, graph_sizes)
-
-        # Run
-        fetch_list = [self.cells[0].ops['output']]
-        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
-
-        return result[0]
-
-class PredictionModelTrainer(PredictionModel):
-    """
-    Implementation of the training process.
-    """
-    def __init__(self, config: dict, state: PredictionModelState):
-        super().__init__(config, state)
-
-        self.with_gradient_monitoring = True if 'gradient_monitoring' in self.config and self.config['gradient_monitoring'] == 1 else False
-
-        # Create and initialize model
-        with self.state.graph.as_default():
-            self._make_model(True)
-            self._make_train_step()
-            self._initialize_model()
-
-        # Configure directories and save model configuration
-        SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-        if 'out_dir' in self.config:
-            self.out_dir = self.config['out_dir'] + '/_out/'
-        else:
-            self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
-
-        if not os.path.exists(self.out_dir):
-            os.makedirs(self.out_dir)
-
-        if 'run_id' in self.config:
-            self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-        else:
-            self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-
-        self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
-        if os.path.exists(self.out_dir):
-            shutil.rmtree(self.out_dir)
-
-        model_path = self.out_dir + '/model'
-        os.makedirs(model_path, exist_ok=True)
-        self.model_file = os.path.join(model_path, 'model.pickle')
-
-        self.tensorboard_dir = self.out_dir + '/tensorboard'
-        os.makedirs(self.tensorboard_dir, exist_ok=True)
-
-        with open(self.out_dir + '/config.json', 'w') as fp:
-            json.dump(self.config, fp)
-
-        # Configure TensorBoard
-        self.train_writer = tf.summary.FileWriter(os.path.join(self.tensorboard_dir, 'train'), graph=self.state.graph)
-
     def _make_train_step(self) -> None:
         """
         Create tf train step
         """
-        trainable_vars = self.state.sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            trainable_vars = self.state.sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
 
-        optimizer = tf.train.AdamOptimizer(self.config['learning_rate'])
-        grads_and_vars = optimizer.compute_gradients(self.ops['loss'], var_list=trainable_vars)
+            optimizer = tf.train.AdamOptimizer(self.config['learning_rate'])
+            grads_and_vars = optimizer.compute_gradients(self.ops['loss'], var_list=trainable_vars)
 
-        # Clipping
-        clipped_grads = []
-        for grad, var in grads_and_vars:
-            if grad is not None:
-                clipped_grads.append((tf.clip_by_norm(grad, self.config['clamp_gradient_norm']), var))
-            else:
-                clipped_grads.append((grad, var))
+            # Clipping
+            clipped_grads = []
+            for grad, var in grads_and_vars:
+                if grad is not None:
+                    clipped_grads.append((tf.clip_by_norm(grad, self.config['clamp_gradient_norm']), var))
+                else:
+                    clipped_grads.append((grad, var))
 
-        # Monitoring
-        if self.with_gradient_monitoring:
-            self.ops['gradients'] = tf.summary.merge([tf.summary.histogram("%s-grad" % g[1].name, g[0]) for g in grads_and_vars])
-            self.ops['clipped_gradients'] = tf.summary.merge([tf.summary.histogram("%s-clipped-grad" % g[1].name, g[0]) for g in clipped_grads])
+            # Monitoring
+            if self.with_gradient_monitoring:
+                self.ops['gradients'] = tf.summary.merge([tf.summary.histogram("%s-grad" % g[1].name, g[0]) for g in grads_and_vars])
+                self.ops['clipped_gradients'] = tf.summary.merge([tf.summary.histogram("%s-clipped-grad" % g[1].name, g[0]) for g in clipped_grads])
 
-        # Apply
-        self.ops['train_step'] = optimizer.apply_gradients(clipped_grads)
+            # Apply
+            self.ops['train_step'] = optimizer.apply_gradients(clipped_grads)
 
         # Initialize newly-introduced variables:
         self.state.sess.run(tf.local_variables_initializer())
@@ -333,7 +364,7 @@ class PredictionModelTrainer(PredictionModel):
 
                 # Build feed dict
                 # 1. Graph info
-                feed_dict = self._graphs_to_batch_feed_dict(batch_graphs, batch_graph_sizes)
+                feed_dict = self._graphs_to_batch_feed_dict(batch_graphs, batch_graph_sizes, True)
 
                 # Run batch
                 result = self._run_batch(feed_dict)
@@ -350,10 +381,10 @@ class PredictionModelTrainer(PredictionModel):
                 best_epoch_loss = epoch_loss
 
                 best_epoch_count += 1
-                # if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
-                #     self.state.backup_best_weights()
-                #
-                #     best_epoch_count = 0
+                if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
+                    self.state.backup_best_weights()
+
+                    best_epoch_count = 0
 
             epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
 
@@ -367,7 +398,26 @@ class PredictionModelTrainer(PredictionModel):
             summary.value.add(tag='loss', simple_value=epoch_loss)
             self.train_writer.add_summary(summary, epoch)
 
-        # self.state.restore_best_weights()
+        self.state.restore_best_weights()
+
+    def predict(self, graphs):
+        # Enrich graphs with adj list
+        for graph in graphs:
+            graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'] == 1)[0]
+
+        # Extract graph sizes
+        graph_sizes = []
+        for graph in graphs:
+            graph_sizes.append(len(graph[utils.T.NODES]))
+
+        # Graph info
+        feed_dict = self._graphs_to_batch_feed_dict(graphs, graph_sizes, False)
+
+        # Run
+        fetch_list = [self.cells[0].ops['output']]
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        return result[0]
 
 
 def main():

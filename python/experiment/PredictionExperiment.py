@@ -21,7 +21,7 @@ from keras.models import Model
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
 
-from model.PredictionModel import PredictionModelTrainer, PredictionModelState, PredictionModelPredictor
+from model.PredictionModel import PredictionModel, PredictionModelState
 import utils
 
 seed = 204
@@ -792,7 +792,7 @@ class DeepGNN(HeterogemeousMappingModel):
 
             "num_timesteps": 4,
             "hidden_size_orig": 420,
-            "hidden_size": 32,
+            "hidden_size": 16,
             "deepgmg_mlp_size": 2,
 
             "num_node_types": 174,
@@ -801,7 +801,7 @@ class DeepGNN(HeterogemeousMappingModel):
             "learning_rate": 0.0005,
             "clamp_gradient_norm": 1.0,
 
-            "batch_size": 128,
+            "batch_size": 64,
             "num_epochs": 100,
             "out_dir": "/tmp",
 
@@ -813,8 +813,7 @@ class DeepGNN(HeterogemeousMappingModel):
         }
 
         state = PredictionModelState(config)
-        self.trainer = PredictionModelTrainer(config, state)
-        self.predictor = PredictionModelPredictor(config, state)
+        self.model = PredictionModel(config, state)
 
         return self
 
@@ -832,7 +831,7 @@ class DeepGNN(HeterogemeousMappingModel):
 
             graphs.append(graph)
 
-        self.trainer.train(graphs)
+        self.model.train(graphs)
 
     def predict(self, **test):
         graphs = []
@@ -842,7 +841,7 @@ class DeepGNN(HeterogemeousMappingModel):
 
             graphs.append(graph)
 
-        p = self.predictor.predict(graphs)
+        p = self.model.predict(graphs)
         p = np.array(p)
 
         indices = [np.argmax(x) for x in p]
