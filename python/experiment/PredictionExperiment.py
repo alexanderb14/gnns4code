@@ -366,19 +366,23 @@ def grewe_features(df: pd.DataFrame) -> np.array:
 
 def auxiliary_inputs(df: pd.DataFrame) -> np.array:
     """ get dsize and wgsize auxiliary inputs """
-    transfer = df[["transfer"]].values
-    min_max_scaler = preprocessing.MinMaxScaler()
-    transfer_scaled = np.squeeze(min_max_scaler.fit_transform(transfer))
-
-    wgsize = df[["wgsize"]].values
-    min_max_scaler = preprocessing.MinMaxScaler()
-    wgsize_scaled = np.squeeze(min_max_scaler.fit_transform(wgsize))
+    # transfer = df[["transfer"]].values
+    # min_max_scaler = preprocessing.MinMaxScaler()
+    # transfer_scaled = np.squeeze(min_max_scaler.fit_transform(transfer))
+    #
+    # wgsize = df[["wgsize"]].values
+    # min_max_scaler = preprocessing.MinMaxScaler()
+    # wgsize_scaled = np.squeeze(min_max_scaler.fit_transform(wgsize))
+    #
+    # return np.array([
+    #     transfer_scaled,
+    #     wgsize_scaled,
+    # ]).T
 
     return np.array([
-        transfer_scaled,
-        wgsize_scaled,
+        df['transfer'].values,
+        df['wgsize'].values,
     ]).T
-
 
 def get_clang_graphs(df: pd.DataFrame) -> np.array:
     return np.array(
