@@ -314,7 +314,7 @@ class PredictionModelTrainer(PredictionModel):
             batch_size = self.config['batch_size']
 
             lst = list(zip(graphs, graph_sizes))
-            # random.shuffle(lst)
+            random.shuffle(lst)
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
 

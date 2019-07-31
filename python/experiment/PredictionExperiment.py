@@ -16,6 +16,8 @@ from keras.layers.merge import Concatenate
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(SCRIPT_DIR + '/..')
 
 from model.PredictionModel import PredictionModelTrainer, PredictionModelState, PredictionModelPredictor
 import utils
@@ -787,11 +789,11 @@ class Grewe(HeterogemeousMappingModel):
             "num_node_types": 174,
             "num_edge_types": 4,
 
-            "learning_rate": 0.001,
+            "learning_rate": 0.0005,
             "clamp_gradient_norm": 1.0,
 
             "batch_size": 32,
-            "num_epochs": 100,
+            "num_epochs": 2,
             "out_dir": "/tmp",
 
             "tie_fwd_bkwd": 0,
@@ -826,9 +828,10 @@ class Grewe(HeterogemeousMappingModel):
 
     def predict(self, **test):
         graphs = []
-        for str_graph, y in zip(test["clang_graphs"], test["y"]):
+        for str_graph, aux_in, y in zip(test["clang_graphs"], test["aux_in"], test["y"]):
             graph = json.loads(str_graph, object_hook=utils.json_keys_to_int)
             graph[utils.L.LABEL_0] = y
+            graph[utils.I.AUX_IN_0] = aux_in
 
             graphs.append(graph)
 

@@ -78,7 +78,6 @@ class PredictionCell(object):
                                       num_segments=num_graphs)                                                  # [b, 2h]
 
         h_G_and_aux_in = tf.concat([h_G, aux_in], axis=-1)
-        h_G_and_aux_in = tf.layers.batch_normalization(h_G_and_aux_in, training=True)
         h_G_and_aux_in = self.state.weights['mlp_reduce'](h_G_and_aux_in)
 
         h_G_and_aux_in = self.state.weights['mlp_reduce_2'](h_G_and_aux_in)
