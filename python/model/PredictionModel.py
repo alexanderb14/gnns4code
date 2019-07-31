@@ -377,6 +377,12 @@ class PredictionModel(object):
                 epoch_losses.append(result[0])
 
             epoch_loss = np.sum(epoch_losses)
+            epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
+            epoch_end_time = time.time()
+            epoch_time = epoch_end_time - epoch_start_time
+
+            print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss))
+
             if epoch_loss < best_epoch_loss:
                 best_epoch_loss = epoch_loss
 
@@ -385,13 +391,6 @@ class PredictionModel(object):
                     self.state.backup_best_weights()
 
                     best_epoch_count = 0
-
-            epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
-
-            epoch_end_time = time.time()
-            epoch_time = epoch_end_time - epoch_start_time
-
-            print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss))
 
             # Logging
             summary = tf.Summary()
