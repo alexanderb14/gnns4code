@@ -81,7 +81,11 @@ class PredictionModel(object):
                 batch_data['num_incoming_edges_dicts_per_type'] = []
 
             # Labels
-            batch_data['labels'].append(graph[utils.L.LABEL_0])
+            if utils.L.LABEL_0 in graph:
+                batch_data['labels'].append(graph[utils.L.LABEL_0])
+
+            # if utils.L.LABEL_1 in graph:
+            #     batch_data['labels_1'].append(graph[utils.L.LABEL_1])
 
             # Graph model: Adj list
             adj_lists = graph[utils.AE.ADJ_LIST]
@@ -129,6 +133,70 @@ class PredictionModel(object):
 
         return feed_dict
 
+    def _make_model(self) -> None:
+        """
+        Create tf model
+        """
+        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size_orig']], name='embeddings_in')
+
+        # Create model: Unroll network and wire embeddings
+        embeddings_reduced = self.placeholders['embeddings_in']
+
+        # Create embedding layer
+        embedding_layer = EmbeddingLayer(self.config, self.state.embedding_layer_state)
+        embeddings = embedding_layer.compute_embeddings(embeddings_reduced)
+
+        # Create propagation layer
+        ggnn_layer = GGNNModelLayer(self.config, self.state.ggnn_layer_state)
+        embeddings = ggnn_layer.compute_embeddings(embeddings)
+
+        # Create prediction cell
+        prediction_cell = PredictionCell(self.config, True, self.state.prediction_cell_state)
+        prediction_cell.initial_embeddings = embeddings_reduced
+        prediction_cell.compute_predictions(embeddings)
+
+        self.ggnn_layers.append(ggnn_layer)
+        self.cells.append(prediction_cell)
+
+        # Accumulate losses
+        losses = []
+
+        for cell in self.cells:
+            losses.append(cell.ops['loss'])
+
+        self.ops['losses'] = losses
+        self.ops['loss'] = tf.reduce_sum(losses)
+
+
+class PredictionModelPredictor(PredictionModel):
+    """
+    Implementation of the prediction process.
+    """
+    def __init__(self, config: dict, state: PredictionModelState):
+        super().__init__(config, state)
+
+        # Create model
+        with self.state.graph.as_default():
+            self._make_model()
+
+    def predict(self, graphs):
+        # Enrich graphs with adj list
+        for graph in graphs:
+            graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'] == 1)[0]
+
+        # Extract graph sizes
+        graph_sizes = []
+        for graph in graphs:
+            graph_sizes.append(len(graph[utils.T.NODES]))
+
+        # Graph info
+        feed_dict = self._graphs_to_batch_feed_dict(graphs, graph_sizes)
+
+        # Run
+        fetch_list = [self.ops['loss'], self.cells[0].ops['output']]
+        result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
+
+        return result[1]
 
 class PredictionModelTrainer(PredictionModel):
     """
@@ -141,8 +209,8 @@ class PredictionModelTrainer(PredictionModel):
 
         # Create and initialize model
         with self.state.graph.as_default():
-            self.__make_model()
-            self.__make_train_step()
+            self._make_model()
+            self._make_train_step()
             self._initialize_model()
 
         # Configure directories and save model configuration
@@ -177,41 +245,7 @@ class PredictionModelTrainer(PredictionModel):
         # Configure TensorBoard
         self.train_writer = tf.summary.FileWriter(os.path.join(self.tensorboard_dir, 'train'), graph=self.state.graph)
 
-    def __make_model(self) -> None:
-        """
-        Create tf model
-        """
-        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size_orig']], name='embeddings_in')
-
-        # Create model: Unroll network and wire embeddings
-        embeddings_reduced = self.placeholders['embeddings_in']
-
-        # Create embedding layer
-        embedding_layer = EmbeddingLayer(self.config, self.state.embedding_layer_state)
-        embeddings = embedding_layer.compute_embeddings(embeddings_reduced)
-
-        # Create propagation layer
-        ggnn_layer = GGNNModelLayer(self.config, self.state.ggnn_layer_state)
-        embeddings = ggnn_layer.compute_embeddings(embeddings)
-
-        # Create prediction cell
-        prediction_cell = PredictionCell(self.config, True, self.state.prediction_cell_state)
-        prediction_cell.initial_embeddings = embeddings_reduced
-        outputs = prediction_cell.compute_predictions(embeddings)
-
-        self.ggnn_layers.append(ggnn_layer)
-        self.cells.append(prediction_cell)
-
-        # Accumulate losses
-        losses = []
-
-        for cell in self.cells:
-            losses.append(cell.ops['loss'])
-
-        self.ops['losses'] = losses
-        self.ops['loss'] = tf.reduce_sum(losses)
-
-    def __make_train_step(self) -> None:
+    def _make_train_step(self) -> None:
         """
         Create tf train step
         """
@@ -239,7 +273,7 @@ class PredictionModelTrainer(PredictionModel):
         # Initialize newly-introduced variables:
         self.state.sess.run(tf.local_variables_initializer())
 
-    def __run_batch(self, feed_dict, iteration):
+    def _run_batch(self, feed_dict):
         """
         Train model with one batch and retrieve result
         """
@@ -275,7 +309,7 @@ class PredictionModelTrainer(PredictionModel):
             batch_size = self.config['batch_size']
 
             lst = list(zip(graphs, graph_sizes))
-#            random.shuffle(lst)
+            # random.shuffle(lst)
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
 
@@ -295,7 +329,7 @@ class PredictionModelTrainer(PredictionModel):
                 feed_dict = self._graphs_to_batch_feed_dict(batch_graphs, batch_graph_sizes)
 
                 # Run batch
-                result = self.__run_batch(feed_dict, epoch)
+                result = self._run_batch(feed_dict)
                 end_time = time.time()
 
                 # Log
@@ -309,10 +343,10 @@ class PredictionModelTrainer(PredictionModel):
                 best_epoch_loss = epoch_loss
 
                 best_epoch_count += 1
-                if 'save_best_model_interval' in self.config and best_epoch_count > self.config['save_best_model_interval']:
-                    self.state.backup_best_weights()
-
-                    best_epoch_count = 0
+                # if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
+                #     self.state.backup_best_weights()
+                #
+                #     best_epoch_count = 0
 
             epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
 
@@ -326,7 +360,7 @@ class PredictionModelTrainer(PredictionModel):
             summary.value.add(tag='loss', simple_value=epoch_loss)
             self.train_writer.add_summary(summary, epoch)
 
-        self.state.restore_best_weights()
+        # self.state.restore_best_weights()
 
 
 def main():

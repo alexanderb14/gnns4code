@@ -82,4 +82,4 @@ class PredictionCell(object):
 
         self.ops['peek'] = loss
 
-        return output
+        self.ops['output'] = output
