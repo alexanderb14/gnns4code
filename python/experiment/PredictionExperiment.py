@@ -781,8 +781,8 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
 # print(result)
 
 
-# Experiment: Grewe et al
-class Grewe(HeterogemeousMappingModel):
+# Experiment: DeepGNN et al
+class DeepGNN(HeterogemeousMappingModel):
     __name__ = "DeepGNN"
     __basename__ = "deepgnn"
 
@@ -801,7 +801,7 @@ class Grewe(HeterogemeousMappingModel):
             "learning_rate": 0.0005,
             "clamp_gradient_norm": 1.0,
 
-            "batch_size": 32,
+            "batch_size": 128,
             "num_epochs": 100,
             "out_dir": "/tmp",
 
@@ -850,6 +850,9 @@ class Grewe(HeterogemeousMappingModel):
 
 
 print("Evaluating DeepGNN ...", file=sys.stderr)
-grewe = evaluate(Grewe())
-result = grewe.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
+deepGnn = evaluate(DeepGNN())
+result = deepGnn.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
+print(result)
+
+result = deepGnn.groupby(['Platform'])['Platform', 'Correct?', 'Speedup'].mean()
 print(result)
