@@ -17,8 +17,12 @@ class PredictionCellState(object):
 
         self.weights = {}
 
-        self.weights['transform'] = utils.MLP(h_size, 1, [], 'relu', 'mlp_regression_transform')
-        self.weights['gate'] = utils.MLP(h_size + h_size_orig, 1, [], 'relu', 'mlp_regression_gate')
+        self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, [], 'relu', 'mlp_regression_transform')
+        self.weights['mlp_g_m'] = utils.MLP(h_size + h_size_orig, h_size * m_size, [], 'relu', 'mlp_regression_gate')
+
+        self.weights['mlp_reduce'] = utils.MLP(h_size * m_size + 2, 32, [], 'relu', 'mlp_reduce')
+        self.weights['mlp_reduce_2'] = utils.MLP(32, 1, [], 'sigmoid', 'mlp_reduce_2')
+
 
 class PredictionCell(object):
     """
@@ -55,18 +59,32 @@ class PredictionCell(object):
         embeddings_to_graph_mappings = self.placeholders['embeddings_to_graph_mappings']
         num_graphs = tf.reduce_max(embeddings_to_graph_mappings) + 1                                            # Scalar
 
+        # Input
+        self.placeholders['aux_in'] = tf.placeholder(tf.int32, [None, 2], name='aux_in')
+        aux_in = tf.cast(self.placeholders['aux_in'], dtype=tf.float32)
+
         # Model
         # #########################################
-        # Gate outputs
-        gate_input = tf.concat([embeddings, self.initial_embeddings], axis=-1)                                       # [b*v, 2h]
-        gated_outputs = tf.nn.sigmoid(self.state.weights['gate'](gate_input)) * self.state.weights['transform'](embeddings) # [b*v, 1]
+        gate_input = tf.concat([embeddings, self.initial_embeddings], axis=-1)                                  # [b*v, 2h + h_init]
+        h_v_G = self.state.weights['mlp_f_m'](embeddings)                                                       # [b*v, 2h]
+        g_v_G = self.state.weights['mlp_g_m'](gate_input)                                                       # [b*v, 2h]
+        g_v_G = tf.nn.sigmoid(g_v_G)                                                                            # [b*v, 2h]
+
+        h_G = h_v_G * g_v_G                                                                                     # [b*v, 2h]
 
         # Sum up all nodes per graph
-        graph_representations = tf.unsorted_segment_sum(data=gated_outputs,
-                                                        segment_ids=embeddings_to_graph_mappings,
-                                                        num_segments=num_graphs)                                # [b, 1]
-        output = tf.squeeze(graph_representations)                                                              # [b]
-        output = tf.sigmoid(output)
+        h_G = tf.unsorted_segment_sum(data=h_G,
+                                      segment_ids=embeddings_to_graph_mappings,
+                                      num_segments=num_graphs)                                                  # [b, 2h]
+
+        h_G_and_aux_in = tf.concat([h_G, aux_in], axis=-1)
+        h_G_and_aux_in = tf.layers.batch_normalization(h_G_and_aux_in, training=True)
+        h_G_and_aux_in = self.state.weights['mlp_reduce'](h_G_and_aux_in)
+
+        h_G_and_aux_in = self.state.weights['mlp_reduce_2'](h_G_and_aux_in)
+        self.ops['peek'] = h_G_and_aux_in
+
+        output = tf.squeeze(h_G_and_aux_in)                                                                     # [b]
 
         # Training
         if self.enable_training:
@@ -79,7 +97,5 @@ class PredictionCell(object):
             loss = 0.5 * tf.square(diff_loss)                                                                   # [b]
 
             self.ops['loss'] = loss
-
-        self.ops['peek'] = loss
 
         self.ops['output'] = output

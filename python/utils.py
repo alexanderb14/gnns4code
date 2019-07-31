@@ -12,6 +12,7 @@ VERY_SMALL_NUMBER = 1e-30
 
 LABEL_OFFSET = 20
 ACTION_OFFSET = 30
+I_OFFSET = 40
 
 # Enums
 #######
@@ -42,6 +43,10 @@ class A:
 # Type
 class T:
     NODES, EDGES = range(30, 32)
+
+# Inputs
+class I:
+    AUX_IN_0 = range(LABEL_OFFSET, I_OFFSET + 1)
 
 
 # Functions

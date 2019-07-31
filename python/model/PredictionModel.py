@@ -70,6 +70,7 @@ class PredictionModel(object):
             # Graph model
             'adjacency_lists': [[] for _ in range(self.config['num_edge_types'])],
             'embeddings_to_graph_mappings': [],
+            'aux_in': [],
             'labels': [],
             'embeddings_in': []
         }
@@ -80,12 +81,13 @@ class PredictionModel(object):
             if self.config['use_edge_bias'] == 1:
                 batch_data['num_incoming_edges_dicts_per_type'] = []
 
+            # Aux in
+            if utils.I.AUX_IN_0 in graph:
+                batch_data['aux_in'].append(graph[utils.I.AUX_IN_0])
+
             # Labels
             if utils.L.LABEL_0 in graph:
                 batch_data['labels'].append(graph[utils.L.LABEL_0])
-
-            # if utils.L.LABEL_1 in graph:
-            #     batch_data['labels_1'].append(graph[utils.L.LABEL_1])
 
             # Graph model: Adj list
             adj_lists = graph[utils.AE.ADJ_LIST]
@@ -122,6 +124,9 @@ class PredictionModel(object):
             # Graph model: Incoming edge numbers
             feed_dict[self.ggnn_layers[0].placeholders['num_incoming_edges_per_type']] \
                 = np.concatenate(batch_data['num_incoming_edges_dicts_per_type'], axis=0)
+
+        # Aux in
+        feed_dict[self.cells[0].placeholders['aux_in']] = batch_data['aux_in']
 
         # Labels
         feed_dict[self.cells[0].placeholders['labels']] = batch_data['labels']

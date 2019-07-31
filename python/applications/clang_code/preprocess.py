@@ -320,12 +320,12 @@ def main():
                 utils.T.NODES: nodes,
                 utils.T.EDGES: edges
             }
-            if graph.oracle == 'CPU':
-                graph_export[utils.L.LABEL_0] = 0
-            elif graph.oracle == 'GPU':
-                graph_export[utils.L.LABEL_0] = 1
-            else:
-                raise Exception()
+            # if graph.oracle == 'CPU':
+            #     graph_export[utils.L.LABEL_0] = 0
+            # elif graph.oracle == 'GPU':
+            #     graph_export[utils.L.LABEL_0] = 1
+            # else:
+            #     raise Exception()
 
             graphs_export.append(graph_export)
             names_export.append(graph.name)
