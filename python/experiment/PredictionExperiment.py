@@ -568,7 +568,7 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
                         features=features[train_index],
                         aux_in=aux_in[train_index],
                         clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
-                        sequences=sequences[train_index] if sequences else None,
+                        sequences=sequences[train_index] if sequences is not None else None,
                         y=y[train_index],
                         y_1hot=y_1hot[train_index],
                         verbose=False)
@@ -578,7 +578,7 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
                 features=features[test_index],
                 aux_in=aux_in[test_index],
                 clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
-                sequences=sequences[test_index] if sequences else None,
+                sequences=sequences[test_index] if sequences is not None else None,
                 y=y[test_index],
                 y_1hot=y_1hot[test_index],
                 verbose=False)
