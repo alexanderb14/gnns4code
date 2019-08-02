@@ -850,9 +850,9 @@ def main():
             "num_edge_types": 2,
 
             "prediction_cell": {
-                "mlp_f_m_dims": [],
-                "mlp_g_m_dims": [],
-                "mlp_reduce_dims": [],
+                "mlp_f_m_dims": [128],
+                "mlp_g_m_dims": [128],
+                "mlp_reduce_dims": [130],
                 "mlp_reduce_2_dims": []
             },
 
