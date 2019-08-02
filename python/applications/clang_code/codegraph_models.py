@@ -732,14 +732,22 @@ class NodeTypeIdCreateVisitor(VisitorBase):
     """
     Visitor for assigning unique ids to nodes
     """
-    def __init__(self, debug: int = False):
+    def __init__(self, with_functionnames: bool = True, with_callnames: bool = True):
         super(NodeTypeIdCreateVisitor, self).__init__()
 
+        self.with_functionnames = with_functionnames
+        self.with_callnames = with_callnames
         self.node_type_ids_by_statements = {}
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Statement) or isinstance(obj, Function):
-            if obj.name == 'IntegerLiteral':
+            classname = obj.__class__.__name__
+
+            if classname == 'Function' and self.with_functionnames == False:
+                key_hashed = hash((classname, utils.freeze_dict(obj.specifics)))
+            elif obj.name == 'CallExpr' and self.with_callnames == False:
+                key_hashed = hash((obj.name))
+            elif obj.name == 'IntegerLiteral':
                 key_hashed = hash((obj.name))
             else:
                 key_hashed = hash((obj.name, utils.freeze_dict(obj.specifics)))
@@ -751,6 +759,7 @@ class NodeTypeIdCreateVisitor(VisitorBase):
                 self.node_type_ids_by_statements[key_hashed] = {
                     # id is incremented by 1 because type 0 is reserved as terminator type
                     'id': len(self.node_type_ids_by_statements) + 1,
+                    'classname': classname,
                     'name': obj.name,
                     'specifics': obj.specifics,
                     'count': 1

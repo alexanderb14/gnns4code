@@ -819,6 +819,8 @@ class DeepGNN(HeterogemeousMappingModel):
         state = PredictionModelState(config)
         self.model = PredictionModel(config, state)
 
+        print('Number of trainable parameters:', state.count_number_trainable_params())
+
         return self
 
     def save(self, outpath):

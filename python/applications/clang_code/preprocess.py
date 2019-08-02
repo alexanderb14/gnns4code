@@ -304,7 +304,7 @@ def main():
         print('num_graphs:', len(preprocessed))
 
         # CodeGraph -> graph
-        nic_vstr = codegraph_models.NodeTypeIdCreateVisitor()
+        nic_vstr = codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False, with_callnames=True)
         for graph in preprocessed:
             graph.accept(nic_vstr)
         node_types = nic_vstr.node_type_ids_by_statements
@@ -337,6 +337,8 @@ def main():
 
             graphs_export.append(graph_export)
             names_export.append(graph.name)
+
+        utils.pretty_print_dict(node_types)
 
         # Write to file
         with open(args.json_out, 'w') as f:
