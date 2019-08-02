@@ -15,7 +15,7 @@ def print_process_stdout_continuously(process, prefix):
         line = process.stderr.readline()
         if not line:
             break
-        print(str(prefix) + ': ' + str(line.rstrip(), 'utf-8'), file=sys.stderr)
+        print(str(prefix) + ': ' + str(line.rstrip(), 'utf-8'))
     process.wait()
     print(prefix + ' RETURNCODE: ' + str(process.returncode))
 
