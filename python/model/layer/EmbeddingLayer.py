@@ -17,7 +17,7 @@ class EmbeddingLayerState(object):
 
         self.weights = {}
 
-        self.weights['mapping'] = utils.MLP(hidden_size_orig, h_size, [], 'relu', 'mapping')
+        self.weights['mapping'] = utils.MLP(hidden_size_orig, h_size, self.config['embedding_layer']['mapping_dims'], 'relu', 'mapping')
 
 
 class EmbeddingLayer(PropagationModelLayer):

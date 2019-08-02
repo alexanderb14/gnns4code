@@ -772,14 +772,17 @@ class EdgeExtractionVisitor(VisitorBase):
     """
     Visitor for extracting the edges of a CodeGraph
     """
-    def __init__(self, debug: int = False):
+    def __init__(self, edge_types: dict = None, debug: int = False):
         super(EdgeExtractionVisitor, self).__init__()
 
         self.edges = []
+        self.edge_types = edge_types
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Edge):
-            edge_info = (obj.src.node_id, get_id_for_edge_type(obj.type), obj.dest.node_id)
+            edge_info = (obj.src.node_id,
+                         self.edge_types[obj.type] if self.edge_types else get_id_for_edge_type(obj.type),
+                         obj.dest.node_id)
 
             if edge_info not in self.edges:
                 self.edges.append(edge_info)

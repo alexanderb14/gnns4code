@@ -1,28 +1,18 @@
-import numpy as np
-import pandas as pd
-import pickle
+import argparse
 import json
 import os
-import sys
-from labm8 import fs
-from typing import List
-from sklearn.model_selection import StratifiedKFold
-from sklearn import preprocessing
-from progressbar import ProgressBar
 import numpy as np
-import string
+import pandas as pd
+import sys
 from collections import Counter
-
-from keras.layers import Input, Embedding, LSTM, Dense
-from keras.layers.merge import Concatenate
-from keras.layers.normalization import BatchNormalization
-from keras.models import Model
+from typing import List
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
 
 from model.PredictionModel import PredictionModel, PredictionModelState
 import utils
+
 
 seed = 204
 
@@ -397,7 +387,7 @@ def encode_1hot(y: np.array) -> np.array:
     return np.array(list(zip(l1, l2)), dtype=np.int32)
 
 
-def encode_srcs(srcs: List[str]) -> np.array:
+def encode_srcs(atomizer, srcs: List[str]) -> np.array:
     """ encode and pad source code for learning """
     from keras.preprocessing.sequence import pad_sequences
 
@@ -569,8 +559,8 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
             model_path = f"data/case-study-a/models/{model.__basename__}-{platform}-{j}.model"
             predictions_path = f"data/case-study-a/predictions/{model.__basename__}-{platform}-{j}.result"
 
-            # if sequences is None:  # encode source codes if needed
-            #     sequences = encode_srcs(df["src"].values)
+            if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
+                sequences = encode_srcs(model.atomizer, df["src"].values)
 
             # train and cache a model
             model.init(seed=seed)
@@ -578,7 +568,7 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
                         features=features[train_index],
                         aux_in=aux_in[train_index],
                         clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
-#                        sequences=sequences[train_index],
+                        sequences=sequences[train_index] if sequences else None,
                         y=y[train_index],
                         y_1hot=y_1hot[train_index],
                         verbose=False)
@@ -588,7 +578,7 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
                 features=features[test_index],
                 aux_in=aux_in[test_index],
                 clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
-                # sequences=sequences[test_index],
+                sequences=sequences[test_index] if sequences else None,
                 y=y[test_index],
                 y_1hot=y_1hot[test_index],
                 verbose=False)
@@ -640,149 +630,121 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
         ])
 
 
+# Experiment: Static mapping
+class StaticMapping(HeterogemeousMappingModel):
+    __name__ = "Static mapping"
+    __basename__ = "static"
 
-# srcs = '\n'.join(pd.read_csv("data/case-study-a/cgo17-nvidia.csv")['src'].values)
-# atomizer = GreedyAtomizer.from_text(srcs)
+    def init(self, seed: int):
+        return self
 
+    def save(self, outpath):
+        with open(outpath, "wb") as outfile:
+            pickle.dump(self.model, outfile)
 
-# # Experiment: Static mapping
-# class StaticMapping(HeterogemeousMappingModel):
-#     __name__ = "Static mapping"
-#     __basename__ = "static"
-#
-#     def init(self, seed: int):
-#         return self
-#
-#     def save(self, outpath):
-#         with open(outpath, "wb") as outfile:
-#             pickle.dump(self.model, outfile)
-#
-#     def restore(self, inpath):
-#         with open(inpath, "rb") as infile:
-#             self.model = pickle.load(infile)
-#
-#     def train(self, df=None, **train):
-#         from collections import Counter
-#
-#         pd.set_option('display.max_rows', 5)
-#         pd.set_option('display.max_columns', None)
-#         print(df)
-#
-#         # select the Zero-R device: the most frequently optimal device
-#         zero_r_device = Counter(df['oracle']).most_common(1)[0][0]
-#         self.model = 1 if zero_r_device == "GPU" else 0
-#
-#     def predict(self, **test):
-#         if self.model:
-#             return np.ones(len(test["y"])).astype(np.int32)
-#         else:
-#             return np.zeros(len(test["y"])).astype(dtype=np.int32)
-#
-# print("Evaluating static mapping ...", file=sys.stderr)
-# baseline = evaluate(StaticMapping())
-# result = baseline.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
-# print(result)
+    def restore(self, inpath):
+        with open(inpath, "rb") as infile:
+            self.model = pickle.load(infile)
 
+    def train(self, df=None, **train):
+        from collections import Counter
 
-# # Experiment: Grewe et al
-# class Grewe(HeterogemeousMappingModel):
-#     __name__ = "Grewe et al."
-#     __basename__ = "grewe"
-#
-#     def init(self, seed: int):
-#         from sklearn.tree import DecisionTreeClassifier
-#
-#         self.model = DecisionTreeClassifier(
-#             random_state=seed, splitter="best",
-#             criterion="entropy", max_depth=5,
-#             min_samples_leaf=5)
-#         return self
-#
-#     def save(self, outpath):
-#         with open(outpath, "wb") as outfile:
-#             pickle.dump(self.model, outfile)
-#
-#     def restore(self, inpath):
-#         with open(inpath, "rb") as infile:
-#             self.model = pickle.load(infile)
-#
-#     def train(self, **train):
-#         self.model.fit(train["features"], train["y"])
-#
-#     def predict(self, **test):
-#         return self.model.predict(test["features"])
-#
-# print("Evaluating Grewe et al. ...", file=sys.stderr)
-# grewe = evaluate(Grewe())
-# result = grewe.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
-# print(result)
+        # select the Zero-R device: the most frequently optimal device
+        zero_r_device = Counter(df['oracle']).most_common(1)[0][0]
+        self.model = 1 if zero_r_device == "GPU" else 0
 
+    def predict(self, **test):
+        if self.model:
+            return np.ones(len(test["y"])).astype(np.int32)
+        else:
+            return np.zeros(len(test["y"])).astype(dtype=np.int32)
 
-# # Experiment: DeepTune
-# class DeepTune(HeterogemeousMappingModel):
-#     __name__ = "DeepTune"
-#     __basename__ = "deeptune"
-#
-#     def init(self, seed: int):
-#         from keras.layers import Input, Embedding, LSTM, Dense
-#         from keras.layers.merge import Concatenate
-#         from keras.layers.normalization import BatchNormalization
-#         from keras.models import Model
-#
-#         np.random.seed(seed)
-#
-#         # Language model. Takes as inputs source code sequences.
-#         code_in = Input(shape=(1024,), dtype="int32", name="code_in")
-#         x = Embedding(input_dim=atomizer.vocab_size + 1, input_length=1024,
-#                       output_dim=64, name="embedding")(code_in)
-#         x = LSTM(64, implementation=1, return_sequences=True, name="lstm_1")(x)
-#         x = LSTM(64, implementation=1, name="lstm_2")(x)
-#         langmodel_out = Dense(2, activation="sigmoid")(x)
-#
-#         # Auxiliary inputs. wgsize and dsize.
-#         auxiliary_inputs = Input(shape=(2,))
-#
-#         # Heuristic model. Takes as inputs the language model,
-#         #   outputs 1-hot encoded device mapping
-#         x = Concatenate()([auxiliary_inputs, x])
-#         x = BatchNormalization()(x)
-#         x = Dense(32, activation="relu")(x)
-#         out = Dense(2, activation="sigmoid")(x)
-#
-#         self.model = Model(inputs=[auxiliary_inputs, code_in], outputs=[out, langmodel_out])
-#         self.model.compile(
-#             optimizer="adam", metrics=['accuracy'],
-#             loss=["categorical_crossentropy", "categorical_crossentropy"],
-#             loss_weights=[1., .2])
-#
-#         return self
-#
-#     def save(self, outpath):
-#         self.model.save(outpath)
-#
-#     def restore(self, inpath):
-#         from keras.models import load_model
-#         self.model = load_model(inpath)
-#
-#     def train(self, **train):
-#         self.model.fit([train["aux_in"], train["sequences"]], [train["y_1hot"], train["y_1hot"]],
-#                        epochs=50, batch_size=64, verbose=train["verbose"], shuffle=True)
-#
-#     def predict(self, **test):
-#         p = np.array(self.model.predict(
-#             [test["aux_in"], test["sequences"]], batch_size=64, verbose=test["verbose"]))
-#         indices = [np.argmax(x) for x in p[0]]
-#         return indices
-#
-# deeptune_model = DeepTune()
-# deeptune_model.init(seed)
-# deeptune_model.model.summary()
-#
-# print("Evaluating DeepTune ...", file=sys.stderr)
-# deeptune = evaluate(deeptune_model)
-# result = deeptune.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
-#
-# print(result)
+# Experiment: Grewe et al
+class Grewe(HeterogemeousMappingModel):
+    __name__ = "Grewe et al."
+    __basename__ = "grewe"
+
+    def init(self, seed: int):
+        from sklearn.tree import DecisionTreeClassifier
+
+        self.model = DecisionTreeClassifier(
+            random_state=seed, splitter="best",
+            criterion="entropy", max_depth=5,
+            min_samples_leaf=5)
+        return self
+
+    def save(self, outpath):
+        with open(outpath, "wb") as outfile:
+            pickle.dump(self.model, outfile)
+
+    def restore(self, inpath):
+        with open(inpath, "rb") as infile:
+            self.model = pickle.load(infile)
+
+    def train(self, **train):
+        self.model.fit(train["features"], train["y"])
+
+    def predict(self, **test):
+        return self.model.predict(test["features"])
+
+# Experiment: DeepTune
+class DeepTune(HeterogemeousMappingModel):
+    __name__ = "DeepTune"
+    __basename__ = "deeptune"
+
+    def init(self, seed: int):
+        from keras.layers import Input, Embedding, LSTM, Dense
+        from keras.layers.merge import Concatenate
+        from keras.layers.normalization import BatchNormalization
+        from keras.models import Model
+
+        srcs = '\n'.join(pd.read_csv("/devel/tmp/gnns4code/out.csv")['src'].values)
+        self.atomizer = GreedyAtomizer.from_text(srcs)
+
+        np.random.seed(seed)
+
+        # Language model. Takes as inputs source code sequences.
+        code_in = Input(shape=(1024,), dtype="int32", name="code_in")
+        x = Embedding(input_dim=self.atomizer.vocab_size + 1, input_length=1024,
+                      output_dim=64, name="embedding")(code_in)
+        x = LSTM(64, implementation=1, return_sequences=True, name="lstm_1")(x)
+        x = LSTM(64, implementation=1, name="lstm_2")(x)
+        langmodel_out = Dense(2, activation="sigmoid")(x)
+
+        # Auxiliary inputs. wgsize and dsize.
+        auxiliary_inputs = Input(shape=(2,))
+
+        # Heuristic model. Takes as inputs the language model,
+        #   outputs 1-hot encoded device mapping
+        x = Concatenate()([auxiliary_inputs, x])
+        x = BatchNormalization()(x)
+        x = Dense(32, activation="relu")(x)
+        out = Dense(2, activation="sigmoid")(x)
+
+        self.model = Model(inputs=[auxiliary_inputs, code_in], outputs=[out, langmodel_out])
+        self.model.compile(
+            optimizer="adam", metrics=['accuracy'],
+            loss=["categorical_crossentropy", "categorical_crossentropy"],
+            loss_weights=[1., .2])
+
+        return self
+
+    def save(self, outpath):
+        self.model.save(outpath)
+
+    def restore(self, inpath):
+        from keras.models import load_model
+        self.model = load_model(inpath)
+
+    def train(self, **train):
+        self.model.fit([train["aux_in"], train["sequences"]], [train["y_1hot"], train["y_1hot"]],
+                       epochs=50, batch_size=64, verbose=train["verbose"], shuffle=True)
+
+    def predict(self, **test):
+        p = np.array(self.model.predict(
+            [test["aux_in"], test["sequences"]], batch_size=64, verbose=test["verbose"]))
+        indices = [np.argmax(x) for x in p[0]]
+        return indices
 
 
 # Experiment: DeepGNN et al
@@ -790,34 +752,12 @@ class DeepGNN(HeterogemeousMappingModel):
     __name__ = "DeepGNN"
     __basename__ = "deepgnn"
 
-    def init(self, seed: int):
-        config = {
-            "graph_rnn_cell": "GRU",
+    def __init__(self, config):
+        self.config = config
 
-            "num_timesteps": 4,
-            "hidden_size_orig": 420,
-            "hidden_size": 16,
-            "deepgmg_mlp_size": 2,
-
-            "num_node_types": 174,
-            "num_edge_types": 4,
-
-            "learning_rate": 0.0005,
-            "clamp_gradient_norm": 1.0,
-
-            "batch_size": 64,
-            "num_epochs": 100,
-            "out_dir": "/tmp",
-
-            "tie_fwd_bkwd": 0,
-            "use_edge_bias": 0,
-            "use_edge_msg_avg_aggregation": 0,
-
-            "save_best_model_interval": 1
-        }
-
-        state = PredictionModelState(config)
-        self.model = PredictionModel(config, state)
+    def init(self, seed):
+        state = PredictionModelState(self.config)
+        self.model = PredictionModel(self.config, state)
 
         print('Number of trainable parameters:', state.count_number_trainable_params())
 
@@ -855,10 +795,100 @@ class DeepGNN(HeterogemeousMappingModel):
         return indices
 
 
-print("Evaluating DeepGNN ...", file=sys.stderr)
-deepGnn = evaluate(DeepGNN())
-result = deepGnn.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
-print(result)
+def parse_report_to_human_readable(report: pd.DataFrame):
+    report_str = ''
 
-result = deepGnn.groupby(['Platform'])['Platform', 'Correct?', 'Speedup'].mean()
-print(result)
+    result = report.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
+    report_str += str(result)
+    report_str += '\n'
+    result = report.groupby(['Platform'])['Platform', 'Correct?', 'Speedup'].mean()
+    report_str += str(result)
+
+    return report_str
+
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    # Experiments
+    parser.add_argument('--StaticMapping', action='store_true')
+    parser.add_argument('--Grewe', action='store_true')
+    parser.add_argument('--DeepTuneLSTM', action='store_true')
+    parser.add_argument('--DeepTuneGNN', action='store_true')
+
+    # Config
+    parser.add_argument('--report_write_dir')
+
+    args = parser.parse_args()
+
+    if args.StaticMapping:
+        print("Evaluating static mapping ...", file=sys.stderr)
+        model = StaticMapping()
+        report = evaluate(model)
+
+    if args.Grewe:
+        print("Evaluating Grewe et al. ...", file=sys.stderr)
+        model = Grewe()
+        report = evaluate(model)
+
+    if args.DeepTuneLSTM:
+        print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
+        model = DeepTune()
+        model.init(seed)
+        model.model.summary()
+        report = evaluate(model)
+
+    if args.DeepTuneGNN:
+        config = {
+            "graph_rnn_cell": "GRU",
+
+            "num_timesteps": 4,
+            "hidden_size_orig": 92,
+            "hidden_size": 32,
+            "deepgmg_mlp_size": 2,
+
+            "num_edge_types": 2,
+
+            "prediction_cell": {
+                "mlp_f_m_dims": [],
+                "mlp_g_m_dims": [],
+                "mlp_reduce_dims": [],
+                "mlp_reduce_2_dims": []
+            },
+
+            "embedding_layer": {
+                "mapping_dims": []
+            },
+
+
+            "learning_rate": 0.0005,
+            "clamp_gradient_norm": 1.0,
+
+            "batch_size": 64,
+            "num_epochs": 1,
+            "out_dir": "/tmp",
+
+            "tie_fwd_bkwd": 0,
+            "use_edge_bias": 0,
+            "use_edge_msg_avg_aggregation": 0,
+
+            "save_best_model_interval": 1
+        }
+
+        print("Evaluating DeepTuneGNN ...", file=sys.stderr)
+        model = DeepGNN(config)
+        report = evaluate(model)
+
+    # Print report
+    report_human_readable = parse_report_to_human_readable(report)
+    print(report_human_readable)
+
+    # Write report to file
+    filename = model.__name__ + '_' + str(len(next(os.walk(args.report_write_dir))[1])) + '.txt'
+    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+        f += report_human_readable
+        if config:
+            f += json.dumps(config)
+
+if __name__ == '__main__':
+    main()

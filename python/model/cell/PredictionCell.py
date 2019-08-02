@@ -16,11 +16,11 @@ class PredictionCellState(object):
 
         self.weights = {}
 
-        self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, [], 'relu', 'mlp_regression_transform')
-        self.weights['mlp_g_m'] = utils.MLP(h_size + h_size_orig, h_size * m_size, [], 'relu', 'mlp_regression_gate')
+        self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, self.config['prediction_cell']['mlp_f_m_dims'], 'relu', 'mlp_regression_transform')
+        self.weights['mlp_g_m'] = utils.MLP(h_size + h_size_orig, h_size * m_size, self.config['prediction_cell']['mlp_g_m_dims'], 'relu', 'mlp_regression_gate')
 
-        self.weights['mlp_reduce'] = utils.MLP(h_size * m_size + 2, 32, [], 'relu', 'mlp_reduce')
-        self.weights['mlp_reduce_2'] = utils.MLP(32, 2, [], 'relu', 'mlp_reduce_2')
+        self.weights['mlp_reduce'] = utils.MLP(h_size * m_size + 2, 32, self.config['prediction_cell']['mlp_reduce_dims'], 'relu', 'mlp_reduce')
+        self.weights['mlp_reduce_2'] = utils.MLP(32, 2, self.config['prediction_cell']['mlp_reduce_2_dims'], 'relu', 'mlp_reduce_2')
 
 
 class PredictionCell(object):
@@ -42,10 +42,6 @@ class PredictionCell(object):
         :param embeddings: Tensor of shape [b*v, h]
         :return: Predictions
         """
-        h_size = self.config['hidden_size']
-        m_size = self.config['deepgmg_mlp_size']
-        num_node_types = self.config['num_node_types']
-
         # Placeholders
         # #########################################
         # # Initial embeddings

@@ -230,7 +230,7 @@ def main():
         num_nodes = []
 
         df_benchmarks = pd.read_csv(args.cgo17_benchmarks_csv)
-        df_benchmarks = df_benchmarks.drop(columns=['src'])
+        # df_benchmarks = df_benchmarks.drop(columns=['src'])
         df_benchmarks = df_benchmarks.drop(columns=['seq'])
 
         filenames = get_files_by_extension(args.out_dir, '.json')
@@ -304,7 +304,7 @@ def main():
         print('num_graphs:', len(preprocessed))
 
         # CodeGraph -> graph
-        nic_vstr = codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False, with_callnames=True)
+        nic_vstr = codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False, with_callnames=False)
         for graph in preprocessed:
             graph.accept(nic_vstr)
         node_types = nic_vstr.node_type_ids_by_statements
@@ -320,7 +320,7 @@ def main():
             nodes = ne_vstr.node_types()
 
             # Extract edges
-            ee_vstr = codegraph_models.EdgeExtractionVisitor()
+            ee_vstr = codegraph_models.EdgeExtractionVisitor(edge_types={'AST': 0, 'LIVE': 1})
             graph.accept(ee_vstr)
             edges = ee_vstr.edges
 
