@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -30,18 +31,23 @@ def build_with_cmake(project_path, target):
     print('Build with cmake and make. Target: %s, Project path: %s' % (target, project_path))
     utils.print_dash()
 
-    build_path = os.path.join(project_path, 'build')
+    target_executable = 'NOT_BUILT'
+    try:
+        build_path = os.path.join(project_path, 'build')
 
-    if not os.path.exists(build_path):
-        subprocess.Popen(['mkdir', build_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=project_path)
+        if not os.path.exists(build_path):
+            subprocess.Popen(['mkdir', build_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=project_path)
 
-        process = subprocess.Popen(['cmake', '..'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
-        print_process_stdout_continuously(process, 'CMAKE')
+            process = subprocess.Popen(['cmake', '..'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
+            print_process_stdout_continuously(process, 'CMAKE')
 
-    process = subprocess.Popen(['make', '-j', '4', target], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
-    print_process_stdout_continuously(process, 'MAKE')
+        process = subprocess.Popen(['make', '-j', '4', target], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
+        print_process_stdout_continuously(process, 'MAKE')
 
-    target_executable = os.path.join(build_path, target)
+        target_executable = os.path.join(build_path, target)
+    except:
+        print(sys.exc_info()[0])
+
     return target_executable
 
 
