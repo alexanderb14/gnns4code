@@ -886,9 +886,9 @@ def main():
     # Write report to file
     filename = model.__name__ + '_' + str(len(next(os.walk(args.report_write_dir))[1])) + '.txt'
     with open(os.path.join(args.report_write_dir, filename), 'w') as f:
-        f += report_human_readable
+        f.write(report_human_readable)
         if config:
-            f += json.dumps(config)
+            f.write(json.dumps(config))
 
 if __name__ == '__main__':
     main()

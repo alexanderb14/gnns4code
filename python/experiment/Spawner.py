@@ -24,18 +24,19 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--command')
-    parser.add_argument('--iterations')
+    parser.add_argument('--num_command_iterations')
+    parser.add_argument('--num_threads')
 
     args = parser.parse_args()
 
-    iterations = range(0, int(args.iterations))
+    iterations = range(0, int(args.num_command_iterations))
 
     def fnc(iteration):
         command = args.command.split(' ')
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.getcwd())
         print_process_stdout_continuously(process, iteration)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=int(args.num_threads)) as executor:
         executor.map(fnc, iterations)
 
 if __name__ == '__main__':
