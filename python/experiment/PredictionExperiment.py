@@ -411,6 +411,9 @@ class HeterogemeousMappingModel(object):
     __name__ = None
     __basename__ = None
 
+    def __init__(self, dataset) -> None:
+        self.dataset = dataset
+
     def init(self, seed: int) -> None:
         """
         Initialize the model.
@@ -540,7 +543,7 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
         platform_name = platform2str(platform)
 
         # load runtime data
-        df = pd.read_csv("/devel/tmp/gnns4code/out.csv")
+        df = model.dataset
 
         sequences = None  # defer sequence encoding until needed (it's expensive)
 
@@ -698,7 +701,7 @@ class DeepTune(HeterogemeousMappingModel):
         from keras.layers.normalization import BatchNormalization
         from keras.models import Model
 
-        srcs = '\n'.join(pd.read_csv("/devel/tmp/gnns4code/out.csv")['src'].values)
+        srcs = '\n'.join(self.dataset['src'].values)
         self.atomizer = GreedyAtomizer.from_text(srcs)
 
         np.random.seed(seed)
@@ -752,8 +755,9 @@ class DeepGNN(HeterogemeousMappingModel):
     __name__ = "DeepGNN"
     __basename__ = "deepgnn"
 
-    def __init__(self, config):
+    def __init__(self, config, dataset):
         self.config = config
+        self.dataset = dataset
 
     def init(self, seed):
         state = PredictionModelState(self.config)
@@ -817,23 +821,26 @@ def main():
     parser.add_argument('--DeepTuneGNN', action='store_true')
 
     # Config
+    parser.add_argument('--dataset')
     parser.add_argument('--report_write_dir')
 
     args = parser.parse_args()
 
+    dataset = pd.read_csv(args.dataset)
+
     if args.StaticMapping:
         print("Evaluating static mapping ...", file=sys.stderr)
-        model = StaticMapping()
+        model = StaticMapping(dataset)
         report = evaluate(model)
 
     if args.Grewe:
         print("Evaluating Grewe et al. ...", file=sys.stderr)
-        model = Grewe()
+        model = Grewe(dataset)
         report = evaluate(model)
 
     if args.DeepTuneLSTM:
         print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
-        model = DeepTune()
+        model = DeepTune(dataset)
         model.init(seed)
         model.model.summary()
         report = evaluate(model)
@@ -876,7 +883,7 @@ def main():
         }
 
         print("Evaluating DeepTuneGNN ...", file=sys.stderr)
-        model = DeepGNN(config)
+        model = DeepGNN(config, dataset)
         report = evaluate(model)
 
     # Print report
