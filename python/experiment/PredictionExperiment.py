@@ -891,7 +891,8 @@ def main():
     print(report_human_readable)
 
     # Write report to file
-    filename = model.__name__ + '_' + str(len(next(os.walk(args.report_write_dir))[1])) + '.txt'
+    num_files = len([f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))])
+    filename = model.__name__ + '_' + str(num_files) + '.txt'
     print(filename)
     with open(os.path.join(args.report_write_dir, filename), 'w') as f:
         f.write(report_human_readable)
