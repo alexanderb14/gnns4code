@@ -845,7 +845,7 @@ def main():
             "num_timesteps": 4,
             "hidden_size_orig": 92,
             "hidden_size": 32,
-            "deepgmg_mlp_size": 2,
+            "deepgmg_mlp_size": 4,
 
             "num_edge_types": 2,
 
@@ -865,7 +865,7 @@ def main():
             "clamp_gradient_norm": 1.0,
 
             "batch_size": 64,
-            "num_epochs": 1,
+            "num_epochs": 400,
             "out_dir": "/tmp",
 
             "tie_fwd_bkwd": 0,
