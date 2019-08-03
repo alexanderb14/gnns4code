@@ -6,6 +6,7 @@ import pandas as pd
 import sys
 from collections import Counter
 from typing import List
+import pickle
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
@@ -811,6 +812,15 @@ def parse_report_to_human_readable(report: pd.DataFrame):
     return report_str
 
 
+def report_to_json(report: pd.DataFrame):
+    result = report.groupby(['Platform'])['Platform', 'Correct?', 'Speedup'].mean()
+    accuracy = result.loc['NVIDIA GTX 970', 'Correct?']
+    speedup = result.loc['NVIDIA GTX 970', 'Speedup']
+
+    return {'accuracy': round(accuracy, 4),
+            'speedup': round(speedup, 4)}
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -890,14 +900,23 @@ def main():
     report_human_readable = parse_report_to_human_readable(report)
     print(report_human_readable)
 
-    # Write report to file
+    report_json = report_to_json(report)
+
+    # Write to file
     num_files = len([f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))])
     filename = model.__name__ + '_' + str(num_files) + '.txt'
-    print(filename)
+
     with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+        # Report
         f.write(report_human_readable)
+        f.write('\n')
+        f.write(json.dumps(report_json))
+        f.write('\n')
+
+        # Config
         if config:
             f.write(json.dumps(config))
+            f.write('\n')
 
 if __name__ == '__main__':
     main()
