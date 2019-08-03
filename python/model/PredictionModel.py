@@ -237,6 +237,7 @@ class PredictionModel(object):
                 node_types = utils.get_one_hot(np.array(graph[utils.T.NODES]),
                                                self.config['hidden_size_orig'] - 1).astype(float)
                 node_values = np.array(graph[utils.T.NODE_VALUES]).astype(float).reshape(-1, 1)
+                node_values = node_values / 2147483647
 
                 batch_data['embeddings_in'].append(np.concatenate([node_types, node_values], axis=1))
             else:
