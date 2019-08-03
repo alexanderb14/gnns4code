@@ -126,6 +126,11 @@ def test_gen_and_compile_function_call(tmpdir_factory):
     print(tmpdir)
     assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'function_call.c')) == True
 
+def test_gen_and_compile_increment(tmpdir_factory):
+    tmpdir = tmpdir_factory.mktemp('out')
+    print(tmpdir)
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'increment.c')) == True
+
 def test_gen_and_compile_max(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)

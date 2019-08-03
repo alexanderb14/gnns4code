@@ -205,10 +205,10 @@ def main():
         parser.print_help()
         exit(1)
 
-    delete_and_create_folder(args.out_dir)
-    delete_and_create_folder(args.bad_code_dir)
-    delete_and_create_folder(args.good_code_dir)
-    delete_and_create_folder(args.error_log_dir)
+    # delete_and_create_folder(args.out_dir)
+    # delete_and_create_folder(args.bad_code_dir)
+    # delete_and_create_folder(args.good_code_dir)
+    # delete_and_create_folder(args.error_log_dir)
 
     # Generative command
     if command_arg.command == 'generative':
@@ -222,8 +222,8 @@ def main():
         # Find all .cl files and extract code graphs from them
         files = get_files_by_extension(args.code_dir, '.cl')
 
-        process_files(files, args.out_dir, args.good_code_dir,
-                      args.bad_code_dir, args.error_log_dir, args.code_dir)
+        # process_files(files, args.out_dir, args.good_code_dir,
+        #               args.bad_code_dir, args.error_log_dir, args.code_dir)
 
         # Extract oracle from the cgo17 dataframe
         preprocessed = []
@@ -314,10 +314,11 @@ def main():
         names_export = []
 
         for graph in preprocessed:
-            # Extract node types
-            ne_vstr = codegraph_models.NodeTypesExtractionVisitor()
-            graph.accept(ne_vstr)
-            nodes = ne_vstr.node_types()
+            # Extract node infos
+            ni_vstr = codegraph_models.NodeInfoExtractionVisitor()
+            graph.accept(ni_vstr)
+            nodes = ni_vstr.node_types()
+            node_values = ni_vstr.node_values()
 
             # Extract edges
             ee_vstr = codegraph_models.EdgeExtractionVisitor(edge_types={'AST': 0, 'LIVE': 1})
@@ -326,6 +327,7 @@ def main():
 
             graph_export = {
                 utils.T.NODES: nodes,
+                utils.T.NODE_VALUES: node_values,
                 utils.T.EDGES: edges
             }
             # if graph.oracle == 'CPU':

@@ -43,7 +43,7 @@ class A:
 
 # Type
 class T:
-    NODES, EDGES = range(30, 32)
+    NODES, EDGES, NODE_VALUES = range(30, 33)
 
 # Inputs
 class I:

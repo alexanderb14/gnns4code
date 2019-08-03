@@ -787,23 +787,28 @@ class EdgeExtractionVisitor(VisitorBase):
             if edge_info not in self.edges:
                 self.edges.append(edge_info)
 
-class NodeTypesExtractionVisitor(VisitorBase):
+class NodeInfoExtractionVisitor(VisitorBase):
     """
-    Visitor for extracting the node types of a CodeGraph
+    Visitor for extracting node infos of a CodeGraph
     """
     def __init__(self, debug: int = False):
-        super(NodeTypesExtractionVisitor, self).__init__()
+        super(NodeInfoExtractionVisitor, self).__init__()
 
         self.__node_types = {}
+        self.__node_values = {}
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Statement) or isinstance(obj, Function):
             if obj.node_id not in self.__node_types:
                 self.__node_types[obj.node_id] = obj.node_type_id
 
+            if 'value' in obj.specifics:
+                if obj.node_id not in self.__node_values:
+                    self.__node_values[obj.node_id] = int(obj.specifics['value'])
+
     def node_types(self):
         ret = []
-        for idx, (node_id, node_type) in enumerate(self.__node_types.items()):
+        for idx in range(0, max(self.__node_types, key=int)):
             if idx not in self.__node_types:
                 raise Exception()
 
@@ -811,6 +816,16 @@ class NodeTypesExtractionVisitor(VisitorBase):
                 raise Exception()
 
             ret.append(self.__node_types[idx])
+
+        return ret
+
+    def node_values(self):
+        ret = []
+        for i in range(0, max(list(self.__node_types.keys()))):
+            if i in self.__node_values:
+                ret.append(self.__node_values[i])
+            else:
+                ret.append(0)
 
         return ret
 

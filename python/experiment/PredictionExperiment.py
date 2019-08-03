@@ -865,21 +865,21 @@ def main():
             "graph_rnn_cell": "GRU",
 
             "num_timesteps": 4,
-            "hidden_size_orig": 92,
+            "hidden_size_orig": 93,
             "hidden_size": 32,
-            "deepgmg_mlp_size": 4,
+            "deepgmg_mlp_size": 2,
 
             "num_edge_types": 2,
 
             "prediction_cell": {
-                "mlp_f_m_dims": [128],
-                "mlp_g_m_dims": [128],
-                "mlp_reduce_dims": [130],
+                "mlp_f_m_dims": [64, 64],
+                "mlp_g_m_dims": [64, 64],
+                "mlp_reduce_dims": [64, 64],
                 "mlp_reduce_2_dims": []
             },
 
             "embedding_layer": {
-                "mapping_dims": []
+                "mapping_dims": [128, 128]
             },
 
 
