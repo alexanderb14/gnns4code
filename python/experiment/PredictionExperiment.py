@@ -3,10 +3,11 @@ import json
 import os
 import numpy as np
 import pandas as pd
+import pickle
 import sys
 from collections import Counter
+from pandas.io.json import json_normalize
 from typing import List
-import pickle
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
@@ -834,9 +835,13 @@ def main():
     parser.add_argument('--dataset')
     parser.add_argument('--report_write_dir')
 
+    # Evaluation
+    parser.add_argument('--evaluate_report_dir')
+
     args = parser.parse_args()
 
-    dataset = pd.read_csv(args.dataset)
+    if args.StaticMapping or args.Grewe or args.DeepTuneLSTM or args.DeepTuneGNN:
+        dataset = pd.read_csv(args.dataset)
 
     if args.StaticMapping:
         print("Evaluating static mapping ...", file=sys.stderr)
@@ -896,27 +901,64 @@ def main():
         model = DeepGNN(config, dataset)
         report = evaluate(model)
 
-    # Print report
-    report_human_readable = parse_report_to_human_readable(report)
-    print(report_human_readable)
+    if args.StaticMapping or args.Grewe or args.DeepTuneLSTM or args.DeepTuneGNN:
+        # Print report
+        report_human_readable = parse_report_to_human_readable(report)
+        print(report_human_readable)
 
-    report_json = report_to_json(report)
+        report_json = report_to_json(report)
 
-    # Write to file
-    num_files = len([f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))])
-    filename = model.__name__ + '_' + str(num_files) + '.txt'
+        # Write to file
+        num_files = len([f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))])
+        filename = model.__name__ + '_' + str(num_files) + '.txt'
 
-    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
-        # Report
-        f.write(report_human_readable)
-        f.write('\n')
-        f.write(json.dumps(report_json))
-        f.write('\n')
-
-        # Config
-        if config:
-            f.write(json.dumps(config))
+        with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+            # Report
+            f.write(report_human_readable)
             f.write('\n')
+            f.write(json.dumps(report_json))
+            f.write('\n')
+
+            # Config
+            if config:
+                f.write(json.dumps(config))
+                f.write('\n')
+
+    if args.evaluate_report_dir:
+        report_files = os.listdir(args.evaluate_report_dir)
+
+        df = pd.DataFrame()
+        for report_file in report_files:
+            with open(os.path.join(args.evaluate_report_dir, report_file), 'r') as f:
+                lines = f.readlines()
+                report = json.loads(lines[-2])
+                config = lines[-1]
+
+                d = pd.io.json.json_normalize(json.loads(config))
+                d['accuracy'] = report['accuracy']
+                d['speedup'] = report['speedup']
+
+                df = pd.concat([df, d])
+
+        utils.print_df(df)
+
+        for y in df.columns:
+            if df[y].dtype != np.int64 and df[y].dtype != np.float64:
+                df[y] = df[y].apply(str)
+        config_columns = list(pd.io.json.json_normalize(json.loads(config)).columns)
+
+        print('Mean')
+        utils.print_df(df.groupby(config_columns).mean())
+        utils.print_dash()
+
+
+        print('Median')
+        utils.print_df(df.groupby(config_columns).median())
+        utils.print_dash()
+
+        print('Max')
+        utils.print_df(df.groupby(config_columns).max())
+        utils.print_dash()
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,7 @@
 import copy
 import json
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from collections import defaultdict
 from typing import Tuple, Dict
@@ -352,6 +353,14 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
 def get_one_hot(targets, nb_classes):
     res = np.eye(nb_classes)[np.array(targets).reshape(-1)]
     return res.reshape(list(targets.shape)+[nb_classes])
+
+
+def print_df(df, max_rows=100):
+    """Print a dataframe to stdout"""
+    with pd.option_context('display.max_rows', max_rows,
+                           'display.max_columns', None,
+                           'max_colwidth', 999999):
+        print(df)
 
 
 # Classes
