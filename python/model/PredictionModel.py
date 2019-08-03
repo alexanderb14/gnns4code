@@ -233,10 +233,16 @@ class PredictionModel(object):
             graph_mappings_all = np.full(num_nodes, graph_idx)
             batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
 
-            node_types = utils.get_one_hot(np.array(graph[utils.T.NODES]), self.config['hidden_size_orig'] - 1).astype(float)
-            node_values = np.array(graph[utils.T.NODE_VALUES]).astype(float).reshape(-1, 1)
+            if self.config['use_node_values'] == 1:
+                node_types = utils.get_one_hot(np.array(graph[utils.T.NODES]),
+                                               self.config['hidden_size_orig'] - 1).astype(float)
+                node_values = np.array(graph[utils.T.NODE_VALUES]).astype(float).reshape(-1, 1)
 
-            batch_data['embeddings_in'].append(np.concatenate([node_types, node_values], axis=1))
+                batch_data['embeddings_in'].append(np.concatenate([node_types, node_values], axis=1))
+            else:
+                node_types = utils.get_one_hot(np.array(graph[utils.T.NODES]),
+                                               self.config['hidden_size_orig']).astype(float)
+                batch_data['embeddings_in'].append(node_types)
 
         # Build feed dict
         feed_dict = {}
