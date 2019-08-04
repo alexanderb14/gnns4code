@@ -200,6 +200,7 @@ class PredictionModel(object):
             'aux_in': [],
             'labels': [],
             'embeddings_in': [],
+            'node_values': [],
         }
 
         for graph_idx, graph in enumerate(graphs):
@@ -233,17 +234,15 @@ class PredictionModel(object):
             graph_mappings_all = np.full(num_nodes, graph_idx)
             batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
 
+            node_types = utils.get_one_hot(np.array(graph[utils.T.NODES]),
+                                           self.config['hidden_size_orig']).astype(float)
+            batch_data['embeddings_in'].append(node_types)
+
             if self.config['use_node_values'] == 1:
-                node_types = utils.get_one_hot(np.array(graph[utils.T.NODES]),
-                                               self.config['hidden_size_orig'] - 1).astype(float)
                 node_values = np.array(graph[utils.T.NODE_VALUES]).astype(float).reshape(-1, 1)
                 node_values = node_values / 2147483647
 
-                batch_data['embeddings_in'].append(np.concatenate([node_types, node_values], axis=1))
-            else:
-                node_types = utils.get_one_hot(np.array(graph[utils.T.NODES]),
-                                               self.config['hidden_size_orig']).astype(float)
-                batch_data['embeddings_in'].append(node_types)
+                batch_data['node_values'].append(node_values)
 
         # Build feed dict
         feed_dict = {}
@@ -276,6 +275,9 @@ class PredictionModel(object):
         feed_dict[self.cells[0].placeholders['embeddings_to_graph_mappings']] \
             = np.concatenate(batch_data['embeddings_to_graph_mappings'], axis=0)
 
+        # Node balues
+        feed_dict[self.placeholders['node_values']] = np.concatenate(batch_data['node_values'], axis=0)
+
         return feed_dict
 
     def _make_model(self, enable_training) -> None:
@@ -283,6 +285,9 @@ class PredictionModel(object):
         Create tf model
         """
         self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size_orig']], name='embeddings_in')
+        if self.config['use_node_values'] == 1:
+            self.placeholders['node_values'] = tf.placeholder(tf.float32, [None, 1], name='node_values')
+            node_values = self.placeholders['node_values']
 
         # Create model: Unroll network and wire embeddings
         embeddings_reduced = self.placeholders['embeddings_in']
@@ -294,6 +299,9 @@ class PredictionModel(object):
         # Create propagation layer
         ggnn_layer = GGNNModelLayer(self.config, self.state.ggnn_layer_state)
         embeddings = ggnn_layer.compute_embeddings(embeddings)
+
+        if self.config['use_node_values'] == 1:
+            embeddings = tf.concat([embeddings, node_values], axis=1)
 
         # Create prediction cell
         prediction_cell = PredictionCell(self.config, enable_training, self.state.prediction_cell_state)
