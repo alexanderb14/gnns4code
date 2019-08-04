@@ -275,8 +275,9 @@ class PredictionModel(object):
         feed_dict[self.cells[0].placeholders['embeddings_to_graph_mappings']] \
             = np.concatenate(batch_data['embeddings_to_graph_mappings'], axis=0)
 
-        # Node balues
-        feed_dict[self.placeholders['node_values']] = np.concatenate(batch_data['node_values'], axis=0)
+        # Node values
+        if self.config['use_node_values'] == 1:
+            feed_dict[self.placeholders['node_values']] = np.concatenate(batch_data['node_values'], axis=0)
 
         return feed_dict
 

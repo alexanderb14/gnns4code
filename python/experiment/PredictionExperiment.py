@@ -894,7 +894,7 @@ def main():
             "use_edge_bias": 0,
             "use_edge_msg_avg_aggregation": 0,
 
-            "use_node_values": 1,
+            "use_node_values": 0,
 
             "save_best_model_interval": 1
         }
