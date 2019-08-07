@@ -26,7 +26,7 @@ def print_process_stdout_continuously(process, prefix):
     print(prefix + ' RETURNCODE: ' + str(process.returncode))
 
 
-def build_with_cmake(project_path, target):
+def build_with_cmake(project_path, target, additional_cmake_arguments: list = [], is_library=False):
     utils.print_dash()
     print('Build with cmake and make. Target: %s, Project path: %s' % (target, project_path))
     utils.print_dash()
@@ -38,13 +38,19 @@ def build_with_cmake(project_path, target):
         if not os.path.exists(build_path):
             subprocess.Popen(['mkdir', build_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=project_path)
 
-            process = subprocess.Popen(['cmake', '..'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
+            cmd = ['cmake', '..'] + additional_cmake_arguments
+            print(' '.join(cmd))
+
+            process = subprocess.Popen(['cmake', '..'] + additional_cmake_arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
             print_process_stdout_continuously(process, 'CMAKE')
 
         process = subprocess.Popen(['make', '-j', '4', target], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)
         print_process_stdout_continuously(process, 'MAKE')
 
-        target_executable = os.path.join(build_path, target)
+        if is_library:
+            target_executable = os.path.join(build_path, 'lib', 'lib' + target + '.so')
+        else:
+            target_executable = os.path.join(build_path, target)
     except:
         print(sys.exc_info()[0])
 
@@ -93,9 +99,16 @@ MINER_PASS_CLANG = \
         'MINER_PASS_CLANG',
         'clang')
 MINER_PASS_SHARED_LIBRARY = \
+    build_with_cmake(os.path.join(SCRIPT_DIR, '..', '..', 'c', 'miner_llvm_pass'),
+                     'miner_pass',
+                     ['-DCMAKE_PREFIX_PATH=/devel/git/llvm_build/llvm/cmake-build-debug/lib/cmake/llvm/'], is_library=True)
+    # get_env_or_default(
+    #     'MINER_PASS_SHARED_LIBRARY',
+    #     '/devel/git/ML-CodeGraph/c/miner_llvm_pass/build/lib/libminer_pass.so')
+OPT_MINER_EXECUTABLE = \
     get_env_or_default(
-        'MINER_PASS_SHARED_LIBRARY',
-        '/devel/git/ML-CodeGraph/c/miner_llvm_pass/build/lib/libminer_pass.so')
+        'OPT_MINER_EXECUTABLE',
+        '/devel/git/llvm_build/llvm/cmake-build-debug/bin/opt')
 CLANG_MINER_EXECUTABLE = \
     build_with_cmake(os.path.join(SCRIPT_DIR, '..', '..', 'c', 'clang_miner'), 'clang_miner')
 

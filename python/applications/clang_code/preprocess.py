@@ -16,13 +16,6 @@ import applications.clang_code.codegraph_models as codegraph_models
 import applications.utils as app_utils
 import utils
 
-def get_kernel_names_from_df(A):
-    A["group"] = ["A"] * len(A)
-
-    benchmark_names = list(set(A['benchmark']))
-
-    return benchmark_names
-
 
 def get_files_by_file_size(dirname, reverse=False):
     """ Return list of file paths in directory sorted by file size.
@@ -51,26 +44,6 @@ def get_files_by_file_size(dirname, reverse=False):
     return filepaths
 
 
-def get_files_by_extension(dirname, extension):
-    filepaths = []
-
-    for root, dirs, files in os.walk(dirname):
-        for file in files:
-            if file.endswith(extension):
-                filepaths.append(os.path.join(root, file))
-
-    return filepaths
-
-
-def delete_and_create_folder(path):
-    shutil.rmtree(path, ignore_errors=True)
-    os.makedirs(path, exist_ok=True)
-
-
-def create_folder(path):
-    os.makedirs(path, exist_ok=True)
-
-
 def opencl_kernel_c_code_to_llvm_graph(c_code:str):
     # Code to json file
     with open('/tmp/tmp.c', 'w') as f:
@@ -90,14 +63,19 @@ def opencl_kernel_c_code_to_llvm_graph(c_code:str):
         return graph
 
 
-def process_files(files, out_dir, good_code_dir, bad_code_dir, error_log_dir, substract_str=None):
+def process_files(files, preprocessing_artifact_dir, substract_str=None):
+    out_dir = os.path.join(preprocessing_artifact_dir, 'out')
+    good_code_dir = os.path.join(preprocessing_artifact_dir, 'bad_code')
+    bad_code_dir = os.path.join(preprocessing_artifact_dir, 'good_code')
+    error_log_dir = os.path.join(preprocessing_artifact_dir, 'error_logs')
+
     print(files)
     def fnc(filename):
         if substract_str:
             out_filename = filename.replace(substract_str + '/', '') + '.json'
             out_filename = os.path.join(out_dir, out_filename)
 
-            create_folder(os.path.dirname(out_filename))
+            utils.create_folder(os.path.dirname(out_filename))
         else:
             out_filename = filename
 
@@ -120,33 +98,12 @@ def process_files(files, out_dir, good_code_dir, bad_code_dir, error_log_dir, su
 
         # In case of an error
         if result != 0:
-            # write error report file containing source, stdout, stderr
-            report = ''
-
-            report += 'SOURCE:' + '\n'
-            report += utils.get_dash() + '\n'
-
-            with open(filename, 'r') as f:
-                try:
-                    report += f.read() + '\n'
-                except:
-                    pass
-
-            report += 'STDOUT:' + '\n'
-            report += utils.get_dash() + '\n'
-            report += stdout.decode('utf-8') + '\n'
-
-            report += 'STDERR:' + '\n'
-            report += utils.get_dash() + '\n'
-            report += stderr.decode('utf-8') + '\n'
-
-            num_files = len([name for name in os.listdir(error_log_dir)])
-
             report_filename = os.path.join(
                 error_log_dir,
                 filename.replace('/', '_') + '.txt')
-            with open(report_filename, 'w+') as f:
-                f.write(report)
+
+            # write error report file containing source, stdout, stderr
+            utils.write_error_report_file(filename, report_filename, [stdout], [stderr])
 
             shutil.copyfile(filename, os.path.join(bad_code_dir, os.path.basename(filename)))
         else:
@@ -188,12 +145,7 @@ def main():
     parser.add_argument("--error_log_dir", type=str,
                         help="directory to write errors to")
 
-    parser.add_argument('--cgo17_benchmarks_csv', type=str)
-    parser.add_argument("--pickle_out", type=str,
-                        help="file to write to")
     parser.add_argument("--json_out", type=str,
-                        help="file to write to")
-    parser.add_argument("--cgo17_benchmarks_csv_out", type=str,
                         help="file to write to")
 
     args = parser.parse_args(sys.argv[1:])
@@ -205,142 +157,17 @@ def main():
         parser.print_help()
         exit(1)
 
-    # delete_and_create_folder(args.out_dir)
-    # delete_and_create_folder(args.bad_code_dir)
-    # delete_and_create_folder(args.good_code_dir)
-    # delete_and_create_folder(args.error_log_dir)
+    utils.delete_and_create_folder(args.out_dir)
+    utils.delete_and_create_folder(args.bad_code_dir)
+    utils.delete_and_create_folder(args.good_code_dir)
+    utils.delete_and_create_folder(args.error_log_dir)
 
     # Generative command
     if command_arg.command == 'generative':
-        filenames = get_files_by_file_size(args.code_dir, False)
+        filenames = utils.get_files_by_file_size(args.code_dir, False)
 
         process_files(filenames, args.out_dir, args.good_code_dir,
                       args.bad_code_dir, args.error_log_dir)
-
-    # Predictive command
-    if command_arg.command == 'predictive':
-        # Find all .cl files and extract code graphs from them
-        files = get_files_by_extension(args.code_dir, '.cl')
-
-        # process_files(files, args.out_dir, args.good_code_dir,
-        #               args.bad_code_dir, args.error_log_dir, args.code_dir)
-
-        # Extract oracle from the cgo17 dataframe
-        preprocessed = []
-        num_nodes = []
-
-        df_benchmarks = pd.read_csv(args.cgo17_benchmarks_csv)
-        # df_benchmarks = df_benchmarks.drop(columns=['src'])
-        df_benchmarks = df_benchmarks.drop(columns=['seq'])
-
-        filenames = get_files_by_extension(args.out_dir, '.json')
-
-        for filename in filenames:
-            relative_filename = filename.replace(args.out_dir + '/', '')
-
-            benchmark_suite_name = relative_filename.split('/')[0]
-            if benchmark_suite_name == 'parboil-0.2' or benchmark_suite_name == 'rodinia-3.1':
-                benchmark_name = relative_filename.split('/')[2].lower()
-            elif benchmark_suite_name == 'shoc-1.1.5':
-                benchmark_name = relative_filename.split('/')[4].upper()
-            elif benchmark_suite_name == 'polybench-gpu-1.0':
-                benchmark_name = relative_filename.split('/')[-2].lower()
-                if benchmark_name == '2dconv':
-                    benchmark_name = '2DConvolution'
-                elif benchmark_name == '3dconv':
-                    benchmark_name = '3DConvolution'
-                elif benchmark_name == 'covar':
-                    benchmark_name = 'covariance'
-                elif benchmark_name == 'corr':
-                    benchmark_name = 'correlation'
-                elif benchmark_name == 'gramschm':
-                    benchmark_name = 'gramschmidt'
-            else:
-                benchmark_name = relative_filename.split('/')[-2]
-
-            with open(filename) as f:
-                jRoot = json.load(f)
-            graphs = codegraph_models.codegraphs_create_from_miner_output(jRoot)
-            for graph_idx, graph in enumerate(graphs):
-                function_name = graph.functions[0].name
-
-                # Find this kernel in the cgo17 dataframe
-                for idx, row in df_benchmarks.iterrows():
-                    b = row['benchmark']
-                    o = row['oracle']
-
-                    function_name_cgo17 = b.split('-')[-1]
-                    benchmark_name_cgo17 = b.split('-')[-2]
-                    benchmark_suite_name_cgo17 = b.split('-')[0]
-
-                    if function_name_cgo17 == function_name \
-                            and benchmark_name_cgo17.upper() in benchmark_name.upper() \
-                            and benchmark_suite_name_cgo17 in benchmark_suite_name:
-
-                        jRoot['functions'][graph_idx][utils.AE.KERNEL_NAME] = b
-                        jRoot['functions'][graph_idx][utils.L.LABEL_0] = o
-
-                        # Transform
-                        graph = codegraph_models.transform_graph(graph)
-
-                        # Add information to graph
-                        graph.name = b
-                        graph.oracle = o
-
-                        # Stats: Number of nodes
-                        stats_vstr = codegraph_models.StatisticsVisitor()
-                        graph.accept(stats_vstr)
-                        num_nodes.append(stats_vstr.num_nodes)
-
-                        preprocessed.append(graph)
-
-                        print(benchmark_suite_name, benchmark_name, function_name, o, stats_vstr.num_nodes)
-
-                        # TODO: Work group size!
-                        break
-
-        print('num_nodes_max:', np.max(num_nodes))
-        print('num_nodes_mean:', np.mean(num_nodes))
-        print('num_graphs:', len(preprocessed))
-
-        # CodeGraph -> graph
-        nic_vstr = codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False, with_callnames=False)
-        for graph in preprocessed:
-            graph.accept(nic_vstr)
-        node_types = nic_vstr.node_type_ids_by_statements
-        print('num_node_types:', len(node_types))
-
-        graphs_export = []
-        names_export = []
-
-        for graph in preprocessed:
-            # Extract node infos
-            ni_vstr = codegraph_models.NodeInfoExtractionVisitor()
-            graph.accept(ni_vstr)
-            nodes = ni_vstr.node_types()
-            node_values = ni_vstr.node_values()
-
-            # Extract edges
-            ee_vstr = codegraph_models.EdgeExtractionVisitor(edge_types={'AST': 0, 'LIVE': 1})
-            graph.accept(ee_vstr)
-            edges = ee_vstr.edges
-
-            graph_export = {
-                utils.T.NODES: nodes,
-                utils.T.NODE_VALUES: node_values,
-                utils.T.EDGES: edges
-            }
-            # if graph.oracle == 'CPU':
-            #     graph_export[utils.L.LABEL_0] = 0
-            # elif graph.oracle == 'GPU':
-            #     graph_export[utils.L.LABEL_0] = 1
-            # else:
-            #     raise Exception()
-
-            graphs_export.append(graph_export)
-            names_export.append(graph.name)
-
-        utils.pretty_print_dict(node_types)
 
         # Write to file
         with open(args.json_out, 'w') as f:
@@ -350,17 +177,6 @@ def main():
                 'names': names_export
             }
             json.dump(data, f)
-
-        # Write cgo17 benchmarks csv file
-        if args.cgo17_benchmarks_csv_out:
-            # Find this kernel in the cgo17 dataframe
-            for row_idx, row in df_benchmarks.iterrows():
-                for name, graph in zip(names_export, graphs_export):
-                    if row['benchmark'] == name:
-                        df_benchmarks.loc[row_idx, 'clang_graph'] = json.dumps(graph)
-
-            df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
-
 
 if __name__ == "__main__":
     main()

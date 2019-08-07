@@ -1,7 +1,9 @@
 import copy
 import json
 import numpy as np
+import os
 import pandas as pd
+import shutil
 import tensorflow as tf
 from collections import defaultdict
 from typing import Tuple, Dict
@@ -361,6 +363,61 @@ def print_df(df, max_rows=100):
                            'display.max_columns', None,
                            'max_colwidth', 999999):
         print(df)
+
+
+def get_files_by_extension(dirname, extension):
+    filepaths = []
+
+    for root, dirs, files in os.walk(dirname):
+        for file in files:
+            if file.endswith(extension):
+                filepaths.append(os.path.join(root, file))
+
+    return filepaths
+
+
+def delete_and_create_folder(path):
+    shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path, exist_ok=True)
+
+
+def create_folder(path):
+    os.makedirs(path, exist_ok=True)
+
+
+def write_error_report_file(src_filename, report_filename, stdouts, stderrs):
+    report = ''
+
+    report += 'SOURCE:' + '\n'
+    report += get_dash() + '\n'
+
+    with open(src_filename, 'r') as f:
+        try:
+            report += f.read() + '\n'
+        except:
+            pass
+
+    for stdout in stdouts:
+        report += 'STDOUT:' + '\n'
+        report += get_dash() + '\n'
+        report += stdout.decode('utf-8') + '\n'
+
+    for stderr in stderrs:
+        if stderr:
+            report += 'STDERR:' + '\n'
+            report += get_dash() + '\n'
+            report += stderr.decode('utf-8') + '\n'
+
+    with open(report_filename, 'w+') as f:
+        f.write(report)
+
+
+def min_max_avg(l: list) -> dict:
+    return {
+        'min': min(l),
+        'max': max(l),
+        'avg': int(sum(l) / float(len(l)))
+    }
 
 
 # Classes

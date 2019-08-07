@@ -12,8 +12,12 @@ from typing import List
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
 
-from model.PredictionModel import PredictionModel, PredictionModelState
 import utils
+import applications.clang_code.codegraph_models as clang_codegraph_models
+import applications.clang_code.preprocess as clang_preprocess
+import applications.code.codegraph_models as llvm_codegraph_models
+import applications.code.preprocess as llvm_preprocess
+from model.PredictionModel import PredictionModel, PredictionModelState
 
 
 seed = 204
@@ -822,111 +826,476 @@ def report_to_json(report: pd.DataFrame):
             'speedup': round(speedup, 4)}
 
 
+def prepare_preprocessing_artifact_dir(base_dir):
+    utils.delete_and_create_folder(base_dir)
+    utils.delete_and_create_folder(os.path.join(base_dir, 'out'))
+    utils.delete_and_create_folder(os.path.join(base_dir, 'bad_code'))
+    utils.delete_and_create_folder(os.path.join(base_dir, 'good_code'))
+    utils.delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
+
+
+def handle_gnn_report(args, config, model, report, model_name):
+    # Print report
+    report_human_readable = parse_report_to_human_readable(report)
+    print(report_human_readable)
+
+    report_json = report_to_json(report)
+
+    # Write to file
+    num_files = len(
+        [f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))])
+    filename = model_name + '_' + str(num_files) + '.txt'
+    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+        # Report
+        f.write(report_human_readable)
+        f.write('\n')
+        f.write(json.dumps(report_json))
+        f.write('\n')
+
+        # Config
+        if config:
+            f.write(json.dumps(config))
+            f.write('\n')
+
+
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('command', help='Subcommand to run')
+    subparsers = parser.add_subparsers()
 
-    # Experiments
-    parser.add_argument('--StaticMapping', action='store_true')
-    parser.add_argument('--Grewe', action='store_true')
-    parser.add_argument('--DeepTuneLSTM', action='store_true')
-    parser.add_argument('--DeepTuneGNN', action='store_true')
+    # Parse command
+    command_arg = parser.parse_args(sys.argv[1:2])
+    if not hasattr(command_arg, 'command'):
+        print('Unrecognized command')
+        parser.print_help()
+        exit(1)
 
-    # Config
-    parser.add_argument('--dataset')
-    parser.add_argument('--report_write_dir')
+    # Preprocess command
+    if command_arg.command == 'preprocess':
+        # Parse args
+        parser_prep = subparsers.add_parser('preprocess')
 
-    # Evaluation
-    parser.add_argument('--evaluate_report_dir')
+        parser_prep.add_argument("--code_dir", type=str,
+                                 help="directory of c code files")
+        parser_prep.add_argument("--preprocessing_artifact_dir", type=str,
+                                 help="out directory containing preprocessing information")
+        parser_prep.add_argument('--cgo17_benchmarks_csv', type=str)
+        parser_prep.add_argument("--cgo17_benchmarks_csv_out", type=str)
 
-    args = parser.parse_args()
+        args = parser_prep.parse_args(sys.argv[2:])
 
-    if args.StaticMapping or args.Grewe or args.DeepTuneLSTM or args.DeepTuneGNN:
+        #
+        preprocessing_artifact_dir_clang = os.path.join(args.preprocessing_artifact_dir, 'clang')
+        preprocessing_artifact_dir_llvm = os.path.join(args.preprocessing_artifact_dir, 'llvm')
+        prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_clang)
+        prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm)
+
+        # Find all .cl files and extract code graphs from them
+        files = utils.get_files_by_extension(args.code_dir, '.cl')
+
+        clang_preprocess.process_files(files, preprocessing_artifact_dir_clang, args.code_dir)
+        llvm_preprocess.process_files(files, preprocessing_artifact_dir_llvm, args.code_dir)
+
+        # Extract oracle from the cgo17 dataframe
+        # 
+        df_benchmarks = pd.read_csv(args.cgo17_benchmarks_csv)
+        df_benchmarks = df_benchmarks.drop(columns=['src'])       #######
+        df_benchmarks = df_benchmarks.drop(columns=['seq'])
+
+        # Clang
+        # ############################################
+        utils.print_dash()
+        print('Preprocessing Clang')
+        utils.print_dash()
+        out_dir_clang = os.path.join(preprocessing_artifact_dir_clang, 'out')
+        filenames_clang = utils.get_files_by_extension(out_dir_clang, '.json')
+
+        preprocessed = []
+        num_nodes = []
+        for filename in filenames_clang:
+            relative_filename = filename.replace(out_dir_clang + '/', '')
+
+            benchmark_suite_name = relative_filename.split('/')[0]
+            if benchmark_suite_name == 'parboil-0.2' or benchmark_suite_name == 'rodinia-3.1':
+                benchmark_name = relative_filename.split('/')[2].lower()
+            elif benchmark_suite_name == 'shoc-1.1.5':
+                benchmark_name = relative_filename.split('/')[4].upper()
+            elif benchmark_suite_name == 'polybench-gpu-1.0':
+                benchmark_name = relative_filename.split('/')[-2].lower()
+                if benchmark_name == '2dconv':
+                    benchmark_name = '2DConvolution'
+                elif benchmark_name == '3dconv':
+                    benchmark_name = '3DConvolution'
+                elif benchmark_name == 'covar':
+                    benchmark_name = 'covariance'
+                elif benchmark_name == 'corr':
+                    benchmark_name = 'correlation'
+                elif benchmark_name == 'gramschm':
+                    benchmark_name = 'gramschmidt'
+            else:
+                benchmark_name = relative_filename.split('/')[-2]
+
+            with open(filename) as f:
+                jRoot = json.load(f)
+            graphs = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)
+            for graph_idx, graph in enumerate(graphs):
+                function_name = graph.functions[0].name
+
+                # Find this kernel in the cgo17 dataframe
+                for idx, row in df_benchmarks.iterrows():
+                    b = row['benchmark']
+                    o = row['oracle']
+
+                    function_name_cgo17 = b.split('-')[-1]
+                    benchmark_name_cgo17 = b.split('-')[-2]
+                    benchmark_suite_name_cgo17 = b.split('-')[0]
+
+                    if function_name_cgo17 == function_name \
+                            and benchmark_name_cgo17.upper() in benchmark_name.upper() \
+                            and benchmark_suite_name_cgo17 in benchmark_suite_name:
+                        jRoot['functions'][graph_idx][utils.AE.KERNEL_NAME] = b
+                        jRoot['functions'][graph_idx][utils.L.LABEL_0] = o
+
+                        # Transform
+                        graph = clang_codegraph_models.transform_graph(graph)
+
+                        # Add information to graph
+                        graph.name = b
+                        graph.oracle = o
+
+                        # Stats: Number of nodes
+                        stats_vstr = clang_codegraph_models.StatisticsVisitor()
+                        graph.accept(stats_vstr)
+                        num_nodes.append(stats_vstr.num_nodes)
+
+                        preprocessed.append(graph)
+
+                        print(benchmark_suite_name, benchmark_name, function_name, o, stats_vstr.num_nodes)
+
+                        break
+
+        print('num_nodes_max:', np.max(num_nodes))
+        print('num_nodes_mean:', np.mean(num_nodes))
+        print('num_graphs:', len(preprocessed))
+
+        # CodeGraph -> graph
+        nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False, with_callnames=False)
+        for graph in preprocessed:
+            graph.accept(nic_vstr)
+        node_types = nic_vstr.node_type_ids_by_statements
+        print('num_node_types:', len(node_types))
+
+        graphs_export = []
+        names_export = []
+
+        for graph in preprocessed:
+            # Extract node infos
+            ni_vstr = clang_codegraph_models.NodeInfoExtractionVisitor()
+            graph.accept(ni_vstr)
+            nodes = ni_vstr.node_types()
+            node_values = ni_vstr.node_values()
+
+            # Extract edges
+            ee_vstr = clang_codegraph_models.EdgeExtractionVisitor(edge_types={'AST': 0, 'LIVE': 1})
+            graph.accept(ee_vstr)
+            edges = ee_vstr.edges
+
+            graph_export = {
+                utils.T.NODES: nodes,
+                utils.T.NODE_VALUES: node_values,
+                utils.T.EDGES: edges
+            }
+            # if graph.oracle == 'CPU':
+            #     graph_export[utils.L.LABEL_0] = 0
+            # elif graph.oracle == 'GPU':
+            #     graph_export[utils.L.LABEL_0] = 1
+            # else:
+            #     raise Exception()
+
+            graphs_export.append(graph_export)
+            names_export.append(graph.name)
+
+        utils.pretty_print_dict(node_types)
+
+        # Write cgo17 benchmarks csv file
+        if args.cgo17_benchmarks_csv_out:
+            # Find this kernel in the cgo17 dataframe
+            for row_idx, row in df_benchmarks.iterrows():
+                for name, graph in zip(names_export, graphs_export):
+                    if row['benchmark'] == name:
+                        df_benchmarks.loc[row_idx, 'clang_graph'] = json.dumps(graph)
+
+            df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
+
+        # LLVM
+        # ############################################
+        utils.print_dash()
+        print('Preprocessing LLVM')
+        utils.print_dash()
+        out_dir_llvm = os.path.join(preprocessing_artifact_dir_llvm, 'out')
+        filenames_llvm = utils.get_files_by_extension(out_dir_llvm, '.json')
+
+        preprocessed = []
+        num_nodes = []
+        for filename in filenames_llvm:
+            relative_filename = filename.replace(out_dir_llvm + '/', '')
+
+            benchmark_suite_name = relative_filename.split('/')[0]
+            if benchmark_suite_name == 'parboil-0.2' or benchmark_suite_name == 'rodinia-3.1':
+                benchmark_name = relative_filename.split('/')[2].lower()
+            elif benchmark_suite_name == 'shoc-1.1.5':
+                benchmark_name = relative_filename.split('/')[4].upper()
+            elif benchmark_suite_name == 'polybench-gpu-1.0':
+                benchmark_name = relative_filename.split('/')[-2].lower()
+                if benchmark_name == '2dconv':
+                    benchmark_name = '2DConvolution'
+                elif benchmark_name == '3dconv':
+                    benchmark_name = '3DConvolution'
+                elif benchmark_name == 'covar':
+                    benchmark_name = 'covariance'
+                elif benchmark_name == 'corr':
+                    benchmark_name = 'correlation'
+                elif benchmark_name == 'gramschm':
+                    benchmark_name = 'gramschmidt'
+            else:
+                benchmark_name = relative_filename.split('/')[-2]
+
+            print(filename)
+            try:
+                with open(filename) as f:
+                    jRoot = json.load(f)
+
+                if not jRoot:
+                    print('!!! Content of %s was None !!!' % filename)
+                    continue
+            except:
+                print('!!! Content of %s was not JSON parsable !!!' % filename)
+                continue
+
+            graphs = llvm_codegraph_models.codegraphs_create_from_miner_output(jRoot)
+            for graph_idx, graph in enumerate(graphs):
+                function_name = graph.functions[0].name
+
+                # Find this kernel in the cgo17 dataframe
+                for idx, row in df_benchmarks.iterrows():
+                    b = row['benchmark']
+                    o = row['oracle']
+
+                    function_name_cgo17 = b.split('-')[-1]
+                    benchmark_name_cgo17 = b.split('-')[-2]
+                    benchmark_suite_name_cgo17 = b.split('-')[0]
+
+                    if function_name_cgo17 == function_name \
+                            and benchmark_name_cgo17.upper() in benchmark_name.upper() \
+                            and benchmark_suite_name_cgo17 in benchmark_suite_name:
+                        jRoot['functions'][function_name][utils.AE.KERNEL_NAME] = b
+                        jRoot['functions'][function_name][utils.L.LABEL_0] = o
+
+                        # Add information to graph
+                        graph.name = b
+                        graph.oracle = o
+
+                        # Stats: Number of nodes
+                        stats_vstr = llvm_codegraph_models.StatisticsVisitor()
+                        graph.visit(stats_vstr)
+                        num_nodes.append(stats_vstr.num_nodes)
+
+                        preprocessed.append(graph)
+
+                        print(benchmark_suite_name, benchmark_name, function_name, o, stats_vstr.num_nodes)
+
+                        break
+        print('num_nodes_max:', np.max(num_nodes))
+        print('num_nodes_mean:', np.mean(num_nodes))
+        print('num_graphs:', len(preprocessed))
+
+        # CodeGraph -> graph
+        stats_vstr = llvm_codegraph_models.StatisticsVisitor()
+        for graph in preprocessed:
+            graph.visit(stats_vstr)
+        summary = stats_vstr.get_summary()
+        node_types_of_all_graphs = summary['node_types']
+        print('num_node_types:', len(node_types_of_all_graphs))
+        utils.pretty_print_dict(node_types_of_all_graphs)
+
+        graphs_export = []
+        names_export = []
+
+        for graph in preprocessed:
+            # Create node ids
+            node_id_vstr = llvm_codegraph_models.NodeIdCreateVisitor()
+            graph.visit(node_id_vstr)
+
+            # Extract node infos
+            ni_vstr = llvm_codegraph_models.NodeInfoExtractionVisitor(node_types_of_all_graphs)
+            graph.visit(ni_vstr)
+            nodes = ni_vstr.get_node_types()
+            # print(node_types)
+
+            # Extract edges
+            ee_vstr = llvm_codegraph_models.EdgeExtractionVisitor(edge_types={'cfg': 0, 'dataflow': 1,
+                                                                               'memaccess': 2, 'call': 3})
+            graph.visit(ee_vstr)
+            edges = ee_vstr.edges
+
+            graph_export = {
+                utils.T.NODES: nodes,
+                # utils.T.NODE_VALUES: node_values,
+                utils.T.EDGES: edges
+            }
+
+            graphs_export.append(graph_export)
+            names_export.append(graph.name)
+
+        print(names_export)
+
+        # Write cgo17 benchmarks csv file
+        if args.cgo17_benchmarks_csv_out:
+            # Find this kernel in the cgo17 dataframe
+            for row_idx, row in df_benchmarks.iterrows():
+                for name, graph in zip(names_export, graphs_export):
+                    if row['benchmark'] == name:
+                        df_benchmarks.loc[row_idx, 'llvm_graph'] = json.dumps(graph)
+
+            df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
+
+
+    # Experiment command
+    if command_arg.command == 'experiment':
+        # Parse args
+        parser_exp = subparsers.add_parser('train')
+
+        parser_exp.add_argument('--StaticMapping', action='store_true')
+        parser_exp.add_argument('--Grewe', action='store_true')
+        parser_exp.add_argument('--DeepTuneLSTM', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNClang', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNLLVM', action='store_true')
+
+        parser_exp.add_argument('--dataset')
+        parser_exp.add_argument('--report_write_dir')
+
+        args = parser_exp.parse_args(sys.argv[2:])
+
+        #
         dataset = pd.read_csv(args.dataset)
 
-    if args.StaticMapping:
-        print("Evaluating static mapping ...", file=sys.stderr)
-        model = StaticMapping(dataset)
-        report = evaluate(model)
+        if args.StaticMapping:
+            print("Evaluating static mapping ...", file=sys.stderr)
+            model = StaticMapping(dataset)
+            report = evaluate(model)
 
-    if args.Grewe:
-        print("Evaluating Grewe et al. ...", file=sys.stderr)
-        model = Grewe(dataset)
-        report = evaluate(model)
+        if args.Grewe:
+            print("Evaluating Grewe et al. ...", file=sys.stderr)
+            model = Grewe(dataset)
+            report = evaluate(model)
 
-    if args.DeepTuneLSTM:
-        print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
-        model = DeepTune(dataset)
-        model.init(seed)
-        model.model.summary()
-        report = evaluate(model)
+        if args.DeepTuneLSTM:
+            print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
+            model = DeepTune(dataset)
+            model.init(seed)
+            model.model.summary()
+            report = evaluate(model)
 
-    if args.DeepTuneGNN:
-        config = {
-            "graph_rnn_cell": "GRU",
+        if args.DeepTuneGNNClang:
+            config = {
+                "graph_rnn_cell": "GRU",
 
-            "num_timesteps": 4,
-            "hidden_size_orig": 93,
-            "hidden_size": 32,
-            "deepgmg_mlp_size": 2,
+                "num_timesteps": 4,
+                "hidden_size_orig": 93,
+                "hidden_size": 32,
+                "deepgmg_mlp_size": 2,
 
-            "num_edge_types": 2,
+                "num_edge_types": 2,
 
-            "prediction_cell": {
-                "mlp_f_m_dims": [64, 64],
-                "mlp_g_m_dims": [64, 64],
-                "mlp_reduce_dims": [64, 64],
-                "mlp_reduce_2_dims": []
-            },
+                "prediction_cell": {
+                    "mlp_f_m_dims": [64, 64],
+                    "mlp_g_m_dims": [64, 64],
+                    "mlp_reduce_dims": [64, 64],
+                    "mlp_reduce_2_dims": []
+                },
 
-            "embedding_layer": {
-                "mapping_dims": [128, 128]
-            },
+                "embedding_layer": {
+                    "mapping_dims": [128, 128]
+                },
 
 
-            "learning_rate": 0.0005,
-            "clamp_gradient_norm": 1.0,
+                "learning_rate": 0.0005,
+                "clamp_gradient_norm": 1.0,
 
-            "batch_size": 64,
-            "num_epochs": 400,
-            "out_dir": "/tmp",
+                "batch_size": 64,
+                "num_epochs": 400,
+                "out_dir": "/tmp",
 
-            "tie_fwd_bkwd": 0,
-            "use_edge_bias": 0,
-            "use_edge_msg_avg_aggregation": 0,
+                "tie_fwd_bkwd": 0,
+                "use_edge_bias": 0,
+                "use_edge_msg_avg_aggregation": 0,
 
-            "use_node_values": 0,
+                "use_node_values": 0,
 
-            "save_best_model_interval": 1
-        }
+                "save_best_model_interval": 1
+            }
 
-        print("Evaluating DeepTuneGNN ...", file=sys.stderr)
-        model = DeepGNN(config, dataset)
-        report = evaluate(model)
+            print("Evaluating DeepTuneGNNClang ...", file=sys.stderr)
+            model = DeepGNN(config, dataset)
+            report = evaluate(model)
 
-    if args.StaticMapping or args.Grewe or args.DeepTuneLSTM or args.DeepTuneGNN:
-        # Print report
-        report_human_readable = parse_report_to_human_readable(report)
-        print(report_human_readable)
+            handle_gnn_report(args, config, model, report, 'DeepTuneGNN')
 
-        report_json = report_to_json(report)
+        if args.DeepTuneGNNLLVM:
+            config = {
+                "graph_rnn_cell": "GRU",
 
-        # Write to file
-        num_files = len([f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))])
-        filename = model.__name__ + '_' + str(num_files) + '.txt'
+                "num_timesteps": 4,
+                "hidden_size_orig": 140,
+                "hidden_size": 32,
+                "deepgmg_mlp_size": 2,
 
-        with open(os.path.join(args.report_write_dir, filename), 'w') as f:
-            # Report
-            f.write(report_human_readable)
-            f.write('\n')
-            f.write(json.dumps(report_json))
-            f.write('\n')
+                "num_edge_types": 2,
 
-            # Config
-            if config:
-                f.write(json.dumps(config))
-                f.write('\n')
+                "prediction_cell": {
+                    "mlp_f_m_dims": [64, 64],
+                    "mlp_g_m_dims": [64, 64],
+                    "mlp_reduce_dims": [64, 64],
+                    "mlp_reduce_2_dims": []
+                },
 
-    if args.evaluate_report_dir:
+                "embedding_layer": {
+                    "mapping_dims": [128, 128]
+                },
+
+
+                "learning_rate": 0.0005,
+                "clamp_gradient_norm": 1.0,
+
+                "batch_size": 64,
+                "num_epochs": 400,
+                "out_dir": "/tmp",
+
+                "tie_fwd_bkwd": 0,
+                "use_edge_bias": 0,
+                "use_edge_msg_avg_aggregation": 0,
+
+                "use_node_values": 0,
+
+                "save_best_model_interval": 1
+            }
+
+            print("Evaluating DeepTuneGNNLLVM ...", file=sys.stderr)
+            model = DeepGNN(config, dataset)
+            report = evaluate(model)
+
+            handle_gnn_report(args, config, model, report, 'DeepTuneGNNLLVM')
+
+    # Evaluate command
+    if command_arg.command == 'evaluate':
+        # Parse args
+        parser_eval = subparsers.add_parser('evaluate')
+
+        parser_eval.add_argument('--evaluate_report_dir')
+
+        args = parser_eval.parse_args(sys.argv[2:])
+
+        #
         report_files = os.listdir(args.evaluate_report_dir)
 
         df = pd.DataFrame()
@@ -953,7 +1322,6 @@ def main():
         utils.print_df(df.groupby(config_columns).mean())
         utils.print_dash()
 
-
         print('Median')
         utils.print_df(df.groupby(config_columns).median())
         utils.print_dash()
@@ -961,6 +1329,7 @@ def main():
         print('Max')
         utils.print_df(df.groupby(config_columns).max())
         utils.print_dash()
+
 
 if __name__ == '__main__':
     main()
