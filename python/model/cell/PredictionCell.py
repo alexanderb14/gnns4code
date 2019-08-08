@@ -79,10 +79,9 @@ class PredictionCell(object):
         h_G = tf.unsorted_segment_sum(data=h_G,
                                       segment_ids=embeddings_to_graph_mappings,
                                       num_segments=num_graphs)                                                  # [b, 2h]
+        aux_in = tf.layers.batch_normalization(aux_in, training=is_training)
 
         h_G_and_aux_in = tf.concat([h_G, aux_in], axis=-1)                                                      # [b, 2h + 2]
-
-        h_G_and_aux_in = tf.layers.batch_normalization(h_G_and_aux_in, training=is_training)
 
         h_G_and_aux_in = self.state.weights['mlp_reduce'](h_G_and_aux_in)
 
