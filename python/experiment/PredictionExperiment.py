@@ -545,7 +545,7 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
     progressbar = [0, ProgressBar(max_value=10)]
 
     data = []
-    for i, platform in enumerate(["nvidia"]):
+    for i, platform in enumerate(["amd"]):
         platform_name = platform2str(platform)
 
         # load runtime data
