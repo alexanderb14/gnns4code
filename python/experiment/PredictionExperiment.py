@@ -521,6 +521,9 @@ class HeterogemeousMappingModel(object):
         """
         raise NotImplementedError
 
+    def get_num_trainable_parameters(self):
+        raise NotImplementedError
+
 
 def evaluate(model: HeterogemeousMappingModel, fold_mode='random_10fold') -> pd.DataFrame:
     """
@@ -579,9 +582,6 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode='random_10fold') -> pd.
         print(split)
 
         for j, (train_index, test_index) in enumerate(split):
-            model_path = f"data/case-study-a/models/{model.__basename__}-{platform}-{j}.model"
-            predictions_path = f"data/case-study-a/predictions/{model.__basename__}-{platform}-{j}.result"
-
             if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
                 sequences = encode_srcs(model.atomizer, df["src"].values)
 
@@ -634,6 +634,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode='random_10fold') -> pd.
                     "Predicted Mapping": p_,
                     "Correct?": correct_,
                     "Speedup": p_speedup_,
+                    "Fold": j,
+                    "num_trainable_parameters": model.get_num_trainable_parameters(),
                 })
 
             # update progress bar
@@ -649,13 +651,15 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode='random_10fold') -> pd.
             "Oracle Mapping",
             "Predicted Mapping",
             "Correct?",
-            "Speedup"
+            "Speedup",
+            "Fold",
+            "num_trainable_parameters",
         ])
 
 # Experiment: Random mapping
 class RandomMapping(HeterogemeousMappingModel):
-    __name__ = "Static mapping"
-    __basename__ = "static"
+    __name__ = "Random mapping"
+    __basename__ = "random"
 
     def init(self, seed: int):
         return self
@@ -665,6 +669,9 @@ class RandomMapping(HeterogemeousMappingModel):
 
     def predict(self, **test):
         return np.random.randint(0, 2, len(test["y"]))
+
+    def get_num_trainable_parameters(self):
+        return 0
 
 # Experiment: Static mapping
 class StaticMapping(HeterogemeousMappingModel):
@@ -695,6 +702,9 @@ class StaticMapping(HeterogemeousMappingModel):
         else:
             return np.zeros(len(test["y"])).astype(dtype=np.int32)
 
+    def get_num_trainable_parameters(self):
+        return None
+
 # Experiment: Grewe et al
 class Grewe(HeterogemeousMappingModel):
     __name__ = "Grewe et al."
@@ -722,6 +732,9 @@ class Grewe(HeterogemeousMappingModel):
 
     def predict(self, **test):
         return self.model.predict(test["features"])
+
+    def get_num_trainable_parameters(self):
+        return None
 
 # Experiment: DeepTune
 class DeepTune(HeterogemeousMappingModel):
@@ -782,8 +795,11 @@ class DeepTune(HeterogemeousMappingModel):
         indices = [np.argmax(x) for x in p[0]]
         return indices
 
+    def get_num_trainable_parameters(self):
+        return self.model.count_params()
 
-# Experiment: DeepGNN et al
+
+# Experiment: DeepGNN
 class DeepGNN(HeterogemeousMappingModel):
     __name__ = "DeepGNN"
     __basename__ = "deepgnn"
@@ -793,10 +809,10 @@ class DeepGNN(HeterogemeousMappingModel):
         self.dataset = dataset
 
     def init(self, seed):
-        state = PredictionModelState(self.config)
-        self.model = PredictionModel(self.config, state)
+        self.state = PredictionModelState(self.config)
+        self.model = PredictionModel(self.config, self.state)
 
-        print('Number of trainable parameters:', state.count_number_trainable_params())
+        print('Number of trainable parameters:', self.state.count_number_trainable_params())
 
         return self
 
@@ -831,15 +847,40 @@ class DeepGNN(HeterogemeousMappingModel):
 
         return indices
 
+    def get_num_trainable_parameters(self):
+        return self.state.count_number_trainable_params()
 
-def parse_report_to_human_readable(report: pd.DataFrame):
+
+class DeepGNNAST(DeepGNN):
+    __name__ = "DeepGNN AST"
+    __basename__ = "deepgnn-ast"
+
+    def __init__(self, config, dataset):
+        DeepGNN.__init__(self, config, dataset)
+
+
+class DeepGNNLLVM(DeepGNN):
+    __name__ = "DeepGNN LLVM"
+    __basename__ = "deepgnn-llvm"
+
+    def __init__(self, config, dataset):
+        DeepGNN.__init__(self, config, dataset)
+
+
+def parse_report_to_summary(report: pd.DataFrame):
     report_str = ''
 
-    result = report.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean()
-    report_str += str(result)
-    report_str += '\n'
-    result = report.groupby(['Platform'])['Platform', 'Correct?', 'Speedup'].mean()
-    report_str += str(result)
+    report_str += 'Grouped by Platform\n'
+    report_str += str(report.groupby(['Platform'])['Platform', 'Correct?', 'Speedup'].mean())
+    report_str += '\n\n'
+
+    report_str += 'Grouped by Platform and Fold\n'
+    report_str += str(report.groupby(['Platform', 'Fold'])['Platform', 'Correct?', 'Speedup'].mean())
+    report_str += '\n\n'
+
+    report_str += 'Grouped by Platform and Benchmark Suite\n'
+    report_str += str(report.groupby(['Platform', 'Benchmark Suite'])['Platform', 'Correct?', 'Speedup'].mean())
+    report_str += '\n\n'
 
     return report_str
 
@@ -861,28 +902,36 @@ def prepare_preprocessing_artifact_dir(base_dir):
     utils.delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
 
 
-def handle_gnn_report(args, config, model, report, model_name):
+def print_and_save_report(args, config, model, report):
     # Print report
-    report_human_readable = parse_report_to_human_readable(report)
-    print(report_human_readable)
+    report_summary = parse_report_to_summary(report)
+    print(report_summary)
 
     report_json = report_to_json(report)
 
-    # Write to file
-    num_files = len(
-        [f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))])
-    filename = model_name + '_' + str(num_files) + '.txt'
-    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
-        # Report
-        f.write(report_human_readable)
-        f.write('\n')
-        f.write(json.dumps(report_json))
-        f.write('\n')
+    # Write to files
+    num_files = int(len(
+        [f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))]))
 
-        # Config
-        if config:
-            f.write(json.dumps(config))
-            f.write('\n')
+    # Config
+    filename = model.__basename__ + '_' + str(num_files) + '_config.txt'
+    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+        f.write(json.dumps(config))
+
+    # Summary
+    filename = model.__basename__ + '_' + str(num_files) + '_summary.txt'
+    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+        f.write(report_summary)
+
+    # Summary as JSON
+    filename = model.__basename__ + '_' + str(num_files) + '_summary.json'
+    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+        f.write(json.dumps(report_json))
+
+    # Raw
+    filename = model.__basename__ + '_' + str(num_files) + '_raw.txt'
+    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+        f.write(report.to_csv())
 
 
 def main():
@@ -1208,41 +1257,55 @@ def main():
         dataset = pd.read_csv(args.dataset)
 
         if args.RandomMapping:
+            config = {
+                'fold_mode': 'benchmark_grouped_7fold'
+            }
+
             print("Evaluating random mapping ...", file=sys.stderr)
             model = RandomMapping(dataset)
-            report = evaluate(model)
+            report = evaluate(model, fold_mode=config['fold_mode'])
 
-            report_human_readable = parse_report_to_human_readable(report)
-            print(report_human_readable)
+            print_and_save_report(args, config, model, report)
 
         if args.StaticMapping:
+            config = {
+                'fold_mode': 'benchmark_grouped_7fold'
+            }
+
             print("Evaluating static mapping ...", file=sys.stderr)
             model = StaticMapping(dataset)
-            report = evaluate(model)
+            report = evaluate(model, fold_mode=config['fold_mode'])
 
-            report_human_readable = parse_report_to_human_readable(report)
-            print(report_human_readable)
+            print_and_save_report(args, config, model, report)
 
         if args.Grewe:
+            config = {
+                'fold_mode': 'benchmark_grouped_7fold'
+            }
+
             print("Evaluating Grewe et al. ...", file=sys.stderr)
             model = Grewe(dataset)
-            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
+            report = evaluate(model, fold_mode=config['fold_mode'])
 
-            report_human_readable = parse_report_to_human_readable(report)
-            print(report_human_readable)
+            print_and_save_report(args, config, model, report)
 
         if args.DeepTuneLSTM:
+            config = {
+                'fold_mode': 'benchmark_grouped_7fold'
+            }
+
             print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
             model = DeepTune(dataset)
             model.init(seed)
             model.model.summary()
-            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
+            report = evaluate(model, fold_mode=config['fold_mode'])
 
-            report_human_readable = parse_report_to_human_readable(report)
-            print(report_human_readable)
+            print_and_save_report(args, config, model, report)
 
         if args.DeepTuneGNNClang:
             config = {
+                'fold_mode': 'benchmark_grouped_7fold',
+
                 "graph_rnn_cell": "GRU",
 
                 "num_timesteps": 8,
@@ -1281,13 +1344,15 @@ def main():
             }
 
             print("Evaluating DeepTuneGNNClang ...", file=sys.stderr)
-            model = DeepGNN(config, dataset)
-            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
+            model = DeepGNNAST(config, dataset)
+            report = evaluate(model, fold_mode=config['fold_mode'])
 
-            handle_gnn_report(args, config, model, report, 'DeepTuneGNN')
+            print_and_save_report(args, config, model, report)
 
         if args.DeepTuneGNNLLVM:
             config = {
+                'fold_mode': 'benchmark_grouped_7fold',
+
                 "graph_rnn_cell": "GRU",
 
                 "num_timesteps": 4,
@@ -1326,10 +1391,10 @@ def main():
             }
 
             print("Evaluating DeepTuneGNNLLVM ...", file=sys.stderr)
-            model = DeepGNN(config, dataset)
-            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
+            model = DeepGNNLLVM(config, dataset)
+            report = evaluate(model, fold_mode=config['fold_mode'])
 
-            handle_gnn_report(args, config, model, report, 'DeepTuneGNNLLVM')
+            print_and_save_report(args, config, model, report)
 
     # Evaluate command
     if command_arg.command == 'evaluate':
