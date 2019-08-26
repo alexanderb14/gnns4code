@@ -101,14 +101,14 @@ MINER_PASS_CLANG = \
 MINER_PASS_SHARED_LIBRARY = \
     build_with_cmake(os.path.join(SCRIPT_DIR, '..', '..', 'c', 'miner_llvm_pass'),
                      'miner_pass',
-                     ['-DCMAKE_PREFIX_PATH=/devel/git/llvm_build/llvm/cmake-build-debug/lib/cmake/llvm/'], is_library=True)
+                     ['-DCMAKE_PREFIX_PATH=/devel/git/llvm/llvm/cmake-build-debug/lib/cmake/llvm/'], is_library=True)
     # get_env_or_default(
     #     'MINER_PASS_SHARED_LIBRARY',
     #     '/devel/git/ML-CodeGraph/c/miner_llvm_pass/build/lib/libminer_pass.so')
 OPT_MINER_EXECUTABLE = \
     get_env_or_default(
         'OPT_MINER_EXECUTABLE',
-        '/devel/git/llvm_build/llvm/cmake-build-debug/bin/opt')
+        '/devel/git/llvm/llvm/cmake-build-debug/bin/opt')
 CLANG_MINER_EXECUTABLE = \
     build_with_cmake(os.path.join(SCRIPT_DIR, '..', '..', 'c', 'clang_miner'), 'clang_miner')
 

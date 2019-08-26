@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from pandas.io.json import json_normalize
 from typing import List
 
@@ -522,7 +522,7 @@ class HeterogemeousMappingModel(object):
         raise NotImplementedError
 
 
-def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
+def evaluate(model: HeterogemeousMappingModel, fold_mode='random_10fold') -> pd.DataFrame:
     """
     Evaluate a model.
 
@@ -539,13 +539,13 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
     pd.Dataframe
         Evaluation results.
     """
-    from sklearn.model_selection import StratifiedKFold
+    from sklearn.model_selection import StratifiedKFold, GroupKFold
     from progressbar import ProgressBar
 
     progressbar = [0, ProgressBar(max_value=10)]
 
     data = []
-    for i, platform in enumerate(["amd"]):
+    for i, platform in enumerate(["nvidia"]):
         platform_name = platform2str(platform)
 
         # load runtime data
@@ -563,8 +563,22 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
         y_1hot = encode_1hot(y)
 
         # 10-fold cross-validation
-        kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
-        for j, (train_index, test_index) in enumerate(kf.split(features, y)):
+        if fold_mode == 'random_10fold':
+            kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+            split = kf.split(features, y)
+        elif fold_mode == 'benchmark_grouped_7fold':
+            benchmark_suites = [x.split('-')[0] for x in list(df['benchmark'])]
+            num_benchmark_suites = len(set(benchmark_suites))
+
+            temp = defaultdict(lambda: len(temp))
+            groups = [temp[x] for x in benchmark_suites]
+
+            kf = GroupKFold(n_splits=num_benchmark_suites)
+            split = kf.split(features, y, groups)
+
+        print(split)
+
+        for j, (train_index, test_index) in enumerate(split):
             model_path = f"data/case-study-a/models/{model.__basename__}-{platform}-{j}.model"
             predictions_path = f"data/case-study-a/predictions/{model.__basename__}-{platform}-{j}.result"
 
@@ -638,6 +652,19 @@ def evaluate(model: HeterogemeousMappingModel) -> pd.DataFrame:
             "Speedup"
         ])
 
+# Experiment: Random mapping
+class RandomMapping(HeterogemeousMappingModel):
+    __name__ = "Static mapping"
+    __basename__ = "static"
+
+    def init(self, seed: int):
+        return self
+
+    def train(self, df=None, **train):
+        pass
+
+    def predict(self, **test):
+        return np.random.randint(0, 2, len(test["y"]))
 
 # Experiment: Static mapping
 class StaticMapping(HeterogemeousMappingModel):
@@ -677,7 +704,7 @@ class Grewe(HeterogemeousMappingModel):
         from sklearn.tree import DecisionTreeClassifier
 
         self.model = DecisionTreeClassifier(
-            random_state=seed, splitter="best",
+            splitter="best",
             criterion="entropy", max_depth=5,
             min_samples_leaf=5)
         return self
@@ -899,8 +926,8 @@ def main():
         # Extract oracle from the cgo17 dataframe
         # 
         df_benchmarks = pd.read_csv(args.cgo17_benchmarks_csv)
-        df_benchmarks = df_benchmarks.drop(columns=['src'])       #######
-        df_benchmarks = df_benchmarks.drop(columns=['seq'])
+        df_benchmarks = df_benchmarks.drop(columns=['src'])
+#        df_benchmarks = df_benchmarks.drop(columns=['seq'])
 
         # Clang
         # ############################################
@@ -1027,137 +1054,137 @@ def main():
 
             df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
 
-        # LLVM
-        # ############################################
-        utils.print_dash()
-        print('Preprocessing LLVM')
-        utils.print_dash()
-        out_dir_llvm = os.path.join(preprocessing_artifact_dir_llvm, 'out')
-        filenames_llvm = utils.get_files_by_extension(out_dir_llvm, '.json')
-
-        preprocessed = []
-        num_nodes = []
-        for filename in filenames_llvm:
-            relative_filename = filename.replace(out_dir_llvm + '/', '')
-
-            benchmark_suite_name = relative_filename.split('/')[0]
-            if benchmark_suite_name == 'parboil-0.2' or benchmark_suite_name == 'rodinia-3.1':
-                benchmark_name = relative_filename.split('/')[2].lower()
-            elif benchmark_suite_name == 'shoc-1.1.5':
-                benchmark_name = relative_filename.split('/')[4].upper()
-            elif benchmark_suite_name == 'polybench-gpu-1.0':
-                benchmark_name = relative_filename.split('/')[-2].lower()
-                if benchmark_name == '2dconv':
-                    benchmark_name = '2DConvolution'
-                elif benchmark_name == '3dconv':
-                    benchmark_name = '3DConvolution'
-                elif benchmark_name == 'covar':
-                    benchmark_name = 'covariance'
-                elif benchmark_name == 'corr':
-                    benchmark_name = 'correlation'
-                elif benchmark_name == 'gramschm':
-                    benchmark_name = 'gramschmidt'
-            else:
-                benchmark_name = relative_filename.split('/')[-2]
-
-            print(filename)
-            try:
-                with open(filename) as f:
-                    jRoot = json.load(f)
-
-                if not jRoot:
-                    print('!!! Content of %s was None !!!' % filename)
-                    continue
-            except:
-                print('!!! Content of %s was not JSON parsable !!!' % filename)
-                continue
-
-            graphs = llvm_codegraph_models.codegraphs_create_from_miner_output(jRoot)
-            for graph_idx, graph in enumerate(graphs):
-                function_name = graph.functions[0].name
-
-                # Find this kernel in the cgo17 dataframe
-                for idx, row in df_benchmarks.iterrows():
-                    b = row['benchmark']
-                    o = row['oracle']
-
-                    function_name_cgo17 = b.split('-')[-1]
-                    benchmark_name_cgo17 = b.split('-')[-2]
-                    benchmark_suite_name_cgo17 = b.split('-')[0]
-
-                    if function_name_cgo17 == function_name \
-                            and benchmark_name_cgo17.upper() in benchmark_name.upper() \
-                            and benchmark_suite_name_cgo17 in benchmark_suite_name:
-                        jRoot['functions'][function_name][utils.AE.KERNEL_NAME] = b
-                        jRoot['functions'][function_name][utils.L.LABEL_0] = o
-
-                        # Add information to graph
-                        graph.name = b
-                        graph.oracle = o
-
-                        # Stats: Number of nodes
-                        stats_vstr = llvm_codegraph_models.StatisticsVisitor()
-                        graph.visit(stats_vstr)
-                        num_nodes.append(stats_vstr.num_nodes)
-
-                        preprocessed.append(graph)
-
-                        print(benchmark_suite_name, benchmark_name, function_name, o, stats_vstr.num_nodes)
-
-                        break
-        print('num_nodes_max:', np.max(num_nodes))
-        print('num_nodes_mean:', np.mean(num_nodes))
-        print('num_graphs:', len(preprocessed))
-
-        # CodeGraph -> graph
-        stats_vstr = llvm_codegraph_models.StatisticsVisitor()
-        for graph in preprocessed:
-            graph.visit(stats_vstr)
-        summary = stats_vstr.get_summary()
-        node_types_of_all_graphs = summary['node_types']
-        print('num_node_types:', len(node_types_of_all_graphs))
-        utils.pretty_print_dict(node_types_of_all_graphs)
-
-        graphs_export = []
-        names_export = []
-
-        for graph in preprocessed:
-            # Create node ids
-            node_id_vstr = llvm_codegraph_models.NodeIdCreateVisitor()
-            graph.visit(node_id_vstr)
-
-            # Extract node infos
-            ni_vstr = llvm_codegraph_models.NodeInfoExtractionVisitor(node_types_of_all_graphs)
-            graph.visit(ni_vstr)
-            nodes = ni_vstr.get_node_types()
-            # print(node_types)
-
-            # Extract edges
-            ee_vstr = llvm_codegraph_models.EdgeExtractionVisitor(edge_types={'cfg': 0, 'dataflow': 1,
-                                                                               'memaccess': 2, 'call': 3})
-            graph.visit(ee_vstr)
-            edges = ee_vstr.edges
-
-            graph_export = {
-                utils.T.NODES: nodes,
-                # utils.T.NODE_VALUES: node_values,
-                utils.T.EDGES: edges
-            }
-
-            graphs_export.append(graph_export)
-            names_export.append(graph.name)
-
-        print(names_export)
-
-        # Write cgo17 benchmarks csv file
-        if args.cgo17_benchmarks_csv_out:
-            # Find this kernel in the cgo17 dataframe
-            for row_idx, row in df_benchmarks.iterrows():
-                for name, graph in zip(names_export, graphs_export):
-                    if row['benchmark'] == name:
-                        df_benchmarks.loc[row_idx, 'llvm_graph'] = json.dumps(graph)
-
-            df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
+        # # LLVM
+        # # ############################################
+        # utils.print_dash()
+        # print('Preprocessing LLVM')
+        # utils.print_dash()
+        # out_dir_llvm = os.path.join(preprocessing_artifact_dir_llvm, 'out')
+        # filenames_llvm = utils.get_files_by_extension(out_dir_llvm, '.json')
+        #
+        # preprocessed = []
+        # num_nodes = []
+        # for filename in filenames_llvm:
+        #     relative_filename = filename.replace(out_dir_llvm + '/', '')
+        #
+        #     benchmark_suite_name = relative_filename.split('/')[0]
+        #     if benchmark_suite_name == 'parboil-0.2' or benchmark_suite_name == 'rodinia-3.1':
+        #         benchmark_name = relative_filename.split('/')[2].lower()
+        #     elif benchmark_suite_name == 'shoc-1.1.5':
+        #         benchmark_name = relative_filename.split('/')[4].upper()
+        #     elif benchmark_suite_name == 'polybench-gpu-1.0':
+        #         benchmark_name = relative_filename.split('/')[-2].lower()
+        #         if benchmark_name == '2dconv':
+        #             benchmark_name = '2DConvolution'
+        #         elif benchmark_name == '3dconv':
+        #             benchmark_name = '3DConvolution'
+        #         elif benchmark_name == 'covar':
+        #             benchmark_name = 'covariance'
+        #         elif benchmark_name == 'corr':
+        #             benchmark_name = 'correlation'
+        #         elif benchmark_name == 'gramschm':
+        #             benchmark_name = 'gramschmidt'
+        #     else:
+        #         benchmark_name = relative_filename.split('/')[-2]
+        #
+        #     print(filename)
+        #     try:
+        #         with open(filename) as f:
+        #             jRoot = json.load(f)
+        #
+        #         if not jRoot:
+        #             print('!!! Content of %s was None !!!' % filename)
+        #             continue
+        #     except:
+        #         print('!!! Content of %s was not JSON parsable !!!' % filename)
+        #         continue
+        #
+        #     graphs = llvm_codegraph_models.codegraphs_create_from_miner_output(jRoot)
+        #     for graph_idx, graph in enumerate(graphs):
+        #         function_name = graph.functions[0].name
+        #
+        #         # Find this kernel in the cgo17 dataframe
+        #         for idx, row in df_benchmarks.iterrows():
+        #             b = row['benchmark']
+        #             o = row['oracle']
+        #
+        #             function_name_cgo17 = b.split('-')[-1]
+        #             benchmark_name_cgo17 = b.split('-')[-2]
+        #             benchmark_suite_name_cgo17 = b.split('-')[0]
+        #
+        #             if function_name_cgo17 == function_name \
+        #                     and benchmark_name_cgo17.upper() in benchmark_name.upper() \
+        #                     and benchmark_suite_name_cgo17 in benchmark_suite_name:
+        #                 jRoot['functions'][function_name][utils.AE.KERNEL_NAME] = b
+        #                 jRoot['functions'][function_name][utils.L.LABEL_0] = o
+        #
+        #                 # Add information to graph
+        #                 graph.name = b
+        #                 graph.oracle = o
+        #
+        #                 # Stats: Number of nodes
+        #                 stats_vstr = llvm_codegraph_models.StatisticsVisitor()
+        #                 graph.visit(stats_vstr)
+        #                 num_nodes.append(stats_vstr.num_nodes)
+        #
+        #                 preprocessed.append(graph)
+        #
+        #                 print(benchmark_suite_name, benchmark_name, function_name, o, stats_vstr.num_nodes)
+        #
+        #                 break
+        # print('num_nodes_max:', np.max(num_nodes))
+        # print('num_nodes_mean:', np.mean(num_nodes))
+        # print('num_graphs:', len(preprocessed))
+        #
+        # # CodeGraph -> graph
+        # stats_vstr = llvm_codegraph_models.StatisticsVisitor()
+        # for graph in preprocessed:
+        #     graph.visit(stats_vstr)
+        # summary = stats_vstr.get_summary()
+        # node_types_of_all_graphs = summary['node_types']
+        # print('num_node_types:', len(node_types_of_all_graphs))
+        # utils.pretty_print_dict(node_types_of_all_graphs)
+        #
+        # graphs_export = []
+        # names_export = []
+        #
+        # for graph in preprocessed:
+        #     # Create node ids
+        #     node_id_vstr = llvm_codegraph_models.NodeIdCreateVisitor()
+        #     graph.visit(node_id_vstr)
+        #
+        #     # Extract node infos
+        #     ni_vstr = llvm_codegraph_models.NodeInfoExtractionVisitor(node_types_of_all_graphs)
+        #     graph.visit(ni_vstr)
+        #     nodes = ni_vstr.get_node_types()
+        #     # print(node_types)
+        #
+        #     # Extract edges
+        #     ee_vstr = llvm_codegraph_models.EdgeExtractionVisitor(edge_types={'cfg': 0, 'dataflow': 1,
+        #                                                                        'memaccess': 2, 'call': 3})
+        #     graph.visit(ee_vstr)
+        #     edges = ee_vstr.edges
+        #
+        #     graph_export = {
+        #         utils.T.NODES: nodes,
+        #         # utils.T.NODE_VALUES: node_values,
+        #         utils.T.EDGES: edges
+        #     }
+        #
+        #     graphs_export.append(graph_export)
+        #     names_export.append(graph.name)
+        #
+        # print(names_export)
+        #
+        # # Write cgo17 benchmarks csv file
+        # if args.cgo17_benchmarks_csv_out:
+        #     # Find this kernel in the cgo17 dataframe
+        #     for row_idx, row in df_benchmarks.iterrows():
+        #         for name, graph in zip(names_export, graphs_export):
+        #             if row['benchmark'] == name:
+        #                 df_benchmarks.loc[row_idx, 'llvm_graph'] = json.dumps(graph)
+        #
+        #     df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
 
 
     # Experiment command
@@ -1165,6 +1192,7 @@ def main():
         # Parse args
         parser_exp = subparsers.add_parser('train')
 
+        parser_exp.add_argument('--RandomMapping', action='store_true')
         parser_exp.add_argument('--StaticMapping', action='store_true')
         parser_exp.add_argument('--Grewe', action='store_true')
         parser_exp.add_argument('--DeepTuneLSTM', action='store_true')
@@ -1179,43 +1207,60 @@ def main():
         #
         dataset = pd.read_csv(args.dataset)
 
+        if args.RandomMapping:
+            print("Evaluating random mapping ...", file=sys.stderr)
+            model = RandomMapping(dataset)
+            report = evaluate(model)
+
+            report_human_readable = parse_report_to_human_readable(report)
+            print(report_human_readable)
+
         if args.StaticMapping:
             print("Evaluating static mapping ...", file=sys.stderr)
             model = StaticMapping(dataset)
             report = evaluate(model)
 
+            report_human_readable = parse_report_to_human_readable(report)
+            print(report_human_readable)
+
         if args.Grewe:
             print("Evaluating Grewe et al. ...", file=sys.stderr)
             model = Grewe(dataset)
-            report = evaluate(model)
+            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
+
+            report_human_readable = parse_report_to_human_readable(report)
+            print(report_human_readable)
 
         if args.DeepTuneLSTM:
             print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
             model = DeepTune(dataset)
             model.init(seed)
             model.model.summary()
-            report = evaluate(model)
+            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
+
+            report_human_readable = parse_report_to_human_readable(report)
+            print(report_human_readable)
 
         if args.DeepTuneGNNClang:
             config = {
                 "graph_rnn_cell": "GRU",
 
-                "num_timesteps": 4,
+                "num_timesteps": 8,
                 "hidden_size_orig": 92,
-                "hidden_size": 32,
+                "hidden_size": 8,
                 "deepgmg_mlp_size": 2,
 
                 "num_edge_types": 2,
 
                 "prediction_cell": {
-                    "mlp_f_m_dims": [64, 64],
-                    "mlp_g_m_dims": [64, 64],
-                    "mlp_reduce_dims": [64, 64],
+                    "mlp_f_m_dims": [],
+                    "mlp_g_m_dims": [],
+                    "mlp_reduce_dims": [],
                     "mlp_reduce_2_dims": []
                 },
 
                 "embedding_layer": {
-                    "mapping_dims": [128, 128]
+                    "mapping_dims": []
                 },
 
 
@@ -1223,7 +1268,7 @@ def main():
                 "clamp_gradient_norm": 1.0,
 
                 "batch_size": 64,
-                "num_epochs": 3000,
+                "num_epochs": 200,
                 "out_dir": "/tmp",
 
                 "tie_fwd_bkwd": 0,
@@ -1237,7 +1282,7 @@ def main():
 
             print("Evaluating DeepTuneGNNClang ...", file=sys.stderr)
             model = DeepGNN(config, dataset)
-            report = evaluate(model)
+            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
 
             handle_gnn_report(args, config, model, report, 'DeepTuneGNN')
 
@@ -1282,7 +1327,7 @@ def main():
 
             print("Evaluating DeepTuneGNNLLVM ...", file=sys.stderr)
             model = DeepGNN(config, dataset)
-            report = evaluate(model)
+            report = evaluate(model, fold_mode='benchmark_grouped_7fold')
 
             handle_gnn_report(args, config, model, report, 'DeepTuneGNNLLVM')
 
