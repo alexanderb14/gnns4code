@@ -969,8 +969,8 @@ def main():
         # Find all .cl files and extract code graphs from them
         files = utils.get_files_by_extension(args.code_dir, '.cl')
 
-        clang_preprocess.process_files(files, preprocessing_artifact_dir_clang, args.code_dir)
-        llvm_preprocess.process_files(files, preprocessing_artifact_dir_llvm, args.code_dir)
+        clang_preprocess.process_sources(files, preprocessing_artifact_dir_clang, args.code_dir)
+        llvm_preprocess.process_sources(files, preprocessing_artifact_dir_llvm, args.code_dir)
 
         # Extract oracle from the cgo17 dataframe
         # 
@@ -1318,8 +1318,8 @@ def main():
                 "prediction_cell": {
                     "mlp_f_m_dims": [],
                     "mlp_g_m_dims": [],
-                    "mlp_reduce_dims": [],
-                    "mlp_reduce_2_dims": []
+                    "mlp_reduce_dims": [32],
+                    "output_dim": 2,
                 },
 
                 "embedding_layer": {
@@ -1340,7 +1340,9 @@ def main():
 
                 "use_node_values": 0,
 
-                "save_best_model_interval": 1
+                "save_best_model_interval": 1,
+
+                "with_aux_in": 1
             }
 
             print("Evaluating DeepTuneGNNClang ...", file=sys.stderr)
@@ -1365,8 +1367,8 @@ def main():
                 "prediction_cell": {
                     "mlp_f_m_dims": [64, 64],
                     "mlp_g_m_dims": [64, 64],
-                    "mlp_reduce_dims": [64, 64],
-                    "mlp_reduce_2_dims": []
+                    "mlp_reduce_dims": [64, 64, 32],
+                    "output_dim": 2,
                 },
 
                 "embedding_layer": {
@@ -1387,7 +1389,9 @@ def main():
 
                 "use_node_values": 0,
 
-                "save_best_model_interval": 1
+                "save_best_model_interval": 1,
+
+                "with_aux_in": 1
             }
 
             print("Evaluating DeepTuneGNNLLVM ...", file=sys.stderr)

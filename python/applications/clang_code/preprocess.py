@@ -63,7 +63,7 @@ def opencl_kernel_c_code_to_llvm_graph(c_code:str):
         return graph
 
 
-def process_files(files, preprocessing_artifact_dir, substract_str=None):
+def process_sources(files, preprocessing_artifact_dir, substract_str, is_opencl_source=True):
     out_dir = os.path.join(preprocessing_artifact_dir, 'out')
     good_code_dir = os.path.join(preprocessing_artifact_dir, 'bad_code')
     bad_code_dir = os.path.join(preprocessing_artifact_dir, 'good_code')
@@ -79,14 +79,21 @@ def process_files(files, preprocessing_artifact_dir, substract_str=None):
         else:
             out_filename = filename
 
-        cmd = [app_utils.CLANG_MINER_EXECUTABLE,
-               '-extra-arg-before=-xcl',
-               '-extra-arg=-I' + app_utils.LIBCLC_DIR]
-        cmd += ['-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE]
-        if 'npb' in filename:
-            cmd += ['-extra-arg=-DM=1']
-        if 'nvidia' in filename or ('rodinia' in filename and 'pathfinder' not in filename):
-            cmd += ['-extra-arg=-DBLOCK_SIZE=64']
+        cmd = [app_utils.CLANG_MINER_EXECUTABLE]
+
+        if is_opencl_source:
+            cmd += ['-extra-arg-before=-xcl',
+                   '-extra-arg=-I' + app_utils.LIBCLC_DIR]
+            cmd += ['-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE]
+            if 'npb' in filename:
+                cmd += ['-extra-arg=-DM=1']
+            if 'nvidia' in filename or ('rodinia' in filename and 'pathfinder' not in filename):
+                cmd += ['-extra-arg=-DBLOCK_SIZE=64']
+
+        else:
+            cmd += ['-extra-arg=-I/Library/Developer/CommandLineTools/usr/include/c++/v1/',
+                    '-extra-arg=-I/devel/git/llvm_build/build/lib/clang/8.0.0/include/']
+
         cmd += [filename, '-o', out_filename]
 
         print(' '.join(cmd))
@@ -94,7 +101,7 @@ def process_files(files, preprocessing_artifact_dir, substract_str=None):
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         stdout, stderr = process.communicate()
-        result = process.returncode
+        result = process.wait()
 
         # In case of an error
         if result != 0:
@@ -103,7 +110,7 @@ def process_files(files, preprocessing_artifact_dir, substract_str=None):
                 filename.replace('/', '_') + '.txt')
 
             # write error report file containing source, stdout, stderr
-            utils.write_error_report_file(filename, report_filename, [stdout], [stderr])
+            utils.write_error_report_file(filename, report_filename, [stdout], [stderr], result, cmd)
 
             shutil.copyfile(filename, os.path.join(bad_code_dir, os.path.basename(filename)))
         else:
@@ -166,7 +173,7 @@ def main():
     if command_arg.command == 'generative':
         filenames = utils.get_files_by_file_size(args.code_dir, False)
 
-        process_files(filenames, args.out_dir, args.good_code_dir,
+        process_sources(filenames, args.out_dir, args.good_code_dir,
                       args.bad_code_dir, args.error_log_dir)
 
         # Write to file

@@ -144,6 +144,8 @@ class PredictionModel(object):
 
         self.with_gradient_monitoring = True if 'gradient_monitoring' in self.config and self.config['gradient_monitoring'] == 1 else False
 
+        self.with_aux_in = True if 'with_aux_in' in self.config and self.config['with_aux_in'] == 1 else False
+
         # Create and initialize model
         with self.state.graph.as_default():
             self._make_model(True)
@@ -197,11 +199,13 @@ class PredictionModel(object):
             # Graph model
             'adjacency_lists': [[] for _ in range(self.config['num_edge_types'])],
             'embeddings_to_graph_mappings': [],
-            'aux_in': [],
             'labels': [],
             'embeddings_in': [],
             'node_values': [],
         }
+
+        if self.with_aux_in:
+            batch_data['aux_in'] = []
 
         for graph_idx, graph in enumerate(graphs):
             num_nodes = graph_sizes[graph_idx]
@@ -210,8 +214,9 @@ class PredictionModel(object):
                 batch_data['num_incoming_edges_dicts_per_type'] = []
 
             # Aux in
-            if utils.I.AUX_IN_0 in graph:
-                batch_data['aux_in'].append(graph[utils.I.AUX_IN_0])
+            if self.with_aux_in:
+                if utils.I.AUX_IN_0 in graph:
+                    batch_data['aux_in'].append(graph[utils.I.AUX_IN_0])
 
             # Labels
             if utils.L.LABEL_0 in graph:
@@ -264,11 +269,12 @@ class PredictionModel(object):
         feed_dict[self.cells[0].placeholders['is_training']] = is_training
 
         # Aux in
-        feed_dict[self.cells[0].placeholders['aux_in']] = batch_data['aux_in']
+        if self.with_aux_in:
+            feed_dict[self.cells[0].placeholders['aux_in']] = batch_data['aux_in']
 
         # Labels
         if 'labels' in self.cells[0].placeholders:
-            feed_dict[self.cells[0].placeholders['labels']] = utils.get_one_hot(np.array(batch_data['labels']), 2)
+            feed_dict[self.cells[0].placeholders['labels']] = utils.get_one_hot(np.array(batch_data['labels']), self.config['prediction_cell']['output_dim'])
 
         # Embeddings
         feed_dict[self.placeholders['embeddings_in']] = np.concatenate(batch_data['embeddings_in'], axis=0)
@@ -305,7 +311,7 @@ class PredictionModel(object):
             embeddings = tf.concat([embeddings, node_values], axis=1)
 
         # Create prediction cell
-        prediction_cell = PredictionCell(self.config, enable_training, self.state.prediction_cell_state)
+        prediction_cell = PredictionCell(self.config, enable_training, self.state.prediction_cell_state, self.with_aux_in)
         prediction_cell.initial_embeddings = embeddings_reduced
         prediction_cell.compute_predictions(embeddings)
 
@@ -365,29 +371,45 @@ class PredictionModel(object):
 
         return result
 
-    def train(self, graphs) -> None:
+    def train(self, graphs_train, graphs_test=None, graphs_valid=None) -> None:
         """
         Train model with training set in multiple epochs
         """
         # Enrich graphs with adj list
-        for graph in graphs:
+        for graph in graphs_train:
             graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'] == 1)[0]
 
         # Extract graph sizes
         graph_sizes = []
-        for graph in graphs:
+        for graph in graphs_train:
             graph_sizes.append(len(graph[utils.T.NODES]))
 
-        best_epoch_loss = sys.maxsize
+        best_epoch_metric = sys.maxsize
         best_epoch_count = 0
 
+        if graphs_valid and graphs_test:
+            # Extract valid labels
+            y_valid = []
+            for graph in graphs_valid:
+                y_valid.append(graph[utils.L.LABEL_0])
+            y_valid = np.array(y_valid)
+
+            # Extract test labels
+            y_test = []
+            for graph in graphs_test:
+                y_test.append(graph[utils.L.LABEL_0])
+            y_test = np.array(y_test)
+
+        # Run epochs
         for epoch in range(0, self.config['num_epochs']):
+            # Training
+            # ############################################
             epoch_start_time = time.time()
 
             # Partition into batches
             batch_size = self.config['batch_size']
 
-            lst = list(zip(graphs, graph_sizes))
+            lst = list(zip(graphs_train, graph_sizes))
             random.shuffle(lst)
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
@@ -422,20 +444,54 @@ class PredictionModel(object):
             epoch_end_time = time.time()
             epoch_time = epoch_end_time - epoch_start_time
 
-            print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss))
-
-            if epoch_loss < best_epoch_loss:
-                best_epoch_loss = epoch_loss
-
-                best_epoch_count += 1
-                if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
-                    self.state.backup_best_weights()
-
-                    best_epoch_count = 0
-
             # Logging
             summary = tf.Summary()
             summary.value.add(tag='loss', simple_value=epoch_loss)
+
+            # Testing
+            # ############################################
+            if graphs_valid and graphs_test:
+                # Make predictions on valid set
+                predictions = self.predict(graphs_valid)
+
+                valid_loss = np.sum(predictions - utils.get_one_hot(y_valid, self.config['prediction_cell']['output_dim']))
+                valid_accuracy = np.sum(np.argmax(predictions, axis=1) == y_valid) / len(predictions)
+
+                # Make predictions on test set
+                predictions = self.predict(graphs_test)
+
+                test_loss = np.sum(predictions - utils.get_one_hot(y_test, self.config['prediction_cell']['output_dim']))
+                test_accuracy = np.sum(np.argmax(predictions, axis=1) == y_test) / len(predictions)
+
+                # Logging
+                summary.value.add(tag='valid_accuracy', simple_value=valid_accuracy)
+                summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, valid_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss, valid_accuracy, test_accuracy))
+
+
+                if valid_accuracy < best_epoch_metric:
+                    best_epoch_metric = test_accuracy
+
+                    best_epoch_count += 1
+                    if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
+                        self.state.backup_best_weights()
+
+                        best_epoch_count = 0
+
+            else:
+                # Logging
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss))
+
+                if epoch_loss < best_epoch_metric:
+                    best_epoch_metric = epoch_loss
+
+                    best_epoch_count += 1
+                    if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
+                        self.state.backup_best_weights()
+
+                        best_epoch_count = 0
+
+            # Logging
             self.train_writer.add_summary(summary, epoch)
 
         self.state.restore_best_weights()

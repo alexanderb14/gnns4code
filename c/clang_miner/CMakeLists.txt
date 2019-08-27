@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(clang_miner)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 add_definitions("-fno-exceptions -fno-rtti")
 
 find_package(Clang REQUIRED)

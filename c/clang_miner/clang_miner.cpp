@@ -309,7 +309,16 @@ public:
         FunctionContainerPtr fnInfo(new FunctionContainer);
 
         // Only function definitions (with bodies), not declarations.
-        if (f->hasBody() && strcmp(f->getName().data(), "__sputc") != 0) {
+        if (f->hasBody() && f->getDeclName().isIdentifier()) {
+            std::string functionName = f->getName().data();
+            if(functionName == "__sputc") {
+              return true;
+            }
+
+            if(!_context.getSourceManager().isInMainFile(f->getBeginLoc())) {
+              return true;
+            }
+
             // Increment number of functions
             ClangCodeGraph::getInstance()._numFunctions++;
 
@@ -430,7 +439,7 @@ public:
                                     if (ds->getType()->isScalarType()) {
                                         sInfo->declInfo->scalarType = ds->getType()->getScalarTypeKind();
                                     }
-                                    sInfo->declInfo->functionNameStr = ds->getDecl()->getName();
+                                    sInfo->declInfo->functionNameStr = ds->getDecl()->getNameAsString();
                                 }
                             }
 

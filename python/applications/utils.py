@@ -38,7 +38,7 @@ def build_with_cmake(project_path, target, additional_cmake_arguments: list = []
         if not os.path.exists(build_path):
             subprocess.Popen(['mkdir', build_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=project_path)
 
-            cmd = ['cmake', '..'] + additional_cmake_arguments
+            cmd = ['cmake', '..', '-DCMAKE_BUILD_TYPE=Release'] + additional_cmake_arguments
             print(' '.join(cmd))
 
             process = subprocess.Popen(['cmake', '..'] + additional_cmake_arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=build_path)

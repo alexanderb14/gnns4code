@@ -750,7 +750,10 @@ class NodeTypeIdCreateVisitor(VisitorBase):
             elif obj.name == 'IntegerLiteral':
                 key_hashed = hash((obj.name))
             else:
-                key_hashed = hash((obj.name, utils.freeze_dict(obj.specifics)))
+                specifics = obj.specifics
+                if 'function_name' in specifics:
+                    del specifics['function_name']
+                key_hashed = hash((obj.name, utils.freeze_dict(specifics)))
 
             # Add to map
             if key_hashed in self.node_type_ids_by_statements:

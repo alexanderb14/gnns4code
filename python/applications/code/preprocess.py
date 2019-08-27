@@ -34,7 +34,7 @@ def opencl_kernel_c_code_to_llvm_graph(c_code:str):
     return llvm_graph
 
 
-def process_files(files, preprocessing_artifact_dir, substract_str=None, optimize_for_size=False):
+def process_sources(files, preprocessing_artifact_dir, substract_str=None, optimize_for_size=False):
     out_dir = os.path.join(preprocessing_artifact_dir, 'out')
     good_code_dir = os.path.join(preprocessing_artifact_dir, 'bad_code')
     bad_code_dir = os.path.join(preprocessing_artifact_dir, 'good_code')
@@ -90,7 +90,7 @@ def process_files(files, preprocessing_artifact_dir, substract_str=None, optimiz
 
             # write error report file containing source, stdout, stderr
             utils.write_error_report_file(filename, report_filename,
-                                          [], [stderr_compile, stderr_miner])
+                                          [], [stderr_compile, stderr_miner], result, cmd_compile)
 
             shutil.copyfile(filename, os.path.join(bad_code_dir, os.path.basename(filename)))
         else:

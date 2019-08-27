@@ -385,8 +385,16 @@ def create_folder(path):
     os.makedirs(path, exist_ok=True)
 
 
-def write_error_report_file(src_filename, report_filename, stdouts, stderrs):
+def write_error_report_file(src_filename, report_filename, stdouts, stderrs, returncode, cmd):
     report = ''
+
+    report += 'COMMAND:' + '\n'
+    report += get_dash() + '\n'
+    report += ' '.join(cmd) + '\n'
+
+    report += 'RETURNCODE:' + '\n'
+    report += get_dash() + '\n'
+    report += str(returncode) + '\n'
 
     report += 'SOURCE:' + '\n'
     report += get_dash() + '\n'

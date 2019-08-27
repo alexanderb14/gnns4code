@@ -23,18 +23,24 @@ class PredictionCellState(object):
             self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, self.config['prediction_cell']['mlp_f_m_dims'], 'relu', 'mlp_regression_transform')
             self.weights['mlp_g_m'] = utils.MLP(h_size + h_size_orig, h_size * m_size, self.config['prediction_cell']['mlp_g_m_dims'], 'relu', 'mlp_regression_gate')
 
-        self.weights['mlp_reduce'] = utils.MLP(h_size * m_size + 2, 32, self.config['prediction_cell']['mlp_reduce_dims'], 'relu', 'mlp_reduce')
-        self.weights['mlp_reduce_2'] = utils.MLP(32, 2, self.config['prediction_cell']['mlp_reduce_2_dims'], 'relu', 'mlp_reduce_2')
+        offset = 0
+        if config['with_aux_in']:
+            offset = 2
+        self.weights['mlp_reduce'] = utils.MLP(h_size * m_size + offset,
+                                               self.config['prediction_cell']['output_dim'],
+                                               self.config['prediction_cell']['mlp_reduce_dims'],
+                                               'relu', 'mlp_reduce')
 
 
 class PredictionCell(object):
     """
     Implementation of the Prediction cell.
     """
-    def __init__(self, config, enable_training, state):
+    def __init__(self, config, enable_training, state, with_aux_in):
         self.config = config
         self.enable_training = enable_training
         self.state = state
+        self.with_aux_in = with_aux_in
 
         self.ops = {}
         self.placeholders = {}
@@ -63,8 +69,9 @@ class PredictionCell(object):
         num_graphs = tf.reduce_max(embeddings_to_graph_mappings) + 1                                            # Scalar
 
         # Input
-        self.placeholders['aux_in'] = tf.placeholder(tf.float32, [None, 2], name='aux_in')
-        aux_in = tf.cast(self.placeholders['aux_in'], dtype=tf.float32)
+        if self.with_aux_in:
+            self.placeholders['aux_in'] = tf.placeholder(tf.float32, [None, 2], name='aux_in')
+            aux_in = tf.cast(self.placeholders['aux_in'], dtype=tf.float32)
 
         # Model
         # #########################################
@@ -79,20 +86,20 @@ class PredictionCell(object):
         h_G = tf.unsorted_segment_sum(data=h_G,
                                       segment_ids=embeddings_to_graph_mappings,
                                       num_segments=num_graphs)                                                  # [b, 2h]
-        aux_in = tf.layers.batch_normalization(aux_in, training=is_training)
 
-        h_G_and_aux_in = tf.concat([h_G, aux_in], axis=-1)                                                      # [b, 2h + 2]
+        if self.with_aux_in:
+            aux_in = tf.layers.batch_normalization(aux_in, training=is_training)
 
-        h_G_and_aux_in = self.state.weights['mlp_reduce'](h_G_and_aux_in)
+            h_G = tf.concat([h_G, aux_in], axis=-1)                                                  # [b, 2h + 2]
 
-        output = self.state.weights['mlp_reduce_2'](h_G_and_aux_in)                                             # [b, 2]
+        output = self.state.weights['mlp_reduce'](h_G)                                             # [b, 2]
 
-        output = tf.nn.sigmoid(output)                                                                          # [b, 2]
+        output = tf.nn.softmax(output)                                                                          # [b, 2]
 
         # Training
         if self.enable_training:
             # Input
-            self.placeholders['labels'] = tf.placeholder(tf.int32, [None, 2], name='labels')
+            self.placeholders['labels'] = tf.placeholder(tf.int32, [None, self.config['prediction_cell']['output_dim']], name='labels')
             labels = tf.cast(self.placeholders['labels'], dtype=tf.float32)
 
             # Loss
