@@ -487,6 +487,8 @@ class PredictionModel(object):
                 test_accuracy = np.sum(np.argmax(predictions, axis=1) == y_test) / len(predictions)
 
                 # Logging
+                summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
+                summary.value.add(tag='test_loss', simple_value=test_loss)
                 print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, test_accuracy))
 
             else:
