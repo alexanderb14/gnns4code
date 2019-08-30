@@ -850,7 +850,7 @@ class DeepGNN(HeterogemeousMappingModel):
             graph[utils.I.AUX_IN_0] = aux_in
             graphs_test.append(graph)
 
-        self.model.train(graphs_train, graphs_train)
+        self.model.train(graphs_train, graphs_test)
 
     def predict(self, **data):
         prefix = 'clang' if self.__basename__ == 'deepgnn-ast' else 'llvm'
