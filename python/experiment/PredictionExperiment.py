@@ -385,6 +385,11 @@ def get_clang_graphs(df: pd.DataFrame) -> np.array:
         df["clang_graph"].values,
     ).T
 
+def get_llvm_graphs(df: pd.DataFrame) -> np.array:
+    return np.array(
+        df["llvm_graph"].values,
+    ).T
+
 def encode_1hot(y: np.array) -> np.array:
     """ 1-hot encode labels """
     labels = np.vstack([np.expand_dims(x, axis=0) for x in y])
@@ -564,6 +569,7 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, datase
         features = grewe_features(df)
         aux_in = auxiliary_inputs(df)
         clang_graphs = get_clang_graphs(df)
+        llvm_graphs = get_llvm_graphs(df)
 
         # optimal mappings
         y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
@@ -595,6 +601,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, datase
                         aux_in_test=aux_in[test_index],
                         clang_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
                         clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
+                        llvm_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_index]],
+                        llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]],
                         sequences=sequences[train_index] if sequences is not None else None,
                         y_train=y[train_index],
                         y_test=y[test_index],
@@ -606,6 +614,7 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, datase
                 features=features[test_index],
                 aux_in_test=aux_in[test_index],
                 clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
+                llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]],
                 sequences=sequences[test_index] if sequences is not None else None,
                 y_test=y[test_index],
                 y_1hot=y_1hot[test_index],
@@ -827,14 +836,16 @@ class DeepGNN(HeterogemeousMappingModel):
         raise Exception()
 
     def train(self, **data):
+        prefix = 'clang' if self.__basename__ == 'deepgnn-ast' else 'llvm'
+
         graphs_train = []
-        for graph, aux_in, y in zip(data["clang_graphs_train"], data["aux_in_train"], data["y_train"]):
+        for graph, aux_in, y in zip(data[prefix + "_graphs_train"], data["aux_in_train"], data["y_train"]):
             graph[utils.L.LABEL_0] = y
             graph[utils.I.AUX_IN_0] = aux_in
             graphs_train.append(graph)
 
         graphs_test = []
-        for graph, aux_in, y in zip(data["clang_graphs_test"], data["aux_in_test"], data["y_test"]):
+        for graph, aux_in, y in zip(data[prefix + "_graphs_test"], data["aux_in_test"], data["y_test"]):
             graph[utils.L.LABEL_0] = y
             graph[utils.I.AUX_IN_0] = aux_in
             graphs_test.append(graph)
@@ -842,8 +853,10 @@ class DeepGNN(HeterogemeousMappingModel):
         self.model.train(graphs_train, graphs_train)
 
     def predict(self, **data):
+        prefix = 'clang' if self.__basename__ == 'deepgnn-ast' else 'llvm'
+
         graphs_test = []
-        for graph, aux_in, y in zip(data["clang_graphs_test"], data["aux_in_test"], data["y_test"]):
+        for graph, aux_in, y in zip(data[prefix + "_graphs_test"], data["aux_in_test"], data["y_test"]):
             graph[utils.L.LABEL_0] = y
             graph[utils.I.AUX_IN_0] = aux_in
             graphs_test.append(graph)
@@ -1374,7 +1387,7 @@ def main():
                 "hidden_size": 32,
                 "deepgmg_mlp_size": 2,
 
-                "num_edge_types": 2,
+                "num_edge_types": 4,
 
                 "prediction_cell": {
                     "mlp_f_m_dims": [64, 64],
