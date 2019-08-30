@@ -583,8 +583,6 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, datase
             kf = GroupKFold(n_splits=num_benchmark_suites)
             split = kf.split(features, y, groups)
 
-        print(split)
-
         for j, (train_index, test_index) in enumerate(split):
             if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
                 sequences = encode_srcs(model.atomizer, df["src"].values)
@@ -1263,7 +1261,7 @@ def main():
 
         if args.RandomMapping:
             config = {
-                'fold_mode': 'benchmark_grouped_7fold'
+                'fold_mode': 'random_10fold'
             }
 
             print("Evaluating random mapping ...", file=sys.stderr)
@@ -1274,7 +1272,7 @@ def main():
 
         if args.StaticMapping:
             config = {
-                'fold_mode': 'benchmark_grouped_7fold'
+                'fold_mode': 'random_10fold'
             }
 
             print("Evaluating static mapping ...", file=sys.stderr)
@@ -1285,7 +1283,7 @@ def main():
 
         if args.Grewe:
             config = {
-                'fold_mode': 'benchmark_grouped_7fold'
+                'fold_mode': 'random_10fold'
             }
 
             print("Evaluating Grewe et al. ...", file=sys.stderr)
@@ -1296,7 +1294,7 @@ def main():
 
         if args.DeepTuneLSTM:
             config = {
-                'fold_mode': 'benchmark_grouped_7fold'
+                'fold_mode': 'random_10fold'
             }
 
             print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
@@ -1309,26 +1307,26 @@ def main():
 
         if args.DeepTuneGNNClang:
             config = {
-                'fold_mode': 'benchmark_grouped_7fold',
+                'fold_mode': 'random_10fold',
 
                 "graph_rnn_cell": "GRU",
 
-                "num_timesteps": 8,
+                "num_timesteps": 4,
                 "hidden_size_orig": 92,
-                "hidden_size": 8,
+                "hidden_size": 32,
                 "deepgmg_mlp_size": 2,
 
                 "num_edge_types": 2,
 
                 "prediction_cell": {
-                    "mlp_f_m_dims": [],
-                    "mlp_g_m_dims": [],
-                    "mlp_reduce_dims": [32],
+                    "mlp_f_m_dims": [64, 64],
+                    "mlp_g_m_dims": [64, 64],
+                    "mlp_reduce_dims": [64, 64, 32],
                     "output_dim": 2,
                 },
 
                 "embedding_layer": {
-                    "mapping_dims": []
+                    "mapping_dims": [128, 128]
                 },
 
 
@@ -1336,7 +1334,7 @@ def main():
                 "clamp_gradient_norm": 1.0,
 
                 "batch_size": 64,
-                "num_epochs": 200,
+                "num_epochs": 3000,
                 "out_dir": "/tmp",
 
                 "tie_fwd_bkwd": 0,
@@ -1358,7 +1356,7 @@ def main():
 
         if args.DeepTuneGNNLLVM:
             config = {
-                'fold_mode': 'benchmark_grouped_7fold',
+                'fold_mode': 'random_10fold',
 
                 "graph_rnn_cell": "GRU",
 
