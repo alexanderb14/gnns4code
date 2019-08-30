@@ -447,7 +447,7 @@ class PredictionModel(object):
 
             # Logging
             summary = tf.Summary()
-            summary.value.add(tag='loss', simple_value=training_loss)
+            summary.value.add(tag='train_loss', simple_value=training_loss)
 
             # Testing
             # ############################################
@@ -478,6 +478,16 @@ class PredictionModel(object):
                         self.state.backup_best_weights()
 
                         best_epoch_count = 0
+
+            elif graphs_test:
+                # Make predictions on test set
+                predictions = self.predict(graphs_test)
+
+                test_loss = np.sum(predictions - utils.get_one_hot(y_test, self.config['prediction_cell']['output_dim']))
+                test_accuracy = np.sum(np.argmax(predictions, axis=1) == y_test) / len(predictions)
+
+                # Logging
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, test_accuracy))
 
             else:
                 # Logging

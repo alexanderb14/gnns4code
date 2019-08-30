@@ -591,20 +591,23 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, datase
             model.init(seed=seed)
             model.train(df=df,
                         features=features[train_index],
-                        aux_in=aux_in[train_index],
-                        clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
+                        aux_in_train=aux_in[train_index],
+                        aux_in_test=aux_in[test_index],
+                        clang_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
+                        clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
                         sequences=sequences[train_index] if sequences is not None else None,
-                        y=y[train_index],
+                        y_train=y[train_index],
+                        y_test=y[test_index],
                         y_1hot=y_1hot[train_index],
                         verbose=False)
 
             # test model
             p = model.predict(
                 features=features[test_index],
-                aux_in=aux_in[test_index],
-                clang_graphs=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
+                aux_in_test=aux_in[test_index],
+                clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
                 sequences=sequences[test_index] if sequences is not None else None,
-                y=y[test_index],
+                y_test=y[test_index],
                 y_1hot=y_1hot[test_index],
                 verbose=False)
 
@@ -823,25 +826,29 @@ class DeepGNN(HeterogemeousMappingModel):
     def restore(self, inpath):
         raise Exception()
 
-    def train(self, **train):
-        graphs = []
-        for graph, aux_in, y in zip(train["clang_graphs"], train["aux_in"], train["y"]):
+    def train(self, **data):
+        graphs_train = []
+        for graph, aux_in, y in zip(data["clang_graphs_train"], data["aux_in_train"], data["y_train"]):
             graph[utils.L.LABEL_0] = y
             graph[utils.I.AUX_IN_0] = aux_in
+            graphs_train.append(graph)
 
-            graphs.append(graph)
-
-        self.model.train(graphs)
-
-    def predict(self, **test):
-        graphs = []
-        for graph, aux_in, y in zip(test["clang_graphs"], test["aux_in"], test["y"]):
+        graphs_test = []
+        for graph, aux_in, y in zip(data["clang_graphs_test"], data["aux_in_test"], data["y_test"]):
             graph[utils.L.LABEL_0] = y
             graph[utils.I.AUX_IN_0] = aux_in
+            graphs_test.append(graph)
 
-            graphs.append(graph)
+        self.model.train(graphs_train, graphs_train)
 
-        p = self.model.predict(graphs)
+    def predict(self, **data):
+        graphs_test = []
+        for graph, aux_in, y in zip(data["clang_graphs_test"], data["aux_in_test"], data["y_test"]):
+            graph[utils.L.LABEL_0] = y
+            graph[utils.I.AUX_IN_0] = aux_in
+            graphs_test.append(graph)
+
+        p = self.model.predict(graphs_test)
         p = np.array(p)
 
         indices = [np.argmax(x) for x in p]
