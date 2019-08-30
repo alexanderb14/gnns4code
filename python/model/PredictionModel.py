@@ -387,13 +387,14 @@ class PredictionModel(object):
         best_epoch_metric = sys.maxsize
         best_epoch_count = 0
 
-        if graphs_valid and graphs_test:
+        if graphs_valid:
             # Extract valid labels
             y_valid = []
             for graph in graphs_valid:
                 y_valid.append(graph[utils.L.LABEL_0])
             y_valid = np.array(y_valid)
 
+        if graphs_test:
             # Extract test labels
             y_test = []
             for graph in graphs_test:
@@ -415,7 +416,7 @@ class PredictionModel(object):
                        range((len(lst) + batch_size - 1) // batch_size)]
 
             # Run batches
-            epoch_losses = []
+            training_losses = []
             epoch_instances_per_secs = []
 
             for batch in batches:
@@ -437,16 +438,16 @@ class PredictionModel(object):
                 instances_per_sec = len(batch_graphs) / (end_time - start_time)
                 epoch_instances_per_secs.append(instances_per_sec)
 
-                epoch_losses.append(result[0])
+                training_losses.append(result[0])
 
-            epoch_loss = np.sum(epoch_losses)
+            training_loss = np.sum(training_losses)
             epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
             epoch_end_time = time.time()
             epoch_time = epoch_end_time - epoch_start_time
 
             # Logging
             summary = tf.Summary()
-            summary.value.add(tag='loss', simple_value=epoch_loss)
+            summary.value.add(tag='loss', simple_value=training_loss)
 
             # Testing
             # ############################################
@@ -466,11 +467,11 @@ class PredictionModel(object):
                 # Logging
                 summary.value.add(tag='valid_accuracy', simple_value=valid_accuracy)
                 summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
-                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, valid_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss, valid_accuracy, test_accuracy))
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, valid_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, valid_accuracy, test_accuracy))
 
 
                 if valid_accuracy < best_epoch_metric:
-                    best_epoch_metric = test_accuracy
+                    best_epoch_metric = valid_accuracy
 
                     best_epoch_count += 1
                     if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
@@ -480,10 +481,10 @@ class PredictionModel(object):
 
             else:
                 # Logging
-                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, epoch_loss))
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss))
 
-                if epoch_loss < best_epoch_metric:
-                    best_epoch_metric = epoch_loss
+                if training_loss < best_epoch_metric:
+                    best_epoch_metric = training_loss
 
                     best_epoch_count += 1
                     if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
