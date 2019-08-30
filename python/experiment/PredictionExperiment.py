@@ -1253,6 +1253,8 @@ def main():
         parser_exp.add_argument('--dataset_amd')
         parser_exp.add_argument('--report_write_dir')
 
+        parser_exp.add_argument('--fold_mode')
+
         args = parser_exp.parse_args(sys.argv[2:])
 
         #
@@ -1261,7 +1263,7 @@ def main():
 
         if args.RandomMapping:
             config = {
-                'fold_mode': 'random_10fold'
+                'fold_mode': args.fold_mode
             }
 
             print("Evaluating random mapping ...", file=sys.stderr)
@@ -1272,7 +1274,7 @@ def main():
 
         if args.StaticMapping:
             config = {
-                'fold_mode': 'random_10fold'
+                'fold_mode': args.fold_mode
             }
 
             print("Evaluating static mapping ...", file=sys.stderr)
@@ -1283,7 +1285,7 @@ def main():
 
         if args.Grewe:
             config = {
-                'fold_mode': 'random_10fold'
+                'fold_mode': args.fold_mode
             }
 
             print("Evaluating Grewe et al. ...", file=sys.stderr)
@@ -1294,7 +1296,7 @@ def main():
 
         if args.DeepTuneLSTM:
             config = {
-                'fold_mode': 'random_10fold'
+                'fold_mode': args.fold_mode
             }
 
             print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
@@ -1307,7 +1309,7 @@ def main():
 
         if args.DeepTuneGNNClang:
             config = {
-                'fold_mode': 'random_10fold',
+                'fold_mode': args.fold_mode,
 
                 "graph_rnn_cell": "GRU",
 
@@ -1356,7 +1358,7 @@ def main():
 
         if args.DeepTuneGNNLLVM:
             config = {
-                'fold_mode': 'random_10fold',
+                'fold_mode': args.fold_mode,
 
                 "graph_rnn_cell": "GRU",
 
