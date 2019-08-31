@@ -529,6 +529,9 @@ class HeterogemeousMappingModel(object):
     def get_num_trainable_parameters(self):
         raise NotImplementedError
 
+    def construct(self):
+        pass
+
 
 def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, dataset_amd) -> pd.DataFrame:
     """
@@ -561,6 +564,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, datase
             model.dataset = dataset_nvidia
         elif platform == "amd":
             model.dataset = dataset_amd
+        model.construct()
+
         df = model.dataset
 
         sequences = None  # defer sequence encoding until needed (it's expensive)
@@ -756,6 +761,9 @@ class DeepTune(HeterogemeousMappingModel):
     __basename__ = "deeptune"
 
     def init(self, seed: int):
+        np.random.seed(seed)
+
+    def construct(self):
         from keras.layers import Input, Embedding, LSTM, Dense
         from keras.layers.merge import Concatenate
         from keras.layers.normalization import BatchNormalization
@@ -763,8 +771,6 @@ class DeepTune(HeterogemeousMappingModel):
 
         srcs = '\n'.join(self.dataset['src'].values)
         self.atomizer = GreedyAtomizer.from_text(srcs)
-
-        np.random.seed(seed)
 
         # Language model. Takes as inputs source code sequences.
         code_in = Input(shape=(1024,), dtype="int32", name="code_in")
@@ -800,12 +806,12 @@ class DeepTune(HeterogemeousMappingModel):
         self.model = load_model(inpath)
 
     def train(self, **train):
-        self.model.fit([train["aux_in"], train["sequences"]], [train["y_1hot"], train["y_1hot"]],
+        self.model.fit([train["aux_in_train"], train["sequences"]], [train["y_1hot"], train["y_1hot"]],
                        epochs=50, batch_size=64, verbose=train["verbose"], shuffle=True)
 
     def predict(self, **test):
         p = np.array(self.model.predict(
-            [test["aux_in"], test["sequences"]], batch_size=64, verbose=test["verbose"]))
+            [test["aux_in_test"], test["sequences"]], batch_size=64, verbose=test["verbose"]))
         indices = [np.argmax(x) for x in p[0]]
         return indices
 
@@ -1322,8 +1328,8 @@ def main():
             print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
             model = DeepTune()
             model.init(seed)
-            model.model.summary()
             report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
+            model.model.summary()
 
             print_and_save_report(args, config, model, report)
 

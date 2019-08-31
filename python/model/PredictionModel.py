@@ -160,7 +160,7 @@ class PredictionModel(object):
             self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
 
         if not os.path.exists(self.out_dir):
-            os.makedirs(self.out_dir)
+            os.makedirs(self.out_dir, exist_ok=True)
 
         if 'run_id' in self.config:
             self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
@@ -490,6 +490,15 @@ class PredictionModel(object):
                 summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
                 summary.value.add(tag='test_loss', simple_value=test_loss)
                 print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, test_accuracy))
+
+                if training_loss < best_epoch_metric:
+                    best_epoch_metric = training_loss
+
+                    best_epoch_count += 1
+                    if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
+                        self.state.backup_best_weights()
+
+                        best_epoch_count = 0
 
             else:
                 # Logging
