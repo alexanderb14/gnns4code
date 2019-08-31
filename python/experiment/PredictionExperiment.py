@@ -936,7 +936,7 @@ def build_run_id(report_write_dir):
     return num_files
 
 
-def print_and_save_report(report_write_dir, num_files, config, model, report):
+def print_and_save_report(report_write_dir, run_id, config, model, report):
     # Print report
     report_summary = parse_report_to_summary(report)
     print(report_summary)
@@ -945,22 +945,22 @@ def print_and_save_report(report_write_dir, num_files, config, model, report):
 
     # Write to files
     # Config
-    filename = model.__basename__ + '_' + str(num_files) + '_config.txt'
+    filename = model.__basename__ + '_' + str(run_id) + '_config.txt'
     with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(json.dumps(config))
 
     # Summary
-    filename = model.__basename__ + '_' + str(num_files) + '_summary.txt'
+    filename = model.__basename__ + '_' + str(run_id) + '_summary.txt'
     with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(report_summary)
 
     # Summary as JSON
-    filename = model.__basename__ + '_' + str(num_files) + '_summary.json'
+    filename = model.__basename__ + '_' + str(run_id) + '_summary.json'
     with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(json.dumps(report_json))
 
     # Raw
-    filename = model.__basename__ + '_' + str(num_files) + '_raw.txt'
+    filename = model.__basename__ + '_' + str(run_id) + '_raw.txt'
     with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(report.to_csv())
 
@@ -1292,7 +1292,7 @@ def main():
         dataset_amd = pd.read_csv(args.dataset_amd)
 
         # Build run id
-        run_id = build_run_id()
+        run_id = build_run_id(args.report_write_dir)
 
         if args.RandomMapping:
             config = {
@@ -1325,7 +1325,7 @@ def main():
 
         if args.DeepTuneGNNClang:
             config = {
-                "run_id": model.__basename__ + '_' + str(run_id),
+                "run_id": 'deepgnn-ast' + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
 
                 "graph_rnn_cell": "GRU",
@@ -1340,7 +1340,7 @@ def main():
                 "prediction_cell": {
                     "mlp_f_m_dims": [64, 64],
                     "mlp_g_m_dims": [64, 64],
-                    "mlp_reduce_dims": [64, 64, 32],
+                    "mlp_reduce_dims": [32],
                     "output_dim": 2,
                 },
 
@@ -1371,7 +1371,7 @@ def main():
 
         if args.DeepTuneGNNLLVM:
             config = {
-                "run_id": model.__basename__ + '_' + str(run_id),
+                "run_id": 'deepgnn-llvm' + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
 
                 "graph_rnn_cell": "GRU",
@@ -1386,7 +1386,7 @@ def main():
                 "prediction_cell": {
                     "mlp_f_m_dims": [64, 64],
                     "mlp_g_m_dims": [64, 64],
-                    "mlp_reduce_dims": [64, 64, 32],
+                    "mlp_reduce_dims": [32],
                     "output_dim": 2,
                 },
 
