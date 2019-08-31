@@ -384,7 +384,8 @@ class PredictionModel(object):
         for graph in graphs_train:
             graph_sizes.append(len(graph[utils.T.NODES]))
 
-        best_epoch_metric = sys.maxsize
+        best_epoch_loss = sys.maxsize
+        best_epoch_accuracy = 0
         best_epoch_count = 0
 
         if graphs_valid:
@@ -470,8 +471,8 @@ class PredictionModel(object):
                 print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, valid_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, valid_accuracy, test_accuracy))
 
 
-                if valid_accuracy < best_epoch_metric:
-                    best_epoch_metric = valid_accuracy
+                if valid_accuracy > best_epoch_accuracy:
+                    best_epoch_accuracy = valid_accuracy
 
                     best_epoch_count += 1
                     if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
@@ -491,8 +492,8 @@ class PredictionModel(object):
                 summary.value.add(tag='test_loss', simple_value=test_loss)
                 print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, test_accuracy))
 
-                if training_loss < best_epoch_metric:
-                    best_epoch_metric = training_loss
+                if training_loss < best_epoch_loss:
+                    best_epoch_loss = training_loss
 
                     best_epoch_count += 1
                     if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
@@ -504,8 +505,8 @@ class PredictionModel(object):
                 # Logging
                 print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss))
 
-                if training_loss < best_epoch_metric:
-                    best_epoch_metric = training_loss
+                if training_loss < best_epoch_loss:
+                    best_epoch_loss = training_loss
 
                     best_epoch_count += 1
                     if 'save_best_model_interval' in self.config and best_epoch_count >= self.config['save_best_model_interval']:
