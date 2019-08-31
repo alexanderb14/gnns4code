@@ -1292,7 +1292,7 @@ def main():
         dataset_amd = pd.read_csv(args.dataset_amd)
 
         # Build run id
-        run_id = build_run_id(args.report_write_dir)
+        run_id = str(os.getpid())
 
         if args.RandomMapping:
             config = {
