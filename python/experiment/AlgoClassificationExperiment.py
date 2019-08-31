@@ -456,7 +456,7 @@ def main():
             "prediction_cell": {
                 "mlp_f_m_dims": [],
                 "mlp_g_m_dims": [],
-                "mlp_reduce_dims": [105],
+                "mlp_reduce_after_aux_in_dims": [105],
                 "output_dim": 105,
             },
 
