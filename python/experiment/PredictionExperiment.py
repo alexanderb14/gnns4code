@@ -929,7 +929,14 @@ def prepare_preprocessing_artifact_dir(base_dir):
     utils.delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
 
 
-def print_and_save_report(args, config, model, report):
+def build_run_id(report_write_dir):
+    num_files = int(len(
+        [f for f in os.listdir(report_write_dir) if os.path.isfile(os.path.join(report_write_dir, f))]))
+
+    return num_files
+
+
+def print_and_save_report(report_write_dir, num_files, config, model, report):
     # Print report
     report_summary = parse_report_to_summary(report)
     print(report_summary)
@@ -937,27 +944,24 @@ def print_and_save_report(args, config, model, report):
     report_json = report_to_json(report)
 
     # Write to files
-    num_files = int(len(
-        [f for f in os.listdir(args.report_write_dir) if os.path.isfile(os.path.join(args.report_write_dir, f))]))
-
     # Config
     filename = model.__basename__ + '_' + str(num_files) + '_config.txt'
-    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+    with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(json.dumps(config))
 
     # Summary
     filename = model.__basename__ + '_' + str(num_files) + '_summary.txt'
-    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+    with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(report_summary)
 
     # Summary as JSON
     filename = model.__basename__ + '_' + str(num_files) + '_summary.json'
-    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+    with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(json.dumps(report_json))
 
     # Raw
     filename = model.__basename__ + '_' + str(num_files) + '_raw.txt'
-    with open(os.path.join(args.report_write_dir, filename), 'w') as f:
+    with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(report.to_csv())
 
 
@@ -1283,58 +1287,45 @@ def main():
 
         args = parser_exp.parse_args(sys.argv[2:])
 
-        #
+        # Load datasets
         dataset_nvidia = pd.read_csv(args.dataset_nvidia)
         dataset_amd = pd.read_csv(args.dataset_amd)
+
+        # Build run id
+        run_id = build_run_id()
 
         if args.RandomMapping:
             config = {
                 'fold_mode': args.fold_mode
             }
 
-            print("Evaluating random mapping ...", file=sys.stderr)
             model = RandomMapping()
-            report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
-
-            print_and_save_report(args, config, model, report)
 
         if args.StaticMapping:
             config = {
                 'fold_mode': args.fold_mode
             }
 
-            print("Evaluating static mapping ...", file=sys.stderr)
             model = StaticMapping()
-            report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
-
-            print_and_save_report(args, config, model, report)
 
         if args.Grewe:
             config = {
                 'fold_mode': args.fold_mode
             }
 
-            print("Evaluating Grewe et al. ...", file=sys.stderr)
             model = Grewe()
-            report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
-
-            print_and_save_report(args, config, model, report)
 
         if args.DeepTuneLSTM:
             config = {
                 'fold_mode': args.fold_mode
             }
 
-            print("Evaluating DeepTuneLSTM ...", file=sys.stderr)
             model = DeepTune()
             model.init(seed)
-            report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
-            model.model.summary()
-
-            print_and_save_report(args, config, model, report)
 
         if args.DeepTuneGNNClang:
             config = {
+                "run_id": model.__basename__ + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
 
                 "graph_rnn_cell": "GRU",
@@ -1376,14 +1367,11 @@ def main():
                 "with_aux_in": 1
             }
 
-            print("Evaluating DeepTuneGNNClang ...", file=sys.stderr)
             model = DeepGNNAST(config)
-            report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
-
-            print_and_save_report(args, config, model, report)
 
         if args.DeepTuneGNNLLVM:
             config = {
+                "run_id": model.__basename__ + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
 
                 "graph_rnn_cell": "GRU",
@@ -1425,11 +1413,12 @@ def main():
                 "with_aux_in": 1
             }
 
-            print("Evaluating DeepTuneGNNLLVM ...", file=sys.stderr)
             model = DeepGNNLLVM(config)
-            report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
 
-            print_and_save_report(args, config, model, report)
+        print("Evaluating %s ..." % model.__name__, file=sys.stderr)
+
+        report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
+        print_and_save_report(args.report_write_dir, run_id, config, model, report)
 
     # Evaluate command
     if command_arg.command == 'evaluate':
