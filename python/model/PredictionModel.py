@@ -164,10 +164,10 @@ class PredictionModel(object):
 
         if 'run_id' in self.config:
             self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
+            self.out_dir = self.run_id
         else:
             self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-
-        self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
+            self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
         if os.path.exists(self.out_dir):
             shutil.rmtree(self.out_dir)
 

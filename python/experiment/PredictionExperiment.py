@@ -533,7 +533,7 @@ class HeterogemeousMappingModel(object):
         pass
 
 
-def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, dataset_amd) -> pd.DataFrame:
+def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd) -> pd.DataFrame:
     """
     Evaluate a model.
 
@@ -553,8 +553,11 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, dataset_nvidia, datase
     from sklearn.model_selection import StratifiedKFold, GroupKFold
     from progressbar import ProgressBar
 
+    if len(datasets) == 0:
+        datasets = ["nvidia", "amd"]
+
     data = []
-    for i, platform in enumerate(["nvidia", "amd"]):
+    for i, platform in enumerate(datasets):
         progressbar = [0, ProgressBar(max_value=10)]
 
         platform_name = platform2str(platform)
@@ -1281,9 +1284,11 @@ def main():
 
         parser_exp.add_argument('--dataset_nvidia')
         parser_exp.add_argument('--dataset_amd')
-        parser_exp.add_argument('--report_write_dir')
 
         parser_exp.add_argument('--fold_mode')
+        parser_exp.add_argument('--datasets', '--names-list', nargs='+', default=[])
+
+        parser_exp.add_argument('--report_write_dir')
 
         args = parser_exp.parse_args(sys.argv[2:])
 
@@ -1443,7 +1448,7 @@ def main():
 
         print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 
-        report = evaluate(model, config['fold_mode'], dataset_nvidia, dataset_amd)
+        report = evaluate(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd)
         print_and_save_report(args.report_write_dir, run_id, config, model, report)
 
     # Evaluate command
