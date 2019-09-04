@@ -625,7 +625,6 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
                 llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]],
                 sequences=sequences[test_index] if sequences is not None else None,
                 y_test=y[test_index],
-                y_1hot=y_1hot[test_index],
                 verbose=False)
 
             # benchmarks
@@ -690,7 +689,7 @@ class RandomMapping(HeterogemeousMappingModel):
         pass
 
     def predict(self, **test):
-        return np.random.randint(0, 2, len(test["y"]))
+        return np.random.randint(0, 2, len(test["y_test"]))
 
     def get_num_trainable_parameters(self):
         return 0
@@ -720,9 +719,9 @@ class StaticMapping(HeterogemeousMappingModel):
 
     def predict(self, **test):
         if self.model:
-            return np.ones(len(test["y"])).astype(np.int32)
+            return np.ones(len(test["y_test"])).astype(np.int32)
         else:
-            return np.zeros(len(test["y"])).astype(dtype=np.int32)
+            return np.zeros(len(test["y_test"])).astype(dtype=np.int32)
 
     def get_num_trainable_parameters(self):
         return None
@@ -750,7 +749,7 @@ class Grewe(HeterogemeousMappingModel):
             self.model = pickle.load(infile)
 
     def train(self, **train):
-        self.model.fit(train["features"], train["y"])
+        self.model.fit(train["features"], train["y_train"])
 
     def predict(self, **test):
         return self.model.predict(test["features"])
@@ -808,13 +807,13 @@ class DeepTune(HeterogemeousMappingModel):
         from keras.models import load_model
         self.model = load_model(inpath)
 
-    def train(self, **train):
-        self.model.fit([train["aux_in_train"], train["sequences"]], [train["y_1hot"], train["y_1hot"]],
-                       epochs=50, batch_size=64, verbose=train["verbose"], shuffle=True)
+    def train(self, **data):
+        self.model.fit([data["aux_in_train"], data["sequences"]], [data["y_1hot"], data["y_1hot"]],
+                       epochs=50, batch_size=64, verbose=data["verbose"], shuffle=True)
 
-    def predict(self, **test):
+    def predict(self, **data):
         p = np.array(self.model.predict(
-            [test["aux_in_test"], test["sequences"]], batch_size=64, verbose=test["verbose"]))
+            [data["aux_in_test"], data["sequences"]], batch_size=64, verbose=data["verbose"]))
         indices = [np.argmax(x) for x in p[0]]
         return indices
 
@@ -1009,8 +1008,8 @@ def main():
         # Extract oracle from the cgo17 dataframe
         # 
         df_benchmarks = pd.read_csv(args.cgo17_benchmarks_csv)
-        df_benchmarks = df_benchmarks.drop(columns=['src'])
-#        df_benchmarks = df_benchmarks.drop(columns=['seq'])
+#        df_benchmarks = df_benchmarks.drop(columns=['src'])
+        df_benchmarks = df_benchmarks.drop(columns=['seq'])
 
         # Clang
         # ############################################
