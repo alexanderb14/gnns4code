@@ -567,7 +567,6 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             model.dataset = dataset_nvidia
         elif platform == "amd":
             model.dataset = dataset_amd
-        model.construct()
 
         df = model.dataset
 
@@ -598,11 +597,12 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             split = kf.split(features, y, groups)
 
         for j, (train_index, test_index) in enumerate(split):
+            # train and cache a model
+            model.init(seed=seed)
+
             if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
                 sequences = encode_srcs(model.atomizer, df["src"].values)
 
-            # train and cache a model
-            model.init(seed=seed)
             model.train(df=df,
                         features=features[train_index],
                         aux_in_train=aux_in[train_index],
@@ -765,7 +765,6 @@ class DeepTune(HeterogemeousMappingModel):
     def init(self, seed: int):
         np.random.seed(seed)
 
-    def construct(self):
         from keras.layers import Input, Embedding, LSTM, Dense
         from keras.layers.merge import Concatenate
         from keras.layers.normalization import BatchNormalization
@@ -1325,7 +1324,6 @@ def main():
             }
 
             model = DeepTune()
-            model.init(seed)
 
         if args.DeepTuneGNNClang:
             config = {
