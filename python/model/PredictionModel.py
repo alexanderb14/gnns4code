@@ -362,7 +362,7 @@ class PredictionModel(object):
         """
         Train model with one batch and retrieve result
         """
-        fetch_list = [self.ops['loss'], self.ops['train_step']]
+        fetch_list = [self.ops['loss'], self.cells[0].ops['output'], self.ops['train_step']]
         if self.with_gradient_monitoring:
             offset = len(fetch_list)
             fetch_list.extend([self.ops['gradients'], self.ops['clipped_gradients']])
@@ -418,6 +418,7 @@ class PredictionModel(object):
 
             # Run batches
             training_losses = []
+            training_good_predicted_all = []
             epoch_instances_per_secs = []
 
             for batch in batches:
@@ -426,6 +427,12 @@ class PredictionModel(object):
 
                 batch_graphs = list(batch_graphs)
                 batch_graph_sizes = list(batch_graph_sizes)
+
+                # Extract train labels
+                y_train = []
+                for graph in batch_graphs:
+                    y_train.append(graph[utils.L.LABEL_0])
+                y_train = np.array(y_train)
 
                 # Build feed dict
                 # 1. Graph info
@@ -441,6 +448,13 @@ class PredictionModel(object):
 
                 training_losses.append(result[0])
 
+                # Evaluate predictions on train set
+                predictions = result[1]
+                training_good_predicted = list(np.argmax(predictions, axis=1) == y_train)
+                training_good_predicted_all += training_good_predicted
+
+            training_accuracy = np.sum(training_good_predicted_all) / len(training_good_predicted_all)
+
             training_loss = np.sum(training_losses)
             epoch_instances_per_sec = np.mean(epoch_instances_per_secs)
             epoch_end_time = time.time()
@@ -448,6 +462,7 @@ class PredictionModel(object):
 
             # Logging
             summary = tf.Summary()
+            summary.value.add(tag='train_accuracy', simple_value=training_accuracy)
             summary.value.add(tag='train_loss', simple_value=training_loss)
 
             # Testing
@@ -490,7 +505,7 @@ class PredictionModel(object):
                 # Logging
                 summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
                 summary.value.add(tag='test_loss', simple_value=test_loss)
-                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, test_accuracy))
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, training_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, training_accuracy, test_accuracy))
 
                 if training_loss < best_epoch_loss:
                     best_epoch_loss = training_loss
