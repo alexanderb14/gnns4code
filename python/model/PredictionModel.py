@@ -483,7 +483,7 @@ class PredictionModel(object):
                 # Logging
                 summary.value.add(tag='valid_accuracy', simple_value=valid_accuracy)
                 summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
-                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, valid_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, valid_accuracy, test_accuracy))
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, train_accuracy: %.4f, valid_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, training_accuracy, valid_accuracy, test_accuracy))
 
 
                 if valid_accuracy > best_epoch_accuracy:
@@ -505,7 +505,7 @@ class PredictionModel(object):
                 # Logging
                 summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
                 summary.value.add(tag='test_loss', simple_value=test_loss)
-                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, training_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, training_accuracy, test_accuracy))
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, train_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, training_accuracy, test_accuracy))
 
                 if training_loss < best_epoch_loss:
                     best_epoch_loss = training_loss
