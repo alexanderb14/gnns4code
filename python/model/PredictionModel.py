@@ -143,8 +143,10 @@ class PredictionModel(object):
             self.placeholders = {}
 
         self.with_gradient_monitoring = True if 'gradient_monitoring' in self.config and self.config['gradient_monitoring'] == 1 else False
-
         self.with_aux_in = True if 'with_aux_in' in self.config and self.config['with_aux_in'] == 1 else False
+
+        # Dump config to stdout
+        utils.pretty_print_dict(self.config)
 
         # Create and initialize model
         with self.state.graph.as_default():
