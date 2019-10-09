@@ -1370,7 +1370,7 @@ def main():
                 "L2_loss_factor": 0.1,
 
                 "batch_size": 64,
-                "num_epochs": 3000,
+                "num_epochs": 1500,
                 "out_dir": "/tmp",
 
                 "tie_fwd_bkwd": 0,
