@@ -51,7 +51,7 @@ def process_sources(files, preprocessing_artifact_dir, substract_str=None, optim
             out_filename = filename
 
         # C -> LLVM IR
-        cmd_start = [app_utils.MINER_PASS_CLANG,
+        cmd_start = [app_utils.CLANG_EXECUTABLE,
                      '-I' + app_utils.LIBCLC_DIR,
                      '-include', app_utils.OPENCL_SHIM_FILE]
         cmd_middle = ['-Oz'] if optimize_for_size else ['-O0']
@@ -69,7 +69,7 @@ def process_sources(files, preprocessing_artifact_dir, substract_str=None, optim
         result_compile = process.returncode
 
         # LLVM IR -> Graph
-        cmd_miner = [app_utils.OPT_MINER_EXECUTABLE,
+        cmd_miner = [app_utils.OPT_EXECUTABLE,
                      '-load', app_utils.MINER_PASS_SHARED_LIBRARY,
                      '-miner', out_filename + '.ll', '-f', '-o', '/dev/null']
         print(' '.join(cmd_miner))

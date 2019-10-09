@@ -8,11 +8,11 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 import utils
 
 
-def get_env_or_default(vairable_name, default_name):
-    if vairable_name in os.environ:
-        return os.environ[vairable_name]
+def get_env(variable_name):
+    if variable_name in os.environ:
+        return os.environ[variable_name]
 
-    return default_name
+    raise Exception('Environment variable % not set' % variable_name)
 
 
 def print_process_stdout_continuously(process, prefix):
@@ -58,7 +58,7 @@ def build_with_cmake(project_path, target, additional_cmake_arguments: list = []
 
 
 def compile_to_bytecode(c_code:str, optimize_for_size=False):
-    cmd_start = [MINER_PASS_CLANG,
+    cmd_start = [CLANG_EXECUTABLE,
                  '-I' + LIBCLC_DIR,
                  '-include', OPENCL_SHIM_FILE]
     cmd_optimize = ['-Oz'] if optimize_for_size else ['-O0']
@@ -81,36 +81,19 @@ def format_c_code(c_code:str):
     return stdout.decode("utf-8"), process.returncode
 
 
-CLANG_EXECUTABLE = \
-    get_env_or_default(
-        'CLANG_EXECUTABLE',
-        '/home/alex/clgen/lib/python3.6/site-packages/CLgen-0.4.1-py3.6.egg/clgen/data/bin/clang')
-CLANG_FORMAT_EXECUTABLE = \
-    get_env_or_default(
-        'CLANG_FORMAT_EXECUTABLE',
-        'clang-format')
-OPT_EXECUTABLE = \
-    get_env_or_default(
-        'OPT_EXECUTABLE',
-        '/usr/local/bin/opt')
+# Executables / Libraries
+CLANG_EXECUTABLE = os.path.join(get_env('LLVM_BUILD'), 'bin/clang')
+CLANG_FORMAT_EXECUTABLE = os.path.join(get_env('LLVM_BUILD'), 'bin/clang-format')
+OPT_EXECUTABLE = os.path.join(get_env('LLVM_BUILD'), 'bin/opt')
 
-MINER_PASS_CLANG = \
-    get_env_or_default(
-        'MINER_PASS_CLANG',
-        'clang')
 MINER_PASS_SHARED_LIBRARY = \
-    build_with_cmake(os.path.join(SCRIPT_DIR, '..', '..', 'c', 'miner_llvm_pass'),
+    build_with_cmake(os.path.join(SCRIPT_DIR, '../../c/miner_llvm_pass'),
                      'miner_pass',
-                     ['-DCMAKE_PREFIX_PATH=/devel/git/llvm_build/llvm/cmake-build-debug/lib/cmake/llvm/'], is_library=True)
-    # get_env_or_default(
-    #     'MINER_PASS_SHARED_LIBRARY',
-    #     '/devel/git/ML-CodeGraph/c/miner_llvm_pass/build/lib/libminer_pass.so')
-OPT_MINER_EXECUTABLE = \
-    get_env_or_default(
-        'OPT_MINER_EXECUTABLE',
-        '/devel/git/llvm_build/llvm/cmake-build-debug/bin/opt')
+                     ['-DCMAKE_PREFIX_PATH=/devel/git/llvm-project/build/lib/cmake/llvm'], is_library=True)
 CLANG_MINER_EXECUTABLE = \
-    build_with_cmake(os.path.join(SCRIPT_DIR, '..', '..', 'c', 'clang_miner'), 'clang_miner')
+    build_with_cmake(os.path.join(SCRIPT_DIR, '../../c/clang_miner'),
+                     'clang_miner',
+                     ['-DCMAKE_PREFIX_PATH=/devel/git/llvm-project/build/lib/cmake/clang'])
 
 LIBCLC_DIR = \
     os.path.join(SCRIPT_DIR, '..', '..', 'c', '3rd_party', 'libclc')
