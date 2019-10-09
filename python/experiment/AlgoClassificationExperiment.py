@@ -466,6 +466,7 @@ def main():
 
             "learning_rate": 0.005,
             "clamp_gradient_norm": 1.0,
+            "L2_loss_factor": 0,
 
             "batch_size": 64,
             "num_epochs": 2500,

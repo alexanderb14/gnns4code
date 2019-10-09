@@ -320,15 +320,19 @@ class PredictionModel(object):
         self.ggnn_layers.append(ggnn_layer)
         self.cells.append(prediction_cell)
 
-        # Accumulate losses
         if enable_training:
+            # Cell losses
             losses = []
-
             for cell in self.cells:
                 losses.append(cell.ops['loss'])
-
             self.ops['losses'] = losses
-            self.ops['loss'] = tf.reduce_sum(losses)
+
+            # Regularization loss
+            vars = tf.trainable_variables()
+            lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in vars
+                               if 'bias' not in v.name]) * float(self.config['L2_loss_factor'])
+
+            self.ops['loss'] = tf.reduce_sum(losses) + lossL2
 
     def _make_train_step(self) -> None:
         """

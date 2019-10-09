@@ -1349,7 +1349,7 @@ def main():
                     "mlp_reduce_dims": [64, 64],
                     "mlp_reduce_activation": "relu",
 
-                    "mlp_reduce_after_aux_in_1_dims": [],
+                    "mlp_reduce_after_aux_in_1_dims": [32, 32, 32],
                     "mlp_reduce_after_aux_in_1_activation": "relu",
                     "mlp_reduce_after_aux_in_1_out_dim": 32,
 
@@ -1367,6 +1367,7 @@ def main():
 
                 "learning_rate": 0.0005,
                 "clamp_gradient_norm": 1.0,
+                "L2_loss_factor": 0.1,
 
                 "batch_size": 64,
                 "num_epochs": 3000,
@@ -1425,6 +1426,7 @@ def main():
 
                 "learning_rate": 0.0005,
                 "clamp_gradient_norm": 1.0,
+                "L2_loss_factor": 0,
 
                 "batch_size": 64,
                 "num_epochs": 400,
