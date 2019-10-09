@@ -9,7 +9,7 @@ TWO_GRAPHS = [(0, 0, 1), (1, 0, 2), (2, 1, 1), (3, 0, 4), (4, 1, 5), (5, 0, 4)]
 
 
 def get_test_data(config: dict, num_graphs: int) -> (np.ndarray, dict, list, list, int, int):
-    h_dim = config['hidden_size']
+    h_dim = config['gnn_h_size']
     v_dim = len(ONE_GRAPH)
 
     if num_graphs == 1:

@@ -1334,8 +1334,8 @@ def main():
 
                 "num_timesteps": 4,
                 "hidden_size_orig": 92,
-                "hidden_size": 32,
-                "deepgmg_mlp_size": 2,
+                "gnn_h_size": 32,
+                "gnn_m_size": 2,
 
                 "num_edge_types": 2,
 
@@ -1394,8 +1394,8 @@ def main():
 
                 "num_timesteps": 4,
                 "hidden_size_orig": 140,
-                "hidden_size": 32,
-                "deepgmg_mlp_size": 2,
+                "gnn_h_size": 32,
+                "gnn_m_size": 2,
 
                 "num_edge_types": 4,
 

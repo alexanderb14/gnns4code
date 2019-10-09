@@ -12,7 +12,7 @@ class EmbeddingLayerState(object):
         self.config = config
 
         hidden_size_orig = self.config['hidden_size_orig']
-        h_size = self.config['hidden_size']
+        h_size = self.config['gnn_h_size']
         num_edge_types = self.config['num_edge_types']
 
         self.weights = {}

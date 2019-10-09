@@ -12,7 +12,7 @@ class GGNNModelLayerState(object):
     def __init__(self, config):
         self.config = config
 
-        h_dim = self.config['hidden_size']
+        h_dim = self.config['gnn_h_size']
         num_edge_types = self.config['num_edge_types']
 
         self.weights = {}
@@ -60,7 +60,7 @@ class GGNNModelLayer(PropagationModelLayer):
         num_edge_types = self.config['num_edge_types']
 
         # Placeholders
-        h_dim = self.config['hidden_size']
+        h_dim = self.config['gnn_h_size']
         self.placeholders['adjacency_lists'] = [tf.placeholder(tf.int32, [None, 2], name='adjacency_e%s' % e)
                                                 for e in range(num_edge_types)]
 

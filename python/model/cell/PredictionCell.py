@@ -10,9 +10,9 @@ class PredictionCellState(object):
     def __init__(self, config):
         self.config = config
 
-        h_size = self.config['hidden_size']
+        h_size = self.config['gnn_h_size']
         h_size_orig = self.config['hidden_size_orig']
-        m_size = self.config['deepgmg_mlp_size']
+        m_size = self.config['gnn_m_size']
 
         self.weights = {}
 
@@ -82,7 +82,7 @@ class PredictionCell(object):
         # Placeholders
         # #########################################
         # # Initial embeddings
-        # self.placeholders['initial_embeddings'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='initial_embeddings')
+        # self.placeholders['initial_embeddings'] = tf.placeholder(tf.float32, [None, self.config['gnn_h_size']], name='initial_embeddings')
         # initial_embeddings = self.placeholders['initial_embeddings']
 
         # Is training (for batch norm)

@@ -302,7 +302,7 @@ class DeepGMGGenerator(DeepGMGModel):
         """
         Create tf model
         """
-        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='embeddings_in')
+        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['gnn_h_size']], name='embeddings_in')
 
         # Create layer and propagate
         ggnn_layer = GGNNModelLayer(self.config, self.state.ggnn_layer_state)
@@ -505,7 +505,7 @@ class DeepGMGGenerator(DeepGMGModel):
         self.current_graph = {utils.T.NODES: [], utils.T.EDGES: []}
         self.last_added_node_id = 0
         self.last_added_node_type = 0
-        self.embeddings = np.ones((self.num_nodes_max, self.config['hidden_size']))
+        self.embeddings = np.ones((self.num_nodes_max, self.config['gnn_h_size']))
 
         # GO!
         # Sample add node
@@ -555,7 +555,7 @@ class DeepGMGGenerator(DeepGMGModel):
         self.current_graph = {utils.T.NODES: [], utils.T.EDGES: []}
         self.last_added_node_id = 0
         self.last_added_node_type = 0
-        self.embeddings = np.ones((self.num_nodes_max, self.config['hidden_size']))
+        self.embeddings = np.ones((self.num_nodes_max, self.config['gnn_h_size']))
 
         p_codegraph = []
 
@@ -662,7 +662,7 @@ class DeepGMGTrainer(DeepGMGModel):
         """
         Create tf model
         """
-        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['hidden_size']], name='embeddings_in')
+        self.placeholders['embeddings_in'] = tf.placeholder(tf.float32, [None, self.config['gnn_h_size']], name='embeddings_in')
 
         # Create model: Unroll network and wire embeddings
         embeddings = self.placeholders['embeddings_in']
@@ -791,7 +791,7 @@ class DeepGMGTrainer(DeepGMGModel):
 
                 # 2. Initial node embeddings
                 num_nodes_all_graphs = sum(batch_graph_sizes)
-                feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['hidden_size']))
+                feed_dict[self.placeholders['embeddings_in']] = np.ones((num_nodes_all_graphs, self.config['gnn_h_size']))
 
                 # Run batch
                 result = self.__run_batch(feed_dict, epoch)

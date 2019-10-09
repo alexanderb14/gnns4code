@@ -15,8 +15,8 @@ CONFIG_DEFAULTGRAPH = {
     'graph_rnn_cell': 'GRU',  # GRU, CudnnCompatibleGRUCell, or RNN
 
     'num_timesteps': 2,
-    'hidden_size': 4,
-    'deepgmg_mlp_size': 2,
+    'gnn_h_size': 4,
+    'gnn_m_size': 2,
 
     'num_node_types': 2,
     'num_edge_types': 2,
@@ -191,7 +191,7 @@ def test_train_save_load_and_gen_defaultgraph():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -272,7 +272,7 @@ def test_train_and_gen_defaultgraph_with_edge_bias():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -304,7 +304,7 @@ def test_train_and_gen_defaultgraph_small_1():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -333,7 +333,7 @@ def test_train_and_gen_defaultgraph_small_2():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -363,7 +363,7 @@ def test_train_and_gen_defaultgraph_medium_1():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 16,
+        'gnn_h_size': 16,
 
         "learning_rate": 0.001,
         "num_training_unroll": 55,
@@ -395,7 +395,7 @@ def test_train_and_gen_defaultgraph_medium_2():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 16,
+        'gnn_h_size': 16,
 
         "learning_rate": 0.001,
         "num_training_unroll": 55,
@@ -427,7 +427,7 @@ def test_train_and_gen_defaultgraph_medium_3():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 16,
+        'gnn_h_size': 16,
 
         "learning_rate": 0.001,
         "num_training_unroll": 43,
@@ -458,7 +458,7 @@ def test_train_and_gen_defaultgraph_medium_4():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 45,
@@ -490,7 +490,7 @@ def test_train_and_gen_many_defaultgraphs_medium():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 46,
@@ -522,7 +522,7 @@ def test_train_and_gen_many_same_defaultgraphs_small():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -550,7 +550,7 @@ def test_train_and_gen_two_different_defaultgraphs_small():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -580,7 +580,7 @@ def test_train_and_gen_clang_codegraph_small():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 32,
+        'gnn_h_size': 32,
 
         "learning_rate": 0.001,
         "num_training_unroll": 33,
@@ -611,7 +611,7 @@ def test_train_and_gen_clang_codegraph_medium():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 64,
+        'gnn_h_size': 64,
 
         "learning_rate": 0.001,
         "num_training_unroll": 81,
@@ -645,7 +645,7 @@ def test_train_and_gen_clang_codegraph_large():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 4,
-        'hidden_size': 64,
+        'gnn_h_size': 64,
 
         "learning_rate": 0.001,
         "num_training_unroll": 137,

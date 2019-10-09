@@ -10,8 +10,8 @@ class DeepGMGCellState(object):
     def __init__(self, config):
         self.config = config
 
-        h_size = self.config['hidden_size']
-        m_size = self.config['deepgmg_mlp_size']
+        h_size = self.config['gnn_h_size']
+        m_size = self.config['gnn_m_size']
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']
@@ -79,8 +79,8 @@ class DeepGMGCell(object):
         :param embeddings: Tensor of shape [b*v, h]
         :return: Predictions
         """
-        h_size = self.config['hidden_size']
-        m_size = self.config['deepgmg_mlp_size']
+        h_size = self.config['gnn_h_size']
+        m_size = self.config['gnn_m_size']
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']
