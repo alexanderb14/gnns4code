@@ -11,9 +11,7 @@ import utils
 def get_env(variable_name):
     if variable_name in os.environ:
         return os.environ[variable_name]
-
-    raise Exception('Environment variable % not set' % variable_name)
-
+    return ""
 
 def print_process_stdout_continuously(process, prefix):
     while True:

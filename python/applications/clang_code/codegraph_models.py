@@ -784,10 +784,10 @@ class EdgeExtractionVisitor(VisitorBase):
     def visit(self, obj: object) -> None:
         if isinstance(obj, Edge):
             if obj.type == 'LIVE':
-                src = obj.dest.node_id,
+                src = obj.dest.node_id
                 dest = obj.src.node_id
             else:
-                src = obj.src.node_id,
+                src = obj.src.node_id
                 dest = obj.dest.node_id
 
             edge_info = (src,
