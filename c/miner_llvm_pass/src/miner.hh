@@ -5,7 +5,6 @@
 
 void mine_module(llvm::Module &module);
 
-
 struct MinerPass : public llvm::ModulePass {
   static char ID;
 

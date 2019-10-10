@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 from model.layer.PropagationModelLayer import PropagationModelLayer
@@ -8,34 +9,37 @@ class GGNNModelLayerState(object):
     """
     Holds the state / weights of a GGNN Layer.
     """
-    def __init__(self, config, master):
+    def __init__(self, config):
         self.config = config
 
-        h_dim = self.config['hidden_size']
+        h_dim = self.config['gnn_h_size']
         num_edge_types = self.config['num_edge_types']
 
         self.weights = {}
 
-        with master.graph.as_default():
-            edge_weights = tf.Variable(glorot_init([num_edge_types * h_dim, h_dim]),
-                                                       name='edge_weights')
-            self.weights['edge_weights'] = tf.reshape(edge_weights, [num_edge_types, h_dim, h_dim])
+        edge_weights = tf.Variable(glorot_init([num_edge_types * h_dim, h_dim]),
+                                                   name='edge_weights')
+        self.weights['edge_weights'] = tf.reshape(edge_weights, [num_edge_types, h_dim, h_dim])
 
-            cell_type = self.config['graph_rnn_cell'].lower()
-            activation_fun = tf.nn.tanh
-            if cell_type == 'gru':
-                # cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun,
-                #                               kernel_initializer=tf.glorot_uniform_initializer,
-                #                               bias_initializer=tf.glorot_uniform_initializer)
-                cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun)
-            elif cell_type == 'cudnncompatiblegrucell':
-                import tensorflow.contrib.cudnn_rnn as cudnn_rnn
-                cell = cudnn_rnn.CudnnCompatibleGRUCell(h_dim)
-            elif cell_type == 'rnn':
-                cell = tf.nn.rnn_cell.BasicRNNCell(h_dim, activation=activation_fun)
-            else:
-                raise Exception("Unknown RNN cell type '%s'." % cell_type)
-            self.weights['rnn_cells'] = cell
+        if self.config['use_edge_bias'] == 1:
+            self.weights['edge_biases'] = tf.Variable(np.zeros([num_edge_types, h_dim], dtype=np.float32),
+                                                            name='gnn_edge_biases')
+
+        cell_type = self.config['graph_rnn_cell'].lower()
+        activation_fun = tf.nn.tanh
+        if cell_type == 'gru':
+            # cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun,
+            #                               kernel_initializer=tf.glorot_uniform_initializer,
+            #                               bias_initializer=tf.glorot_uniform_initializer)
+            cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun)
+        elif cell_type == 'cudnncompatiblegrucell':
+            import tensorflow.contrib.cudnn_rnn as cudnn_rnn
+            cell = cudnn_rnn.CudnnCompatibleGRUCell(h_dim)
+        elif cell_type == 'rnn':
+            cell = tf.nn.rnn_cell.BasicRNNCell(h_dim, activation=activation_fun)
+        else:
+            raise Exception("Unknown RNN cell type '%s'." % cell_type)
+        self.weights['rnn_cells'] = cell
 
 class GGNNModelLayer(PropagationModelLayer):
     """
@@ -56,9 +60,13 @@ class GGNNModelLayer(PropagationModelLayer):
         num_edge_types = self.config['num_edge_types']
 
         # Placeholders
-        h_dim = self.config['hidden_size']
+        h_dim = self.config['gnn_h_size']
         self.placeholders['adjacency_lists'] = [tf.placeholder(tf.int32, [None, 2], name='adjacency_e%s' % e)
                                                 for e in range(num_edge_types)]
+
+        if self.config['use_edge_bias'] == 1:
+            self.placeholders['num_incoming_edges_per_type'] = tf.placeholder(tf.float32, [None, num_edge_types],
+                                                                              name='num_incoming_edges_per_type')
 
     def compute_embeddings(self, embeddings: tf.Tensor) -> tf.Tensor:
         """
@@ -97,6 +105,10 @@ class GGNNModelLayer(PropagationModelLayer):
             messages = tf.unsorted_segment_sum(data=messages,
                                                segment_ids=edge_targets,
                                                num_segments=num_nodes)              # [v, h]
+
+            if self.config['use_edge_bias'] == 1:
+                embeddings += tf.matmul(self.placeholders['num_incoming_edges_per_type'],
+                                        self.state.weights['edge_biases'])
 
             # pass updated vertex features into RNN cell
             embeddings = self.state.weights['rnn_cells'](messages, embeddings)[1]     # [v, h]

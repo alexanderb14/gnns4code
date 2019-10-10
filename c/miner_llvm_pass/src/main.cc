@@ -8,6 +8,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <iostream>
 #include <string>
 
 #include "miner.hh"
@@ -37,8 +38,8 @@ int main(int argc, char **argv) {
   // Construct an IR file from the filename passed on the command line.
   SMDiagnostic err;
   LLVMContext context;
-
   auto module = parseIRFile(inPath.getValue(), err, context);
+
   if (!module.get()) {
     errs() << "Error reading bitcode file: " << inPath << "\n";
     err.print(argv[0], errs());
@@ -49,7 +50,6 @@ int main(int argc, char **argv) {
   PassRegistry &reg = *PassRegistry::getPassRegistry();
   initializeCallGraphWrapperPassPass(reg);
   initializeMemorySSAWrapperPassPass(reg);
-
 
   // setup the pass manager
   legacy::PassManager pm;

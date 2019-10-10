@@ -5,17 +5,21 @@
     "hidden_size": 256,
     "deepgmg_mlp_size": 2,
 
-    "num_node_types": 126,
+    "num_node_types": 174,
     "num_edge_types": 8,
 
     "learning_rate": 0.001,
-    "num_training_unroll": 190,
+    "num_training_unroll": 395,
     "clamp_gradient_norm": 1.0,
 
-    "batch_size": 64,    
-    "num_epochs": 100,
-    "train_file": "../../data/code_clang_train.json",
+    "batch_size": 32,
+    "num_epochs": 600,
+    "train_file": "../../../../datasets/gnns4code/preprocess/dataset.json",
     "out_dir": "/tmp",
+
+    "save_best_model_interval": 20,
+    "gen_num_node_max": 100,
+    "type": "clang",
 
     "actions": [
         {

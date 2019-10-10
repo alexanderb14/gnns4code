@@ -11,11 +11,14 @@ from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
 CONFIG = {
     'num_timesteps': 4,
     'graph_rnn_cell': 'GRU',  # GRU, CudnnCompatibleGRUCell, or RNN
-    'hidden_size': 4,
+    'gnn_h_size': 4,
 
-    'deepgmg_mlp_size': 2,
+    'gnn_m_size': 2,
     'num_node_types': 2,
     'num_edge_types': 2,
+
+    'use_edge_bias': 0,
+    "use_edge_msg_avg_aggregation": 0,
 
     'actions': [
         {
@@ -133,7 +136,7 @@ def test_deepgmg_cell_prediction_1_graph_h_g():
 
     # Check if shape is [1, h_dim * m]. As there's 1 test graph and a h_G embedding
     assert result[0].shape[0] == 1
-    assert result[0].shape[1] == CONFIG['hidden_size'] * CONFIG['deepgmg_mlp_size']
+    assert result[0].shape[1] == CONFIG['gnn_h_size'] * CONFIG['gnn_m_size']
 
 
 def test_deepgmg_cell_prediction_1_graph_h_v():
@@ -141,7 +144,7 @@ def test_deepgmg_cell_prediction_1_graph_h_v():
 
     # Check if shape is [1, h_dim]. As there's 1 test graph and a node (h_v) embedding
     assert result[0].shape[0] == 1
-    assert result[0].shape[1] == CONFIG['hidden_size']
+    assert result[0].shape[1] == CONFIG['gnn_h_size']
 
 
 def test_deepgmg_cell_prediction_1_graph_add_node():
@@ -174,7 +177,7 @@ def test_deepgmg_cell_prediction_2_graphs_h_g():
 
     # Check if shape is [2, h_dim * m]. As there's 2 test graphs and a h_G embedding
     assert result[0].shape[0] == 2
-    assert result[0].shape[1] == CONFIG['hidden_size'] * CONFIG['deepgmg_mlp_size']
+    assert result[0].shape[1] == CONFIG['gnn_h_size'] * CONFIG['gnn_m_size']
 
 
 def test_deepgmg_cell_prediction_2_graphs_h_v():
@@ -182,7 +185,7 @@ def test_deepgmg_cell_prediction_2_graphs_h_v():
 
     # Check if shape is [1, h_dim]. As there's 2 test graphs and a node (h_v) embedding
     assert result[0].shape[0] == 2
-    assert result[0].shape[1] == CONFIG['hidden_size']
+    assert result[0].shape[1] == CONFIG['gnn_h_size']
 
 
 def test_deepgmg_cell_prediction_2_graphs_add_node():

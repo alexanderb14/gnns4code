@@ -7,11 +7,11 @@ class DeepGMGCellState(object):
     """
     Holds the state / weights of a DeepGMG cell.
     """
-    def __init__(self, config, master):
+    def __init__(self, config):
         self.config = config
 
-        h_size = self.config['hidden_size']
-        m_size = self.config['deepgmg_mlp_size']
+        h_size = self.config['gnn_h_size']
+        m_size = self.config['gnn_m_size']
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']
@@ -29,42 +29,40 @@ class DeepGMGCellState(object):
             with tf.variable_scope('out_layer_gated_sum_init_node_weights'):
                 self.weights['mlp_f_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m_init_node')
                 self.weights['mlp_g_m_init_node'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m_init_node')
-            init_extra_number = 1 if 'extended_init' in config and config['extended_init'] else 0
-            self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1 + init_extra_number, h_size, [], 'linear', 'f_init')
+            self.weights['f_init'] = utils.MLP(h_size * m_size + num_node_types + 1, h_size, [h_size * m_size + num_node_types + 1], 'sigmoid', 'f_init')
 
+        # if with_attention:
+        #     with tf.variable_scope('attention_model_weights'):
+        #         self.weights['mlp_attention'] = utils.MLP(h_size * 2, 1, [], 'sigmoid', 'mlp_attention')
 
-            # if with_attention:
-            #     with tf.variable_scope('attention_model_weights'):
-            #         self.weights['mlp_attention'] = utils.MLP(h_size * 2, 1, [], 'sigmoid', 'mlp_attention')
+        with tf.variable_scope('out_model_weights'):
+            with tf.variable_scope('out_layer_gated_sum_weights'):
+                self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m')
+                self.weights['mlp_g_m'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m')
 
-            with tf.variable_scope('out_model_weights'):
-                with tf.variable_scope('out_layer_gated_sum_weights'):
-                    self.weights['mlp_f_m'] = utils.MLP(h_size, h_size * m_size, [], 'linear', 'mlp_f_m')
-                    self.weights['mlp_g_m'] = utils.MLP(h_size, h_size * m_size, [], 'sigmoid', 'mlp_g_m')
+        with tf.variable_scope('gen_model_weights'):
+            for action_idx, action_meta in enumerate(action_metas):
+                name = action_meta['name']
+                function_name = 'f_' + name
+                input_dimension = self.config[action_meta['input_dimension']] \
+                    if isinstance(action_meta['input_dimension'], str) else action_meta['input_dimension']
 
-            with tf.variable_scope('gen_model_weights'):
-                for action_idx, action_meta in enumerate(action_metas):
-                    name = action_meta['name']
-                    function_name = 'f_' + name
-                    input_dimension = self.config[action_meta['input_dimension']] \
-                        if isinstance(action_meta['input_dimension'], str) else action_meta['input_dimension']
+                mlp_dim = h_size * m_size
 
-                    mlp_dim = h_size * m_size
+                if action_meta['type'] == 'add_node':
+                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_node')
 
-                    if action_meta['type'] == 'add_node':
-                        self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_node')
+                elif action_meta['type'] == 'add_edge':
+                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_edge')
 
-                    elif action_meta['type'] == 'add_edge':
-                        self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_edge')
+                elif action_meta['type'] == 'add_edge_to':
+                    self.weights[function_name] = utils.MLP(h_size * 2, input_dimension, [], 'sigmoid', 'add_edge_to')
 
-                    elif action_meta['type'] == 'add_edge_to':
-                        self.weights[function_name] = utils.MLP(h_size * 2, input_dimension, [], 'sigmoid', 'add_edge_to')
+                elif action_meta['type'] == 'add_function':
+                    self.weights[function_name] = utils.MLP(h_size * m_size, input_dimension, [], 'sigmoid', 'add_function')
 
-                    elif action_meta['type'] == 'add_function':
-                        self.weights[function_name] = utils.MLP(h_size * m_size, input_dimension, [], 'sigmoid', 'add_function')
-
-                    elif action_meta['type'] == 'add_basic_block':
-                        self.weights[function_name] = utils.MLP(h_size * m_size * 2, input_dimension, [], 'sigmoid', 'add_basic_block')
+                elif action_meta['type'] == 'add_basic_block':
+                    self.weights[function_name] = utils.MLP(h_size * m_size * 2, input_dimension, [], 'sigmoid', 'add_basic_block')
 
                     elif action_meta['type'] == 'choose_number':
                         self.weights[function_name] = utils.MLP(mlp_dim, 1, [], 'sigmoid', 'choose_number')
@@ -102,8 +100,8 @@ class DeepGMGCell(object):
         :param embeddings: Tensor of shape [b*v, h]
         :return: Predictions
         """
-        h_size = self.config['hidden_size']
-        m_size = self.config['deepgmg_mlp_size']
+        h_size = self.config['gnn_h_size']
+        m_size = self.config['gnn_m_size']
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']

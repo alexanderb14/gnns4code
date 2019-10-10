@@ -15,8 +15,8 @@ CONFIG_DEFAULTGRAPH = {
     'graph_rnn_cell': 'GRU',  # GRU, CudnnCompatibleGRUCell, or RNN
 
     'num_timesteps': 2,
-    'hidden_size': 4,
-    'deepgmg_mlp_size': 2,
+    'gnn_h_size': 4,
+    'gnn_m_size': 2,
 
     'num_node_types': 2,
     'num_edge_types': 2,
@@ -28,7 +28,11 @@ CONFIG_DEFAULTGRAPH = {
     'batch_size': 100,
     "num_epochs": 100,
 
+    'tie_fwd_bkwd': 1,
+    "use_edge_bias": 0,
+
     "out_dir": '/tmp',
+    "debug": 1,
 
     'actions': [
         {
@@ -84,7 +88,7 @@ def are_graphs_equal(training_graph, generated_graph):
 
 def train_generate_and_validate_default_graphs(training_graphs, config, num_graphs_to_gen, num_graphs_to_be_equal):
     # Actionize
-    actions = utils.actionize_default_graphs(training_graphs)
+    actions = utils.actionize_default_graphs(training_graphs, False)
 
     # Build train data
     train_datas = []
@@ -135,7 +139,7 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
 
     # Actionize
     actions = clang_codegraph_models.create_action_sequence(training_graph)
-    utils.enrich_action_sequence_with_adj_list_data(actions)
+    utils.enrich_action_sequence_with_adj_list_data(actions, False)
     utils.action_sequence_pretty_print(actions)
 
     # Build train data
@@ -157,7 +161,7 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
     num_graphs_equal = 0
     for _ in range(num_graphs_to_gen):
         try:
-            generated_graph = generator.generate_clang(node_types)
+            generated_graph = generator.generate_clang(node_types)[0]
         except:
             print(sys.exc_info()[0])
 
@@ -169,8 +173,9 @@ def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_t
                 print('-> TRAIN AND GEN GRAPH DIFFERENT')
 
         except:
-            print('-> GEN GRAPH DEFECT')
-            pass
+           print(sys.exc_info()[0])
+           print('-> GEN GRAPH DEFECT')
+           pass
 
     print(num_graphs_to_gen, num_graphs_equal)
     assert(num_graphs_equal > num_graphs_to_be_equal)
@@ -186,7 +191,7 @@ def test_train_save_load_and_gen_defaultgraph():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -206,7 +211,7 @@ def test_train_save_load_and_gen_defaultgraph():
     training_graphs = [{utils.T.NODES: nodes, utils.T.EDGES: edges}]
 
     # Actionize
-    actions = utils.actionize_default_graphs(training_graphs)
+    actions = utils.actionize_default_graphs(training_graphs, False)
 
     # Build train data
     train_datas = []
@@ -259,6 +264,38 @@ def test_train_save_load_and_gen_defaultgraph():
 
 
 @pytest.mark.acceptance
+def test_train_and_gen_defaultgraph_with_edge_bias():
+    # Config
+    NUM_GRAPHS_TO_GENERATE = 10
+    NUM_GRAPHS_TO_BE_EQUAL = 5
+
+    config = {}
+    config.update(CONFIG_DEFAULTGRAPH)
+    config.update({
+        'gnn_h_size': 8,
+
+        "learning_rate": 0.001,
+        "num_training_unroll": 14,
+        "run_id": "one_defaultgraph_small_1",
+
+        "num_node_types": 3,
+        "num_edge_types": 5,
+
+        "num_epochs": 500,
+        "gen_num_node_max": 5,
+
+        "use_edge_bias": 1,
+    })
+
+    nodes = [1, 2, 1]
+    edges = [(2, 1, 1), (2, 0, 0)]
+    training_graph = {utils.T.NODES: nodes, utils.T.EDGES: edges}
+
+    train_generate_and_validate_default_graphs([training_graph], config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
+
+
+
+@pytest.mark.acceptance
 def test_train_and_gen_defaultgraph_small_1():
     # Config
     NUM_GRAPHS_TO_GENERATE = 10
@@ -267,7 +304,7 @@ def test_train_and_gen_defaultgraph_small_1():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -296,7 +333,7 @@ def test_train_and_gen_defaultgraph_small_2():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -325,7 +362,7 @@ def test_train_and_gen_defaultgraph_medium_1():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 16,
+        'gnn_h_size': 16,
 
         "learning_rate": 0.001,
         "num_training_unroll": 55,
@@ -357,7 +394,7 @@ def test_train_and_gen_defaultgraph_medium_2():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 16,
+        'gnn_h_size': 16,
 
         "learning_rate": 0.001,
         "num_training_unroll": 55,
@@ -389,7 +426,7 @@ def test_train_and_gen_defaultgraph_medium_3():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 16,
+        'gnn_h_size': 16,
 
         "learning_rate": 0.001,
         "num_training_unroll": 43,
@@ -420,7 +457,7 @@ def test_train_and_gen_defaultgraph_medium_4():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 45,
@@ -452,7 +489,7 @@ def test_train_and_gen_many_defaultgraphs_medium():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 46,
@@ -484,7 +521,7 @@ def test_train_and_gen_many_same_defaultgraphs_small():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -512,7 +549,7 @@ def test_train_and_gen_two_different_defaultgraphs_small():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 8,
+        'gnn_h_size': 8,
 
         "learning_rate": 0.001,
         "num_training_unroll": 14,
@@ -542,7 +579,7 @@ def test_train_and_gen_clang_codegraph_small():
     config = {}
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
-        'hidden_size': 32,
+        'gnn_h_size': 32,
 
         "learning_rate": 0.001,
         "num_training_unroll": 33,
@@ -558,7 +595,7 @@ def test_train_and_gen_clang_codegraph_small():
     with open(os.path.join(SCRIPT_DIR, 'data', 'sample_clang_graph_small.json')) as json_data:
         jRoot = json.load(json_data)
 
-    training_graph = clang_codegraph_models.codegraph_create_from_miner_output(jRoot)
+    training_graph = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     train_generate_and_validate_clang_graph(training_graph, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 
@@ -573,7 +610,7 @@ def test_train_and_gen_clang_codegraph_medium():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 2,
-        'hidden_size': 64,
+        'gnn_h_size': 64,
 
         "learning_rate": 0.001,
         "num_training_unroll": 81,
@@ -589,7 +626,7 @@ def test_train_and_gen_clang_codegraph_medium():
     with open(os.path.join(SCRIPT_DIR, 'data', 'sample_clang_graph_medium.json')) as json_data:
         jRoot = json.load(json_data)
 
-    training_graph = clang_codegraph_models.codegraph_create_from_miner_output(jRoot)
+    training_graph = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     training_graph_2 = clang_codegraph_models.transform_graph(training_graph)
     clang_codegraph_models.save_dot_graph(training_graph_2, '/tmp/out.png', 'png')
@@ -607,7 +644,7 @@ def test_train_and_gen_clang_codegraph_large():
     config.update(CONFIG_DEFAULTGRAPH)
     config.update({
         'num_timesteps': 4,
-        'hidden_size': 64,
+        'gnn_h_size': 64,
 
         "learning_rate": 0.001,
         "num_training_unroll": 137,
@@ -623,6 +660,6 @@ def test_train_and_gen_clang_codegraph_large():
     with open(os.path.join(SCRIPT_DIR, 'data', 'sample_clang_graph_large.json')) as json_data:
         jRoot = json.load(json_data)
 
-    training_graph = clang_codegraph_models.codegraph_create_from_miner_output(jRoot)
+    training_graph = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     train_generate_and_validate_clang_graph(training_graph, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)

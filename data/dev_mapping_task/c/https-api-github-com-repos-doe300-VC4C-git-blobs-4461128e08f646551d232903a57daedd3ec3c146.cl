@@ -1,0 +1,38 @@
+__kernel void A(const int a, const int b, const float c, const float d, __global int* e, __global float* f) {
+  e[0] = a + b;
+  e[1] = a - b;
+  e[2] = a * b;
+  e[3] = a / b;
+  e[4] = a % b;
+  e[5] = max(a, b);
+  e[6] = min(a, b);
+  e[7] = (int)c;
+  e[8] = a << b;
+  e[9] = a >> b;
+  e[10] = a & b;
+  e[11] = a | b;
+  e[12] = a ^ b;
+  e[13] = ~a;
+  e[14] = clz(a);
+  int g = a;
+  e[15] = ++g;
+  e[16] = g--;
+  e[17] = a < b;
+  e[18] = a <= b;
+  e[19] = a == b;
+  e[20] = a >= b;
+  e[21] = a > b;
+  e[22] = a != b;
+  e[23] = a && b;
+  e[24] = a || b;
+  e[25] = !a;
+  e[26] = sizeof(a);
+  e[27] = ((char)a) * ((char)b);
+  f[0] = c + d;
+  f[1] = c - d;
+  f[2] = c * d;
+  f[3] = c / d;
+  f[4] = max(c, d);
+  f[5] = min(c, d);
+  f[6] = (float)a;
+}

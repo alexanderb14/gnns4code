@@ -9,9 +9,11 @@ from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
 CONFIG = {
     'num_timesteps': 4,
     'graph_rnn_cell': 'GRU',  # GRU, CudnnCompatibleGRUCell, or RNN
-    'hidden_size': 4,
+    'gnn_h_size': 4,
 
     'num_edge_types': 2,
+
+    'use_edge_bias': 0,
 }
 
 

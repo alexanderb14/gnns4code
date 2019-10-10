@@ -1,6 +1,9 @@
 import copy
 import json
 import numpy as np
+import os
+import pandas as pd
+import shutil
 import tensorflow as tf
 from collections import defaultdict
 from typing import Tuple, Dict
@@ -14,6 +17,7 @@ VERY_SMALL_NUMBER = 1e-30
 
 LABEL_OFFSET = 20
 ACTION_OFFSET = 30
+I_OFFSET = 40
 
 # Enums
 #######
@@ -25,8 +29,10 @@ class AE:
     SKIP_NEXT, \
     SUBGRAPH_START, \
     NUM_NODES, \
-    PROBABILITY \
-    = range(0, 15)
+    PROBABILITY, \
+    NUMS_INCOMING_EDGES_BY_TYPE, \
+    KERNEL_NAME \
+    = range(0, 17)
 
 
 # Labels
@@ -43,7 +49,11 @@ class A:
 
 # Type
 class T:
-    NODES, EDGES = range(30, 32)
+    NODES, EDGES, NODE_VALUES = range(30, 33)
+
+# Inputs
+class I:
+    AUX_IN_0 = range(LABEL_OFFSET, I_OFFSET + 1)
 
 
 # Functions
@@ -92,8 +102,12 @@ def action_pretty_print(action, id=0):
         str(action[AE.ADJ_LIST]).replace('\n      ', '')))
 
 
+def get_dash():
+    return '-' * 40
+
+
 def print_dash():
-    print('-' * 200)
+    print(get_dash())
 
 
 def action_pretty_print_header():
@@ -125,14 +139,14 @@ def glorot_init(shape):
     return np.random.uniform(low=-initialization_range, high=initialization_range, size=shape).astype(np.float32)
 
 
-def actionize_default_graphs(graphs, verbose=False):
+def actionize_default_graphs(graphs, tie_fwd_bkwd, verbose=False):
     # Load data
     action_datas = []
     for graph in graphs:
         action_data = graph_to_action_sequence(graph[T.EDGES], graph[T.NODES], 0)
 
         enrich_action_sequence_with_graph_data(action_data, graph)
-        enrich_action_sequence_with_adj_list_data(action_data)
+        enrich_action_sequence_with_adj_list_data(action_data, tie_fwd_bkwd)
 
         action_datas.append(action_data)
 
@@ -229,15 +243,17 @@ def enrich_action_sequence_with_graph_data(actions:dict, graph: dict) -> dict:
         action[AE.GRAPH] = graph
 
 
-def enrich_action_sequence_with_adj_list_data(actions:dict) -> dict:
+def enrich_action_sequence_with_adj_list_data(actions:dict, tie_fwd_bkwd) -> dict:
     graph_current = {T.NODES: [], T.EDGES: []}
 
     for action_idx, action in actions.items():
-        adj_list, _ = graph_to_adjacency_lists(graph_current[T.EDGES])
+        adj_list, nums_incoming_edges_dicts_per_type \
+            = graph_to_adjacency_lists(graph_current[T.EDGES], tie_fwd_bkwd)
         apply_action_to_graph(graph_current, action)
 
         action[AE.ADJ_LIST] = adj_list
         action[AE.NUM_NODES] = len(graph_current[T.NODES])
+        action[AE.NUMS_INCOMING_EDGES_BY_TYPE] = nums_incoming_edges_dicts_per_type
 
 
 def apply_action_to_graph(graph:dict, action:dict) -> None:
@@ -256,7 +272,7 @@ def apply_action_to_graph(graph:dict, action:dict) -> None:
         ])
 
 
-def graph_to_adjacency_lists(graph) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
+def graph_to_adjacency_lists(graph, tie_fwd_bkwd) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
     adj_lists = defaultdict(list)
     num_incoming_edges_dicts_per_type = defaultdict(lambda: defaultdict(lambda: 0))
     for src, e, dest in graph:
@@ -264,8 +280,9 @@ def graph_to_adjacency_lists(graph) -> (Dict[int, np.ndarray], Dict[int, Dict[in
         adj_lists[fwd_edge_type].append((src, dest))
         num_incoming_edges_dicts_per_type[fwd_edge_type][dest] += 1
 
-#        adj_lists[fwd_edge_type].append((dest, src))
-#        num_incoming_edges_dicts_per_type[fwd_edge_type][src] += 1
+        if tie_fwd_bkwd:
+            adj_lists[fwd_edge_type].append((dest, src))
+            num_incoming_edges_dicts_per_type[fwd_edge_type][src] += 1
 
     final_adj_lists = {e: np.array(sorted(lm), dtype=np.int32)
                        for e, lm in adj_lists.items()}
@@ -279,7 +296,7 @@ def pretty_print_dict(d: dict) -> None:
 
 def json_keys_to_int(x):
     if isinstance(x, dict):
-            return { int(k):v for k,v in x.items() }
+        return { int(k):v for k,v in x.items() }
     return x
 
 
@@ -308,6 +325,112 @@ def get_data_stats(data):
     print("- num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
     print("- node_types (max of it): %i" % (max(node_types)))
     print("- edge_types (max of it): %i" % (max(edge_types)))
+
+
+def freeze_dict(d):
+    if isinstance(d, dict):
+        return frozenset((key, freeze_dict(value)) for key, value in d.items())
+    elif isinstance(d, list):
+        return tuple(freeze_dict(value) for value in d)
+    return d
+
+
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = 'X'):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('%s |%s| %s%% %s' % (prefix, bar, percent, suffix))
+    # Print New Line on Complete
+    if iteration == total:
+        print()
+
+
+def get_one_hot(targets, nb_classes):
+    res = np.eye(nb_classes)[np.array(targets).reshape(-1)]
+    return res.reshape(list(targets.shape)+[nb_classes])
+
+
+def print_df(df, max_rows=100):
+    """Print a dataframe to stdout"""
+    with pd.option_context('display.max_rows', max_rows,
+                           'display.max_columns', None,
+                           'max_colwidth', 999999):
+        print(df)
+
+
+def get_files_by_extension(dirname, extension):
+    filepaths = []
+
+    for root, dirs, files in os.walk(dirname):
+        for file in files:
+            if file.endswith(extension):
+                filepaths.append(os.path.join(root, file))
+
+    return filepaths
+
+
+def delete_and_create_folder(path):
+    shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path, exist_ok=True)
+
+
+def create_folder(path):
+    os.makedirs(path, exist_ok=True)
+
+
+def write_error_report_file(src_filename, report_filename, stdouts, stderrs, returncode, cmd):
+    report = ''
+
+    report += 'COMMAND:' + '\n'
+    report += get_dash() + '\n'
+    report += ' '.join(cmd) + '\n'
+
+    report += 'RETURNCODE:' + '\n'
+    report += get_dash() + '\n'
+    report += str(returncode) + '\n'
+
+    report += 'SOURCE:' + '\n'
+    report += get_dash() + '\n'
+
+    with open(src_filename, 'r') as f:
+        try:
+            report += f.read() + '\n'
+        except:
+            pass
+
+    for stdout in stdouts:
+        report += 'STDOUT:' + '\n'
+        report += get_dash() + '\n'
+        report += stdout.decode('utf-8') + '\n'
+
+    for stderr in stderrs:
+        if stderr:
+            report += 'STDERR:' + '\n'
+            report += get_dash() + '\n'
+            report += stderr.decode('utf-8') + '\n'
+
+    with open(report_filename, 'w+') as f:
+        f.write(report)
+
+
+def min_max_avg(l: list) -> dict:
+    return {
+        'min': min(l),
+        'max': max(l),
+        'avg': int(sum(l) / float(len(l)))
+    }
+
 
 # Classes
 #########

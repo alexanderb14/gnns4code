@@ -2,6 +2,8 @@
 #include <sstream>
 #include <string>
 #include <fstream>
+#include <vector>
+#include <map>
 
 #include "clang/StaticAnalyzer/Frontend/AnalysisConsumer.h"
 #include "clang/StaticAnalyzer/Core/CheckerRegistry.h"
@@ -68,6 +70,15 @@ struct NodeContainer {
 };
 using NodeContainerPtr = std::shared_ptr<NodeContainer>;
 
+struct FunctionContainer {
+    std::string _name;
+    int _scalarReturnType;
+
+    std::vector<NodeContainerPtr> _functionArguments;
+    NodeContainerPtr _bodyRootStmt;
+};
+using FunctionContainerPtr = std::shared_ptr<FunctionContainer>;
+
 
 class ClangCodeGraph {
 public:
@@ -81,56 +92,24 @@ public:
     void operator=(ClangCodeGraph const &) = delete;
 
 public:
-    std::vector<NodeContainerPtr> GetAllStatements() {
-        std::vector<NodeContainerPtr> allStatements;
-
-        std::stack<NodeContainerPtr> stmtStack;
-        stmtStack.push(_bodyRootStmt);
-
-        while (stmtStack.empty() == false) {
-            // Get and remove top element
-            NodeContainerPtr currentContainer = stmtStack.top();
-            stmtStack.pop();
-
-            allStatements.push_back(currentContainer);
-
-            // Add element's children to stack
-            for (std::vector<NodeContainerPtr>::iterator it = currentContainer->astRelations.begin();
-                 it != currentContainer->astRelations.end(); ++it) {
-                stmtStack.push(*it);
-            }
-        }
-
-        return allStatements;
-    }
-
     NodeContainerPtr GetNodeContainerByClangStmt(const Stmt *clangStmt) {
-        std::vector<NodeContainerPtr> allStatements = GetAllStatements();
+        std::map<const Stmt*, NodeContainerPtr>::iterator it;
+        it = _allStmts.find(clangStmt);
 
-        for (std::vector<NodeContainerPtr>::iterator it = allStatements.begin(); it != allStatements.end(); ++it) {
-            if ((*it)->stmtInfo->clangStmt == clangStmt) {
-                return *it;
-            }
+        if(it != _allStmts.end()) {
+            return it->second;
         }
 
-        assert(false && "No NodeContainer has been found for clangStmt.");
+        std::cerr << "No NodeContainer has been found for clangStmt: " << clangStmt->getStmtClassName() << std::endl;
         return nullptr;
     }
 
     NodeContainerPtr GetNodeContainerByClangDecl(const ValueDecl *clangDecl) {
-        std::vector<NodeContainerPtr> allStatements = GetAllStatements();
+        std::map<const ValueDecl*, NodeContainerPtr>::iterator it;
+        it = _allDecls.find(clangDecl);
 
-        for (std::vector<NodeContainerPtr>::iterator it = allStatements.begin(); it != allStatements.end(); ++it) {
-            if ((*it)->declInfo && (*it)->declInfo->clangDecl == clangDecl) {
-                return *it;
-            }
-        }
-
-        for (std::vector<NodeContainerPtr>::iterator it = _functionArguments.begin();
-             it != _functionArguments.end(); ++it) {
-            if ((*it)->declInfo->clangDecl == clangDecl) {
-                return *it;
-            }
+        if(it != _allDecls.end()) {
+            return it->second;
         }
 
         std::cerr << "No NodeContainer has been found for clangDecl: " << clangDecl->getDeclName().getAsString() << std::endl;
@@ -138,167 +117,175 @@ public:
     }
 
     json ToJson() {
-        json jRoot;
-
         AssignNodeIds();
 
-        // 1. Arguments
-        json jArguments;
-        for (std::vector<NodeContainerPtr>::iterator it = _functionArguments.begin();
-             it != _functionArguments.end(); ++it) {
-            NodeContainerPtr currentContainer = (*it);
+        json jFunctions;
 
-            json jArgument;
-            jArgument["name"] = "FunctionArgument";
+        // Functions
+        for (std::vector<FunctionContainerPtr>::iterator it = _functionContainers.begin();
+             it != _functionContainers.end(); ++it) {
 
-            // Specific statement information
-            // Declarations
-            if (currentContainer->declInfo->clangDecl) {
-                jArgument["type"] = currentContainer->declInfo->scalarType;
-            }
+            std::string name = (*it)->_name;
+            int scalarReturnType = (*it)->_scalarReturnType;
+            std::vector<NodeContainerPtr> functionArguments = (*it)->_functionArguments;
+            NodeContainerPtr bodyRootStmt = (*it)->_bodyRootStmt;
 
-            // Liveness relations
-            json jLivenessRelations;
-            if (currentContainer->livenessRelations.empty() == false) {
-                for (std::vector<NodeContainerPtr>::iterator it = currentContainer->livenessRelations.begin();
-                     it != currentContainer->livenessRelations.end(); ++it) {
-                    jLivenessRelations.push_back((*it)->nodeId);
+            json jFunction;
+
+            // 0. Basics
+            jFunction["name"] = name;
+            jFunction["type"] = scalarReturnType;
+
+            // 1. Arguments
+            json jArguments;
+            for (std::vector<NodeContainerPtr>::iterator it = functionArguments.begin();
+                 it != functionArguments.end(); ++it) {
+
+                NodeContainerPtr currentContainer = (*it);
+
+                json jArgument;
+                jArgument["name"] = "FunctionArgument";
+
+                // Specific statement information
+                // Declarations
+                if (currentContainer->declInfo->clangDecl) {
+                    jArgument["type"] = currentContainer->declInfo->scalarType;
                 }
-                jArgument["liveness_relations"] = jLivenessRelations;
+
+                // Liveness relations
+                json jLivenessRelations;
+                if (currentContainer->livenessRelations.empty() == false) {
+                    for (std::vector<NodeContainerPtr>::iterator it = currentContainer->livenessRelations.begin();
+                         it != currentContainer->livenessRelations.end(); ++it) {
+                        jLivenessRelations.push_back((*it)->nodeId);
+                    }
+                    jArgument["liveness_relations"] = jLivenessRelations;
+                }
+
+                jArguments.push_back(jArgument);
             }
 
-            jArguments.push_back(jArgument);
+            // 2. Body
+            json jBody;
+            std::stack<NodeContainerPtr> stmtStack;
+            stmtStack.push(bodyRootStmt);
+
+            while (stmtStack.empty() == false) {
+                // Get and remove top element
+                NodeContainerPtr currentContainer = stmtStack.top();
+                stmtStack.pop();
+
+                // Build JSON
+                json jNode;
+
+                jNode["name"] = currentContainer->stmtInfo->name;
+                jNode["is_root"] = currentContainer->isRoot;
+
+                // Specific declaration information
+                // Declarations
+                if (currentContainer->declInfo) {
+                    // Type
+                    jNode["type"] = currentContainer->declInfo->scalarType;
+
+                    // CalleeName
+                    if (!currentContainer->declInfo->functionNameStr.empty()) {
+                        jNode["function_name"] = currentContainer->declInfo->functionNameStr;
+                    }
+                }
+
+                // Specific statement information
+                // IntegerLiteral
+                if (!currentContainer->stmtInfo->valueStr.empty()) {
+                    jNode["value"] = currentContainer->stmtInfo->valueStr;
+                }
+
+                // Unary operator
+                // Binary operator
+                if (!currentContainer->stmtInfo->operatorStr.empty()) {
+                    jNode["operator"] = currentContainer->stmtInfo->operatorStr;
+                }
+
+                // AST relations
+                json jAstRelations;
+                if (currentContainer->astRelations.empty() == false) {
+                    for (std::vector<NodeContainerPtr>::iterator it = currentContainer->astRelations.begin();
+                         it != currentContainer->astRelations.end(); ++it) {
+                        jAstRelations.push_back((*it)->nodeId);
+
+                        // Also add to DFS traversal stack
+                        stmtStack.push(*it);
+                    }
+                    jNode["ast_relations"] = jAstRelations;
+                }
+
+                // Liveness relations
+                json jLivenessRelations;
+                if (currentContainer->livenessRelations.empty() == false) {
+                    for (std::vector<NodeContainerPtr>::iterator it = currentContainer->livenessRelations.begin();
+                         it != currentContainer->livenessRelations.end(); ++it) {
+                        jLivenessRelations.push_back((*it)->nodeId);
+                    }
+                    jNode["liveness_relations"] = jLivenessRelations;
+                }
+
+                jBody.push_back(jNode);
+            }
+
+            jFunction["arguments"] = jArguments;
+            jFunction["body"] = jBody;
+
+            jFunctions.push_back(jFunction);
         }
 
-        // 2. Body
-        json jBody;
-        std::stack<NodeContainerPtr> stmtStack;
-        stmtStack.push(_bodyRootStmt);
-
-        while (stmtStack.empty() == false) {
-            // Get and remove top element
-            NodeContainerPtr currentContainer = stmtStack.top();
-            stmtStack.pop();
-
-            // Build JSON
-            json jNode;
-
-            jNode["name"] = currentContainer->stmtInfo->name;
-            jNode["is_root"] = currentContainer->isRoot;
-
-            // Specific declaration information
-            // Declarations
-            if (currentContainer->declInfo) {
-                // Type
-                jNode["type"] = currentContainer->declInfo->scalarType;
-
-                // CalleeName
-                if (!currentContainer->declInfo->functionNameStr.empty()) {
-                    jNode["function_name"] = currentContainer->declInfo->functionNameStr;
-                }
-            }
-
-            // Specific statement information
-            // IntegerLiteral
-            if (!currentContainer->stmtInfo->valueStr.empty()) {
-                jNode["value"] = currentContainer->stmtInfo->valueStr;
-            }
-
-            // Unary operator
-            // Binary operator
-            if (!currentContainer->stmtInfo->operatorStr.empty()) {
-                jNode["operator"] = currentContainer->stmtInfo->operatorStr;
-            }
-
-            // AST relations
-            json jAstRelations;
-            if (currentContainer->astRelations.empty() == false) {
-                for (std::vector<NodeContainerPtr>::iterator it = currentContainer->astRelations.begin();
-                     it != currentContainer->astRelations.end(); ++it) {
-                    jAstRelations.push_back((*it)->nodeId);
-
-                    // Also add to DFS traversal stack
-                    stmtStack.push(*it);
-                }
-                jNode["ast_relations"] = jAstRelations;
-            }
-
-            // Liveness relations
-            json jLivenessRelations;
-            if (currentContainer->livenessRelations.empty() == false) {
-                for (std::vector<NodeContainerPtr>::iterator it = currentContainer->livenessRelations.begin();
-                     it != currentContainer->livenessRelations.end(); ++it) {
-                    jLivenessRelations.push_back((*it)->nodeId);
-                }
-                jNode["liveness_relations"] = jLivenessRelations;
-            }
-
-            jBody.push_back(jNode);
-        }
-
-        jRoot["type"] = _scalarReturnType;
-        jRoot["arguments"] = jArguments;
-        jRoot["body"] = jBody;
-
+        json jRoot;
         jRoot["num_functions"] = _numFunctions;
+        jRoot["functions"] = jFunctions;
 
         return jRoot;
     }
 
-    std::string ToString() {
-        std::stringstream retString;
+    void addStmt(NodeContainerPtr sInfo) {
+        _allStmts.insert(std::pair<const Stmt*, NodeContainerPtr>(sInfo->stmtInfo->clangStmt, sInfo));
+    }
 
-        std::stack<NodeContainerPtr> stmtStack;
-        stmtStack.push(_bodyRootStmt);
-
-        while (stmtStack.empty() == false) {
-            // Get and remove top element
-            NodeContainerPtr currentContainer = stmtStack.top();
-            stmtStack.pop();
-
-            retString << "Statement: " << currentContainer->stmtInfo->name << std::endl;
-            if (currentContainer->declInfo) {
-                retString << "Declaration: " << currentContainer->declInfo->clangDecl->getDeclName().getAsString() << std::endl;
-            }
-
-            // Add element's children to stack
-            for (std::vector<NodeContainerPtr>::iterator it = currentContainer->astRelations.begin();
-                 it != currentContainer->astRelations.end(); ++it) {
-                stmtStack.push(*it);
-            }
-        }
-
-        return retString.str();
+    void addDecl(NodeContainerPtr sInfo) {
+        _allDecls.insert(std::pair<const ValueDecl*, NodeContainerPtr>(sInfo->declInfo->clangDecl, sInfo));
     }
 
 private:
     void AssignNodeIds() {
-        int currentNodeId = 0;
+        for (std::vector<FunctionContainerPtr>::iterator it = _functionContainers.begin();
+             it != _functionContainers.end(); ++it) {
 
-        std::stack<NodeContainerPtr> stmtStack;
-        stmtStack.push(_bodyRootStmt);
+            NodeContainerPtr bodyRootStmt = (*it)->_bodyRootStmt;
 
-        while (stmtStack.empty() == false) {
-            // Get and remove top element
-            NodeContainerPtr currentContainer = stmtStack.top();
-            stmtStack.pop();
+            int currentNodeId = 0;
 
-            currentContainer->nodeId = currentNodeId;
-            currentNodeId++;
+            std::stack<NodeContainerPtr> stmtStack;
+            stmtStack.push(bodyRootStmt);
 
-            // Add element's children to stack
-            for (std::vector<NodeContainerPtr>::iterator it = currentContainer->astRelations.begin();
-                 it != currentContainer->astRelations.end(); ++it) {
-                stmtStack.push(*it);
+            while (stmtStack.empty() == false) {
+                // Get and remove top element
+                NodeContainerPtr currentContainer = stmtStack.top();
+                stmtStack.pop();
+
+                currentContainer->nodeId = currentNodeId;
+                currentNodeId++;
+
+                // Add element's children to stack
+                for (std::vector<NodeContainerPtr>::iterator it = currentContainer->astRelations.begin();
+                     it != currentContainer->astRelations.end(); ++it) {
+                    stmtStack.push(*it);
+                }
             }
         }
-
     }
 
 public:
-    int _scalarReturnType;
-    std::vector<NodeContainerPtr> _functionArguments;
-    NodeContainerPtr _bodyRootStmt;
+    std::vector<FunctionContainerPtr> _functionContainers;
+
+    std::map<const Stmt*, NodeContainerPtr> _allStmts;
+    std::map<const ValueDecl*, NodeContainerPtr> _allDecls;
 
     int _numFunctions = 0;
 
@@ -318,16 +305,33 @@ public:
     }
 
     bool VisitFunctionDecl(FunctionDecl *f) {
+        // Create function container
+        FunctionContainerPtr fnInfo(new FunctionContainer);
+
         // Only function definitions (with bodies), not declarations.
-        if (f->hasBody() && strcmp(f->getName().data(), "__sputc") != 0) {
-            // Number of functions
+        if (f->hasBody() && f->getDeclName().isIdentifier()) {
+            std::string functionName = f->getName().data();
+            if(functionName == "__sputc") {
+              return true;
+            }
+
+            if(!_context.getSourceManager().isInMainFile(f->getBeginLoc())) {
+              return true;
+            }
+
+            // Increment number of functions
             ClangCodeGraph::getInstance()._numFunctions++;
 
+            // Extract function name
+            fnInfo->_name = f->getNameInfo().getName().getAsString();
+
             // Extract return type
-            if(f->getReturnType()->isVoidType()) {
-              ClangCodeGraph::getInstance()._scalarReturnType = -1;
+            if(f->getReturnType()->isScalarType()) {
+                fnInfo->_scalarReturnType = f->getReturnType()->getScalarTypeKind();
+            } else if(f->getReturnType()->isVoidType()){
+                fnInfo->_scalarReturnType = -1;
             } else {
-              ClangCodeGraph::getInstance()._scalarReturnType = f->getReturnType()->getScalarTypeKind();
+                fnInfo->_scalarReturnType = -2;
             }
 
             // 1. Extract arguments
@@ -335,9 +339,14 @@ public:
                 NodeContainerPtr sInfo(new NodeContainer);
                 sInfo->declInfo.reset(new DeclInfo);
                 sInfo->declInfo->clangDecl = dyn_cast<ValueDecl>(arg);
-                sInfo->declInfo->scalarType = sInfo->declInfo->clangDecl->getType()->getScalarTypeKind();
+                if(sInfo->declInfo->clangDecl->getType()->isScalarType()) {
+                    sInfo->declInfo->scalarType = sInfo->declInfo->clangDecl->getType()->getScalarTypeKind();
+                } else {
+                    sInfo->declInfo->scalarType = -2;
+                }
 
-                ClangCodeGraph::getInstance()._functionArguments.push_back(sInfo);
+                fnInfo->_functionArguments.push_back(sInfo);
+                ClangCodeGraph::getInstance().addDecl(sInfo);
             }
 
             // 2. Extract body
@@ -355,7 +364,9 @@ public:
             sInfo->stmtInfo->clangStmt = funcBody;
             sInfo->stmtInfo->name = sInfo->stmtInfo->clangStmt->getStmtClassName();
 
-            ClangCodeGraph::getInstance()._bodyRootStmt = sInfo;
+            fnInfo->_bodyRootStmt = sInfo;
+            ClangCodeGraph::getInstance().addStmt(sInfo);
+
             stmtStack.push(sInfo);
 
             while (stmtStack.empty() == false) {
@@ -367,60 +378,75 @@ public:
                 for (StmtIterator it = currentContainer->stmtInfo->clangStmt->child_begin();
                      it != currentContainer->stmtInfo->clangStmt->child_end(); ++it) {
                     if (*it) { // Catch Literals which are children but a nullptr
-                        (*it)->dump();
-
-                        NodeContainerPtr sInfo(new NodeContainer);
-                        sInfo->stmtInfo.reset(new StmtInfo);
-                        sInfo->stmtInfo->clangStmt = (*it);
-                        sInfo->stmtInfo->name = sInfo->stmtInfo->clangStmt->getStmtClassName();
-
-                        // IntegerLiteral
-                        if (const IntegerLiteral *ds = dyn_cast<IntegerLiteral>(sInfo->stmtInfo->clangStmt)) {
-                            sInfo->stmtInfo->valueStr = std::to_string((int) ds->getValue().roundToDouble());
-                        }
-
-                        // Unary operator
-                        if (const UnaryOperator *ds = dyn_cast<UnaryOperator>(sInfo->stmtInfo->clangStmt)) {
-                            sInfo->stmtInfo->operatorStr = ds->getOpcodeStr(ds->getOpcode());
-                        }
-
-                        // Binary operator
-                        if (const BinaryOperator *ds = dyn_cast<BinaryOperator>(sInfo->stmtInfo->clangStmt)) {
-                            sInfo->stmtInfo->operatorStr = ds->getOpcodeStr();
-                        }
-
-
-                        // DeclRefExpr
-                        if (const DeclRefExpr *ds = dyn_cast<DeclRefExpr>(sInfo->stmtInfo->clangStmt)) {
-                            if(!ClangCodeGraph::getInstance().GetNodeContainerByClangDecl(ds->getDecl())) {
-                                sInfo->declInfo.reset(new DeclInfo);
-                                sInfo->declInfo->clangDecl = (ValueDecl *) ds->getDecl();
-                                if (ds->getType()->isScalarType()) {
-                                    sInfo->declInfo->scalarType = ds->getType()->getScalarTypeKind();
-                                }
-                                sInfo->declInfo->functionNameStr = ds->getDecl()->getName();
-                            }
-                        }
+//                        (*it)->dump();
 
                         // Decls
                         if (const auto *ds = dyn_cast<DeclStmt>(*it)) {
                             for (auto it_ds = ds->decl_begin(); it_ds != ds->decl_end(); ++it_ds) {
-                                auto *nd = dyn_cast<ValueDecl>(*it_ds);
+                                if(auto *nd = dyn_cast<ValueDecl>(*it_ds)) {
 
-                                if(!ClangCodeGraph::getInstance().GetNodeContainerByClangDecl(nd)) {
-                                    sInfo->declInfo.reset(new DeclInfo);
-                                    sInfo->declInfo->clangDecl = nd;
-                                    if(nd->getType()->isScalarType()) {
-                                        sInfo->declInfo->scalarType = nd->getType()->getScalarTypeKind();
-                                    } else {
-                                        sInfo->declInfo->scalarType = -1;
+                                    if (!ClangCodeGraph::getInstance().GetNodeContainerByClangDecl(nd)) {
+                                        NodeContainerPtr sInfo(new NodeContainer);
+                                        sInfo->stmtInfo.reset(new StmtInfo);
+                                        sInfo->stmtInfo->clangStmt = (*it);
+                                        sInfo->stmtInfo->name = sInfo->stmtInfo->clangStmt->getStmtClassName();
+
+                                        sInfo->declInfo.reset(new DeclInfo);
+                                        sInfo->declInfo->clangDecl = nd;
+                                        if (nd->getType()->isScalarType()) {
+                                            sInfo->declInfo->scalarType = nd->getType()->getScalarTypeKind();
+                                        } else {
+                                            sInfo->declInfo->scalarType = -1;
+                                        }
+
+                                        stmtStack.push(sInfo);
+
+                                        currentContainer->astRelations.push_back(sInfo);
+                                        ClangCodeGraph::getInstance().addDecl(sInfo);
+                                        ClangCodeGraph::getInstance().addStmt(sInfo);
                                     }
                                 }
                             }
-                        }
 
-                        stmtStack.push(sInfo);
-                        currentContainer->astRelations.push_back(sInfo);
+
+                        // Others
+                        } else {
+                            NodeContainerPtr sInfo(new NodeContainer);
+                            sInfo->stmtInfo.reset(new StmtInfo);
+                            sInfo->stmtInfo->clangStmt = (*it);
+                            sInfo->stmtInfo->name = sInfo->stmtInfo->clangStmt->getStmtClassName();
+
+                            // IntegerLiteral
+                            if (const IntegerLiteral *ds = dyn_cast<IntegerLiteral>(sInfo->stmtInfo->clangStmt)) {
+                                sInfo->stmtInfo->valueStr = std::to_string((int) ds->getValue().roundToDouble());
+                            }
+
+                            // Unary operator
+                            if (const UnaryOperator *ds = dyn_cast<UnaryOperator>(sInfo->stmtInfo->clangStmt)) {
+                                sInfo->stmtInfo->operatorStr = ds->getOpcodeStr(ds->getOpcode());
+                            }
+
+                            // Binary operator
+                            if (const BinaryOperator *ds = dyn_cast<BinaryOperator>(sInfo->stmtInfo->clangStmt)) {
+                                sInfo->stmtInfo->operatorStr = ds->getOpcodeStr();
+                            }
+
+                            // DeclRefExpr
+                            if (const DeclRefExpr *ds = dyn_cast<DeclRefExpr>(sInfo->stmtInfo->clangStmt)) {
+                                if (!ClangCodeGraph::getInstance().GetNodeContainerByClangDecl(ds->getDecl())) {
+                                    sInfo->declInfo.reset(new DeclInfo);
+                                    sInfo->declInfo->clangDecl = (ValueDecl *) ds->getDecl();
+                                    if (ds->getType()->isScalarType()) {
+                                        sInfo->declInfo->scalarType = ds->getType()->getScalarTypeKind();
+                                    }
+                                    sInfo->declInfo->functionNameStr = ds->getDecl()->getNameAsString();
+                                }
+                            }
+
+                            stmtStack.push(sInfo);
+                            currentContainer->astRelations.push_back(sInfo);
+                            ClangCodeGraph::getInstance().addStmt(sInfo);
+                        }
                     }
                 }
             }
@@ -428,7 +454,9 @@ public:
             //CFG
             std::unique_ptr<CFG> sourceCFG = CFG::buildCFG(f, funcBody, &_context, CFG::BuildOptions());
 
-            sourceCFG->print(llvm::errs(), LangOptions(), true);
+//            sourceCFG->print(llvm::errs(), LangOptions(), true);
+
+            ClangCodeGraph::getInstance()._functionContainers.push_back(fnInfo);
         }
 
         return true;
@@ -466,14 +494,15 @@ public:
 
         // Get NodeContainer structure from CodeGraph
         NodeContainerPtr toStmt = ClangCodeGraph::getInstance().GetNodeContainerByClangStmt(S);
+        if(toStmt) {
+            // In case it is a DeclRefExpr, add it to the NodeContainer in the CodeGraph structure
+            if (const DeclRefExpr *dre = dyn_cast<DeclRefExpr>(S)) {
+                const ValueDecl *d = dre->getDecl();
 
-        // In case it is a DeclRefExpr, add it to the NodeContainer in the CodeGraph structure
-        if (const DeclRefExpr *dre = dyn_cast<DeclRefExpr>(S)) {
-            const ValueDecl *d = dre->getDecl();
-
-            NodeContainerPtr fromStmt = ClangCodeGraph::getInstance().GetNodeContainerByClangDecl(d);
-            if (fromStmt) {
-                fromStmt->livenessRelations.push_back(toStmt);
+                NodeContainerPtr fromStmt = ClangCodeGraph::getInstance().GetNodeContainerByClangDecl(d);
+                if (fromStmt) {
+                    fromStmt->livenessRelations.push_back(toStmt);
+                }
             }
         }
     }
@@ -486,7 +515,7 @@ public:
         llvm::errs() << "LiveVariablesChecker::checkASTCodeBody" << "\n";
 
         if (LiveVariables *L = Mgr.getAnalysis<LiveVariables>(D)) {
-            L->dumpBlockLiveness(Mgr.getSourceManager());
+//            L->dumpBlockLiveness(Mgr.getSourceManager());
 
             LiveVariablesObserver obs;
             L->runOnAllBlocks(obs);
@@ -539,13 +568,15 @@ int main(int argc, const char **argv) {
         return 1;
     }
 
-    // Dump information to console
-    llvm::errs() << ClangCodeGraph::getInstance().ToJson().dump(4);
+    // Dump codegraph as JSON to console
+    llvm::outs() << ClangCodeGraph::getInstance().ToJson().dump(4);
 
-    // Dump information to file
-    std::ofstream jsonOutFile(outFileName);
-    jsonOutFile << ClangCodeGraph::getInstance().ToJson().dump(4);
-    jsonOutFile.close();
+    // Optinal: Dump codegraph as JSON to file
+    if(!outFileName.getValue().empty()) {
+        std::ofstream jsonOutFile(outFileName);
+        jsonOutFile << ClangCodeGraph::getInstance().ToJson().dump(4);
+        jsonOutFile.close();
+    }
 
     return 0;
 }

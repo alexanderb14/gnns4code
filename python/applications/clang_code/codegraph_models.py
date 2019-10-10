@@ -1,3 +1,4 @@
+import collections
 import os
 import pydot
 import sys
@@ -12,26 +13,26 @@ LITERAL_NAMES = ['IntegerLiteral', 'FloatLiteral', 'CharacterLiteral']
 # Helper functions
 def get_id_for_edge_type(name: str) -> int:
     if name == 'AST':
-        return 2
+        return 1
     elif name == 'LIVE':
         return 3
 
 def get_id_for_reverse_edge_type(name: str) -> int:
     if name == 'AST':
-        return 0
+        return 2
     elif name == 'LIVE':
-        return 1
+        return 4
 
 def is_forward_edge_type(edge_type_id) -> bool:
-    if edge_type_id in [2, 3]:
+    if edge_type_id % 2 == 1:
         return True
     else:
         return False
 
 def get_edge_name_by_edge_type(edge_type_id) -> str:
-    if edge_type_id in [0, 2]:
+    if edge_type_id == 1 or edge_type_id == 2:
         return 'AST'
-    elif edge_type_id in [1, 3]:
+    elif edge_type_id == 3 or edge_type_id == 4:
         return 'LIVE'
 
 def sort_edges_conforming_c_syntax(edges_in):
@@ -93,6 +94,7 @@ class Function(object):
         self.edges = []
 
         self.function_node_type = -1
+        self.node_id = -1
 
         self.is_first = True
 
@@ -150,6 +152,10 @@ class Function(object):
 
                 stmt = Statement(node_type)
                 stmt.specifics = specifics
+
+                if utils.AE.PROBABILITY in action:
+                    stmt.probability = action[utils.AE.PROBABILITY]
+                    stmt.p_pick = action[utils.AE.PROBABILITY][node_type_id]
 
                 stmt.step_idx = len(self.all_statements)
 
@@ -245,16 +251,9 @@ class StatisticsVisitor(VisitorBase):
     def __init__(self, debug: int = False):
         super(StatisticsVisitor, self).__init__()
 
-        self.num_functions = 0
         self.num_nodes = 0
 
     def visit(self, obj: object) -> None:
-        if isinstance(obj, CodeGraph):
-            self.num_functions = obj.num_functions
-
-        if isinstance(obj, Function):
-            self.num_functions += 1
-
         if isinstance(obj, Statement) or isinstance(obj, Function):
             self.num_nodes += 1
 
@@ -392,9 +391,10 @@ class DotGraphVisitor(VisitorBase):
     """
     Visitor for creating a PNG dot-graph
     """
-    def __init__(self, debug: int = False):
+    def __init__(self, node_types, debug: int = False):
         super(DotGraphVisitor, self).__init__()
         self.debug = debug
+        self.node_types = node_types
 
         self.rank_subraphs = {}
 
@@ -420,7 +420,7 @@ class DotGraphVisitor(VisitorBase):
                 else:
                     color = "black"
 
-                self.dot.add_edge(pydot.Edge(from_name, to_name, color=color, xlabel=str(edge.idx)))
+                self.dot.add_edge(pydot.Edge(from_name, to_name, color=color))
 
         if isinstance(obj, Statement):
             # Get or create subgraph
@@ -473,19 +473,43 @@ class DotGraphVisitor(VisitorBase):
             if hasattr(obj, 'step_idx'):
                 ret = 'step_idx: ' + str(obj.step_idx) + '\l' + ret
 
+            if hasattr(obj, 'p_pick'):
+                ret = 'p_pick: ' + '%.2f' % obj.p_pick + '\l' + ret
+
+            # Print top most likely node types
+            if hasattr(obj, 'probability'):
+                # Convert probability array to indexed dict and sort it
+                p = {k: v for k, v in enumerate(obj.probability)}
+                p_sorted_keys = sorted(p.items(), key=lambda kv: kv[1], reverse=True)
+                p_sorted = collections.OrderedDict(p_sorted_keys)
+
+                top_p_str = ''
+                pos = 0
+                for i, p in p_sorted.items():
+                    pos += 1
+                    if pos == 5:
+                        break
+
+                    node_type_name = ''
+                    for _, nt in self.node_types.items():
+                        if nt['id'] == i:
+                            node_type_name = nt['name']
+                            break
+                    top_p_str += '%.2f %s\l' % (p, node_type_name)
+
+                ret = top_p_str + ret
+
         return ret
 
     def save_to(self, filename: str, filetype: str) -> None:
-        try:
-            self.dot.write_raw('/tmp/graph.dot')
-            (graph,) = pydot.graph_from_dot_file('/tmp/graph.dot')
+        self.dot.write_raw('/tmp/graph.dot')
+        (graph,) = pydot.graph_from_dot_file('/tmp/graph.dot')
 
-            if filetype == 'png':
-                graph.write_png(filename)
-            elif filetype == 'pdf':
-                graph.write_pdf(filename)
-        except:
-            print('except')
+        if filetype == 'png':
+            graph.write_png(filename)
+        elif filetype == 'pdf':
+            graph.write_pdf(filename)
+
 
 class CodeGenVisitor(VisitorBase):
     """
@@ -588,6 +612,8 @@ class CodeGenVisitor(VisitorBase):
 
         if isinstance(obj, Statement):
             if obj.name == 'ArraySubscriptExpr':
+                pos = self._get_and_increment_statement_position('ArraySubscriptExpr_%i' % id(obj))
+
                 self.body.append('[')
 
             elif obj.name == 'BinaryOperator':
@@ -677,7 +703,6 @@ class CodeGenVisitor(VisitorBase):
                body_str
 
     def _inc_and_check_num_visits(self):
-        print(self.num_visits)
         self.num_visits += 1
         if self.num_visits > self.num_visits_limit:
             raise Exception('num_visits_limit exceeded: %i' % self.num_visits)
@@ -707,25 +732,28 @@ class NodeTypeIdCreateVisitor(VisitorBase):
     """
     Visitor for assigning unique ids to nodes
     """
-
-    def __init__(self, debug: int = False):
+    def __init__(self, with_functionnames: bool = True, with_callnames: bool = True):
         super(NodeTypeIdCreateVisitor, self).__init__()
 
+        self.with_functionnames = with_functionnames
+        self.with_callnames = with_callnames
         self.node_type_ids_by_statements = {}
-
-    def __freeze_dict(self, d):
-        if isinstance(d, dict):
-            return frozenset((key, self.__freeze_dict(value)) for key, value in d.items())
-        elif isinstance(d, list):
-            return tuple(self.__freeze_dict(value) for value in d)
-        return d
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Statement) or isinstance(obj, Function):
-            if obj.name == 'IntegerLiteral':
+            classname = obj.__class__.__name__
+
+            if classname == 'Function' and self.with_functionnames == False:
+                key_hashed = hash((classname, utils.freeze_dict(obj.specifics)))
+            elif obj.name == 'CallExpr' and self.with_callnames == False:
+                key_hashed = hash((obj.name))
+            elif obj.name == 'IntegerLiteral':
                 key_hashed = hash((obj.name))
             else:
-                key_hashed = hash((obj.name, self.__freeze_dict(obj.specifics)))
+                specifics = obj.specifics
+                if 'function_name' in specifics:
+                    del specifics['function_name']
+                key_hashed = hash((obj.name, utils.freeze_dict(specifics)))
 
             # Add to map
             if key_hashed in self.node_type_ids_by_statements:
@@ -734,6 +762,7 @@ class NodeTypeIdCreateVisitor(VisitorBase):
                 self.node_type_ids_by_statements[key_hashed] = {
                     # id is incremented by 1 because type 0 is reserved as terminator type
                     'id': len(self.node_type_ids_by_statements) + 1,
+                    'classname': classname,
                     'name': obj.name,
                     'specifics': obj.specifics,
                     'count': 1
@@ -741,6 +770,74 @@ class NodeTypeIdCreateVisitor(VisitorBase):
 
             # Assign node id
             obj.node_type_id = self.node_type_ids_by_statements[key_hashed]['id']
+
+class EdgeExtractionVisitor(VisitorBase):
+    """
+    Visitor for extracting the edges of a CodeGraph
+    """
+    def __init__(self, edge_types: dict = None, debug: int = False):
+        super(EdgeExtractionVisitor, self).__init__()
+
+        self.edges = []
+        self.edge_types = edge_types
+
+    def visit(self, obj: object) -> None:
+        if isinstance(obj, Edge):
+            if obj.type == 'LIVE':
+                src = obj.dest.node_id
+                dest = obj.src.node_id
+            else:
+                src = obj.src.node_id
+                dest = obj.dest.node_id
+
+            edge_info = (src,
+                         self.edge_types[obj.type] if self.edge_types else get_id_for_edge_type(obj.type),
+                         dest)
+
+            if edge_info not in self.edges:
+                self.edges.append(edge_info)
+
+class NodeInfoExtractionVisitor(VisitorBase):
+    """
+    Visitor for extracting node infos of a CodeGraph
+    """
+    def __init__(self, debug: int = False):
+        super(NodeInfoExtractionVisitor, self).__init__()
+
+        self.__node_types = {}
+        self.__node_values = {}
+
+    def visit(self, obj: object) -> None:
+        if isinstance(obj, Statement) or isinstance(obj, Function):
+            if obj.node_id not in self.__node_types:
+                self.__node_types[obj.node_id] = obj.node_type_id
+
+            if 'value' in obj.specifics:
+                if obj.node_id not in self.__node_values:
+                    self.__node_values[obj.node_id] = int(obj.specifics['value'])
+
+    def node_types(self):
+        ret = []
+        for idx in range(0, max(self.__node_types, key=int)):
+            if idx not in self.__node_types:
+                raise Exception()
+
+            if len(ret) > idx:
+                raise Exception()
+
+            ret.append(self.__node_types[idx])
+
+        return ret
+
+    def node_values(self):
+        ret = []
+        for i in range(0, max(list(self.__node_types.keys()))):
+            if i in self.__node_values:
+                ret.append(self.__node_values[i])
+            else:
+                ret.append(0)
+
+        return ret
 
 class StmtNameQueryVisitor(VisitorBase):
     """
@@ -905,7 +1002,7 @@ def transform_graph(graph: object) -> object:
 
     return graph
 
-def save_dot_graph(graph: object, filename: str, filetype: str, debug: bool = False):
+def save_dot_graph(graph: object, filename: str, filetype: str, node_types: dict, debug: bool = False):
     # Assign node ids
     assign_node_ids_in_bfs_order(graph)
 
@@ -920,7 +1017,7 @@ def save_dot_graph(graph: object, filename: str, filetype: str, debug: bool = Fa
     rnkn_vstr = RankNeighborsCreateVisitor()
     graph.accept(rnkn_vstr)
 
-    dg_vstr = DotGraphVisitor(debug)
+    dg_vstr = DotGraphVisitor(node_types, debug)
     graph.accept(dg_vstr)
     dg_vstr.save_to(filename, filetype)
 
@@ -947,7 +1044,7 @@ def assign_node_ids_in_bfs_order(graph: object):
     for idx, node in enumerate(nodes):
         node.node_id = idx
 
-def create_action_sequence(graph: object):
+def create_action_sequence(graph: object, debug: bool = False):
     # Assign node ids
     assign_node_ids_in_bfs_order(graph)
 
@@ -970,6 +1067,10 @@ def create_action_sequence(graph: object):
                 break
             current_node = current_node.rank_next
 
+    if debug:
+        for node in nodes:
+            print(node.rank, node.name)
+
     # Create action sequence from list of nodes
     actions = {}
     edges_pending = {}
@@ -988,6 +1089,8 @@ def create_action_sequence(graph: object):
             utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
         }
+        if debug:
+            print('    <add_node (type %i)> \t\t %s' % (label, str(actions[step_idx])))
         step_idx += 1
 
         if is_first_node:
@@ -1005,6 +1108,8 @@ def create_action_sequence(graph: object):
             utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
         }
+        if debug:
+            print('    <init_node> \t\t %s' % str(actions[step_idx]))
         step_idx += 1
 
         # Add edges if there are any pending for the current node id
@@ -1019,6 +1124,8 @@ def create_action_sequence(graph: object):
                     utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
                     utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
                 }
+                if debug:
+                    print('      <add_edge> \t\t\t\t %s' % str(actions[step_idx]))
                 step_idx += 1
 
                 actions[step_idx] = {
@@ -1028,6 +1135,9 @@ def create_action_sequence(graph: object):
                     utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
                     utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
                 }
+                if debug:
+                    print('      <add_edge_to %i (type: %i)>  %s' % (
+                    end_node, type_id, str(actions[step_idx])))
                 step_idx += 1
 
             edges_pending.pop(last_added_node_id)
@@ -1047,6 +1157,8 @@ def create_action_sequence(graph: object):
                     utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
                     utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
                 }
+                if debug:
+                    print('      <add_edge> \t\t\t\t %s' % str(actions[step_idx]))
                 step_idx += 1
 
                 actions[step_idx] = {
@@ -1056,6 +1168,8 @@ def create_action_sequence(graph: object):
                     utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
                     utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
                 }
+                if debug:
+                    print('      <add_edge_to %i (type: %i)>  %s' % (end_node, type_id, str(actions[step_idx])))
                 step_idx += 1
 
             # If not, add to edges_pending and add later when the node is created with
@@ -1079,6 +1193,8 @@ def create_action_sequence(graph: object):
                 utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
                 utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
         }
+        if debug:
+            print('      <not_add_edge> \t\t\t %s' % str(actions[step_idx]))
         step_idx += 1
 
     # Node Terminator
@@ -1088,17 +1204,13 @@ def create_action_sequence(graph: object):
             utils.AE.LAST_ADDED_NODE_ID: last_added_node_id,
             utils.AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
     }
+    if debug:
+        print('    <not_add_node (type %i)> \t\t %s' % (0, str(actions[step_idx])))
     step_idx += 1
 
     print('Total length of action sequence: %i' % len(actions))
 
     return actions
-
-def get_num_nodes(graph: object):
-    stats_vstr = StatisticsVisitor()
-    graph.accept(stats_vstr)
-
-    return stats_vstr.num_nodes
 
 def create_graph_from_action_sequence(actions: dict, node_types: dict):
     cg = CodeGraph()
@@ -1162,94 +1274,81 @@ def is_graph_in_statement_names_whitelist(graph, statement_names) -> bool:
 
     return True
 
-def codegraph_create_from_miner_output(jRoot: dict) -> object:
+def codegraphs_create_from_miner_output(jRoot: dict) -> list:
     """
     Creates a CodeGraph and associated domain objects by parsing the output of the Clang miner pass
     """
     CLANG_SCALAR_TYPES = ['int*', 'blockPtr', 'objCPtr', 'memberPtr', 'bool', 'int', 'float', 'complexInt', 'complexFloat', 'someComplexType']
 
-    cg = CodeGraph()
+    cgs = []
+    for jFunction in jRoot['functions']:
+        cg = CodeGraph()
 
-    # Assign number of functions
-    cg.num_functions = jRoot['num_functions']
+        # Create function
+        function = Function()
+        function.name = jFunction['name']
+        if jFunction['type'] == -1:
+            function.specifics['type'] = 'void'
+        else:
+            function.specifics['type'] = CLANG_SCALAR_TYPES[jFunction['type']]
+        cg.functions.append(function)
 
-    # Create function
-    function = Function()
-    if jRoot['type'] == -1:
-        function.specifics['type'] = 'void'
-    else:
-        function.specifics['type'] = CLANG_SCALAR_TYPES[jRoot['type']]
-    cg.functions.append(function)
+        # Create arguments
+        if jFunction['arguments'] is not None:
+            for node_obj in jFunction['arguments']:
+                stmt = Statement(node_obj['name'])
 
-    # Create arguments
-    if jRoot['arguments'] is not None:
-        for node_obj in jRoot['arguments']:
-            stmt = Statement(node_obj['name'])
+                if stmt.name == 'FunctionArgument':
+                    if node_obj['type'] == -1:
+                        cg.has_complex_types = True
+                    stmt.specifics['type'] = CLANG_SCALAR_TYPES[node_obj['type']]
+                    stmt.rank = 0
 
-            if stmt.name == 'FunctionArgument':
-                if node_obj['type'] == -1:
-                    cg.has_complex_types = True
-                stmt.specifics['type'] = CLANG_SCALAR_TYPES[node_obj['type']]
-                stmt.rank = 0
-
-            stmt_from = function
-            stmt_to = stmt
-
-            edge = Edge('AST', stmt_from, stmt_to)
-            stmt_from.edges.append(edge)
-
-    # Create statements
-    for node_obj in jRoot['body']:
-        stmt = Statement(node_obj['name'])
-
-        # Specific statement information
-        if stmt.name == 'DeclRefExpr' and 'function_name' in node_obj:
-            stmt.specifics['function_name'] = node_obj['function_name']
-        if stmt.name == 'DeclStmt':
-            if node_obj['type'] == -1:
-                cg.has_complex_types = True
-            stmt.specifics['type'] = CLANG_SCALAR_TYPES[node_obj['type']]
-        if stmt.name == 'IntegerLiteral':
-            stmt.specifics['value'] = node_obj['value']
-        if stmt.name == 'UnaryOperator' or stmt.name == 'BinaryOperator' or stmt.name == 'CompoundAssignOperator':
-            stmt.specifics['operator'] = node_obj['operator']
-
-        function.all_statements.append(stmt)
-
-        if node_obj['is_root']:
-            stmt_from = function
-            stmt_to = stmt
-
-            edge = Edge('AST', stmt_from, stmt_to)
-            stmt_from.edges.append(edge)
-
-    # Create AST edges
-    for node_idx, node_obj in enumerate(jRoot['body']):
-        stmt_from = function.all_statements[node_idx]
-
-        if 'ast_relations' in node_obj:
-            for stmt_to_idx in node_obj['ast_relations']:
-                stmt_to = function.all_statements[stmt_to_idx]
+                stmt_from = function
+                stmt_to = stmt
 
                 edge = Edge('AST', stmt_from, stmt_to)
                 stmt_from.edges.append(edge)
 
-    # Create Liveness edges for statements
-    for node_idx, node_obj in enumerate(jRoot['body']):
-        stmt_from = function.all_statements[node_idx]
+        # Create statements
+        for node_obj in jFunction['body']:
+            stmt = Statement(node_obj['name'])
 
-        if 'liveness_relations' in node_obj:
-            for stmt_to_idx in node_obj['liveness_relations']:
-                stmt_to = function.all_statements[stmt_to_idx]
+            # Specific statement information
+            if stmt.name == 'DeclRefExpr' and 'function_name' in node_obj:
+                stmt.specifics['function_name'] = node_obj['function_name']
+            if stmt.name == 'DeclStmt':
+                if node_obj['type'] == -1:
+                    cg.has_complex_types = True
+                stmt.specifics['type'] = CLANG_SCALAR_TYPES[node_obj['type']]
+            if stmt.name == 'IntegerLiteral':
+                stmt.specifics['value'] = node_obj['value']
+            if stmt.name == 'UnaryOperator' or stmt.name == 'BinaryOperator' or stmt.name == 'CompoundAssignOperator':
+                stmt.specifics['operator'] = node_obj['operator']
 
-                edge = Edge('LIVE', stmt_to, stmt_from)
-                stmt_to.edges.append(edge)
+            function.all_statements.append(stmt)
 
-    # Create Liveness edges for arguments
-    if jRoot['arguments'] is not None:
-        for node_idx, node_obj in enumerate(jRoot['arguments']):
-            all_arguments = function.get_arguments()
-            stmt_from = all_arguments[node_idx]
+            if node_obj['is_root']:
+                stmt_from = function
+                stmt_to = stmt
+
+                edge = Edge('AST', stmt_from, stmt_to)
+                stmt_from.edges.append(edge)
+
+        # Create AST edges
+        for node_idx, node_obj in enumerate(jFunction['body']):
+            stmt_from = function.all_statements[node_idx]
+
+            if 'ast_relations' in node_obj:
+                for stmt_to_idx in node_obj['ast_relations']:
+                    stmt_to = function.all_statements[stmt_to_idx]
+
+                    edge = Edge('AST', stmt_from, stmt_to)
+                    stmt_from.edges.append(edge)
+
+        # Create Liveness edges for statements
+        for node_idx, node_obj in enumerate(jFunction['body']):
+            stmt_from = function.all_statements[node_idx]
 
             if 'liveness_relations' in node_obj:
                 for stmt_to_idx in node_obj['liveness_relations']:
@@ -1258,4 +1357,18 @@ def codegraph_create_from_miner_output(jRoot: dict) -> object:
                     edge = Edge('LIVE', stmt_to, stmt_from)
                     stmt_to.edges.append(edge)
 
-    return cg
+        # Create Liveness edges for arguments
+        if jFunction['arguments'] is not None:
+            for node_idx, node_obj in enumerate(jFunction['arguments']):
+                all_arguments = function.get_arguments()
+                stmt_from = all_arguments[node_idx]
+
+                if 'liveness_relations' in node_obj:
+                    for stmt_to_idx in node_obj['liveness_relations']:
+                        stmt_to = function.all_statements[stmt_to_idx]
+
+                        edge = Edge('LIVE', stmt_to, stmt_from)
+                        stmt_to.edges.append(edge)
+        cgs.append(cg)
+
+    return cgs
