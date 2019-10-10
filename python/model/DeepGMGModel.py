@@ -19,6 +19,11 @@ import applications.clang_code.codegraph_models as clang_codegraph_models
 from model.cell.DeepGMGCell import DeepGMGCell, DeepGMGCellState
 from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
 
+def get_class_key(class_to_get, class_value):
+    class_dict = class_to_get.__dict__
+    for key in class_dict:
+        if class_dict[key] == class_value:
+            return key
 
 def apply_action_to_graph(graph:dict, action:dict) -> None:
     if action[utils.AE.ACTION] == utils.A.ADD_NODE:
@@ -142,6 +147,7 @@ class DeepGMGModel(object):
 
     def _graphs_to_batch_feed_dict(self, actions_by_graphs: list, graph_sizes: list, len_unroll: int) -> dict:
         num_edge_types = self.config['num_edge_types']
+        extended_init = 'extended_init' in self.config and self.config['extended_init']
 
         batch_data_by_cell = {}
         for graph_idx, actions in enumerate(actions_by_graphs):
@@ -165,8 +171,11 @@ class DeepGMGModel(object):
                         # Generative model
                         'actions': [],
                         'last_added_node_idxs': [],
+
                         'last_added_node_idxs_with_minus_ones': [],
-                        'last_added_node_types': []
+                        'last_added_node_types': [],
+                        'extended_init' : []
+
                     }
 
                     if self.config['use_edge_bias'] == 1:
@@ -174,12 +183,20 @@ class DeepGMGModel(object):
 
                     for action_idx in range(0, len(self.config['actions'])):
                         batch_data_by_cell[cell_idx]['a%i_labels' % action_idx] = []
+                        batch_data_by_cell[cell_idx]['a%i_type' % action_idx] = self.config['actions'][action_idx]['type']
 
                 batch_data = batch_data_by_cell[cell_idx]
 
                 # Generative model
+
                 if action and utils.AE.ACTION in action:
-                    batch_data['actions'].append(action[utils.AE.ACTION] - utils.ACTION_OFFSET)
+                    action_index = None
+                    action_name = get_class_key(utils.A, action[utils.AE.ACTION]).lower()
+                    for action_meta in self.config['actions']:
+                        if action_meta['name'] == action_name:
+                            action_index = self.config['actions'].index(action_meta)
+                    batch_data['actions'].append(action_index)
+
                 else:
                     batch_data['actions'].append(-1)
 
@@ -195,21 +212,28 @@ class DeepGMGModel(object):
                 else:
                     batch_data['last_added_node_types'].append(0)
 
+                if extended_init:
+                    if action[utils.AE.ACTION] == utils.A.INIT_NODE and utils.L.LABEL_1 in action:
+                        batch_data['extended_init'].append(action[utils.L.LABEL_1])
+                    else:
+                        batch_data['extended_init'].append(0)
+
                 # Labels
                 for action_idx, action_meta in enumerate(self.config['actions']):
                     # Build action label index. See the enum.
                     label_name = 'a%i_labels' % action_idx
 
                     if action_meta['type'] == 'add_edge_to':
+
                         mat = np.zeros((num_nodes, num_edge_types))
 
-                        if action and utils.L.LABEL_0 in action and utils.L.LABEL_1 in action:
+                        if action and utils.L.LABEL_0 in action and utils.L.LABEL_1 in action and action[utils.AE.ACTION] != utils.A.INIT_NODE:
+
                             node = action[utils.L.LABEL_0]
                             edge_type = action[utils.L.LABEL_1]
                             mat[node][edge_type] = 1
 
                         batch_data[label_name].append(mat)
-
                     else:
                         if action and utils.L.LABEL_0 in action:
                             batch_data[label_name].append(action[utils.L.LABEL_0])
@@ -264,10 +288,25 @@ class DeepGMGModel(object):
             feed_dict[self.cells[cell_idx].placeholders['last_added_node_types']] \
                 = cell_data['last_added_node_types']
 
+            if extended_init:
+                feed_dict[self.cells[cell_idx].placeholders['extended_init']] \
+                    = cell_data['extended_init']
+
             # Labels
-            feed_dict[self.cells[cell_idx].placeholders['a1_labels']] = cell_data['a1_labels']
-            feed_dict[self.cells[cell_idx].placeholders['a2_labels']] = cell_data['a2_labels']
-            feed_dict[self.cells[cell_idx].placeholders['a3_labels']] = np.concatenate(cell_data['a3_labels'], axis=0)
+            label_index = 1
+
+            while True:
+                label_name = 'a%i_labels' % label_index
+                label_type = 'a%i_type' % label_index
+                if not label_name in cell_data:
+                    break
+
+                if cell_data[label_type] == 'add_edge_to':
+                    feed_dict[self.cells[cell_idx].placeholders[label_name]] = np.concatenate(cell_data[label_name], axis=0)
+                else:
+                    feed_dict[self.cells[cell_idx].placeholders[label_name]] = cell_data[label_name]
+
+                label_index += 1
 
             feed_dict[self.cells[cell_idx].placeholders['embeddings_to_graph_mappings']] \
                 = np.concatenate(cell_data['embeddings_to_graph_mappings'], axis=0)
@@ -310,7 +349,7 @@ class DeepGMGGenerator(DeepGMGModel):
         self.ops['peek'] = embeddings
 
         # Create cell and predict
-        deepgmg_cell = DeepGMGCell(self.config, True, self.state.deepgmg_cell_state)
+        deepgmg_cell = DeepGMGCell(self.config, True, self.state.deepgmg_cell_state, 0)
         self.placeholders['embeddings_out'] = deepgmg_cell.compute_predictions(embeddings)
 
         self.ggnn_layers.append(ggnn_layer)
@@ -745,7 +784,7 @@ class DeepGMGTrainer(DeepGMGModel):
         Train model with training set in multiple epochs
         """
         actions_by_graphs = []
-
+        train_llvm = 'train_llvm' in self.config and self.config['train_llvm']
         # Extract actions
         for train_data in train_datas:
             actions = train_data[utils.AE.ACTIONS]
@@ -756,9 +795,11 @@ class DeepGMGTrainer(DeepGMGModel):
         graph_sizes = []
         for train_data in train_datas:
             actions = train_data[utils.AE.ACTIONS]
-            action_last = actions[len(actions) - 1]
-
-            graph_sizes.append(action_last[utils.AE.LAST_ADDED_NODE_ID] + 1)
+            current_size = 0
+            for action_key in actions:
+                if actions[action_key][utils.AE.LAST_ADDED_NODE_ID] + 1 > current_size:
+                    current_size = actions[action_key][utils.AE.LAST_ADDED_NODE_ID] + 1
+            graph_sizes.append(current_size)
 
         best_epoch_loss = sys.maxsize
         best_epoch_count = 0

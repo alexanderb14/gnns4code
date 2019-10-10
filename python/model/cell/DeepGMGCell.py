@@ -15,6 +15,13 @@ class DeepGMGCellState(object):
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']
+        use_choose_function_module = 'choose_function' in [action_metas[action_metas.index(a_meta)]["type"] for a_meta
+                                                           in action_metas]
+        if use_choose_function_module:
+            if not 'choose_function_dims' in self.config:
+                raise KeyError("'choose_function' module is used, but 'choose_function_dims' is not in defined.")
+            choose_function_dims = self.config['choose_function_dims']
+
 
         self.weights = {}
 
@@ -57,6 +64,15 @@ class DeepGMGCellState(object):
                 elif action_meta['type'] == 'add_basic_block':
                     self.weights[function_name] = utils.MLP(h_size * m_size * 2, input_dimension, [], 'sigmoid', 'add_basic_block')
 
+                    elif action_meta['type'] == 'choose_number':
+                        self.weights[function_name] = utils.MLP(mlp_dim, 1, [], 'sigmoid', 'choose_number')
+
+                    elif action_meta['type'] == 'choose_function':
+                        self.weights[function_name] = utils.MLP(mlp_dim, choose_function_dims, [], 'sigmoid', 'choose_function')
+
+                    elif action_meta['type'] in ['add_const_value_node', 'add_type_node', 'add_instruction_node']:
+                        self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', action_meta['type'])
+
 
 class DeepGMGCell(object):
     """
@@ -72,6 +88,11 @@ class DeepGMGCell(object):
         self.ops = {}
         self.placeholders = {}
 
+        action_metas = config['actions']
+        use_choose_function_module = 'choose_function' in [action_metas[action_metas.index(a_meta)]["type"] for a_meta
+                                                           in action_metas]
+        self.use_choose_function_module = use_choose_function_module
+
     def compute_predictions(self, embeddings: tf.Tensor) -> tf.Tensor:
         """
         Make predictions of the individual deepgmg modules based on node embeddings.
@@ -84,6 +105,8 @@ class DeepGMGCell(object):
         num_node_types = self.config['num_node_types']
 
         action_metas = self.config['actions']
+        if self.use_choose_function_module:
+            choose_function_dims = self.config['choose_function_dims']
 
         # Common Placeholders
         # #########################################
@@ -130,6 +153,11 @@ class DeepGMGCell(object):
                 self.placeholders['last_added_node_types'] = tf.placeholder(tf.int32, [None], name='last_added_node_types')
                 last_added_node_types = tf.one_hot(self.placeholders['last_added_node_types'], num_node_types + 1) # [b, v]
 
+                extended_init = 'extended_init' in self.config and self.config['extended_init']
+                if extended_init:
+                    self.placeholders['extended_init'] = tf.placeholder(tf.float32, [None], name='extended_init')
+
+
                 # Model
                 # Gated Sum
                 with tf.variable_scope('out_layer_gated_sum_init_node'):
@@ -148,11 +176,17 @@ class DeepGMGCell(object):
                     self.ops['h_G_init_node'] = h_G
 
                 # Compute new embedding
-                h_G_e = tf.concat([self.ops['h_G_init_node'], last_added_node_types], 1)                        # [b, 2h + num_node_types+1]
+                if extended_init:
+                    extended_init_data = self.placeholders['extended_init']
+                    extended_init_reshaped = tf.reshape(extended_init_data, shape=(-1,1))
+                    h_G_e = tf.concat([self.ops['h_G_init_node'], last_added_node_types, extended_init_reshaped], 1)
+                else:
+                    h_G_e = tf.concat([self.ops['h_G_init_node'], last_added_node_types], 1)                        # [b, 2h + num_node_types+1]
                 f_init = self.state.weights['f_init'](h_G_e)                                                    # [b, h]
 
                 # Update embeddings
                 # 1) Mask: Action 0 (init node)
+
                 actions_transposed = tf.transpose(tf.cast(actions, dtype=tf.int32))                             # [num_actions, b]
                 action_0 = actions_transposed[0]                                                                # [b]
                 mask_action_0 = tf.gather(action_0, embeddings_to_graph_mappings)                               # [b*v]
@@ -213,7 +247,7 @@ class DeepGMGCell(object):
                         self.ops['h_v'] = h_v
 
                         # Action type: add node
-                        if action_meta['type'] == 'add_node':
+                        if action_meta['type'] in ['add_node', 'add_const_value_node', 'add_type_node', 'add_instruction_node']:
                             # Model
                             f_an = self.state.weights[function_name](h_G)                                       # [b, input_dimension]
                             f_an = tf.nn.softmax(f_an)                                                          # [b, input_dimension]
@@ -222,15 +256,16 @@ class DeepGMGCell(object):
                             # Training
                             if self.enable_training:
                                 # Input
+
                                 self.placeholders[label_name] = tf.placeholder(tf.int32, [None], name=label_name)
-                                labels = tf.one_hot(self.placeholders[label_name], input_dimension)             # [b, input_dimension]
+                                labels = tf.one_hot(self.placeholders[label_name], input_dimension)        # [b, input_dimension]
 
                                 # Loss
                                 diff_loss = f_an - labels                                                       # [b, input_dimension]
                                 loss_an = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
                                 loss_an = loss_an * loss_scaling_factor
 
-                                self.ops['loss_an'] = loss_an
+                                self.ops['loss_' + action_meta['type']] = loss_an
                                 losses.append(loss_an)
 
                         # Action type: add edge
@@ -254,6 +289,48 @@ class DeepGMGCell(object):
                                 self.ops['loss_ae'] = loss_ae
                                 losses.append(loss_ae)
 
+                        # Action type: choose function
+                        if action_meta['type'] == 'choose_function':
+                            # Model
+                            f_cf = self.state.weights[function_name](h_G)
+                            f_cf = tf.nn.softmax(f_cf)                                                          # [b, choose_function_dims]
+                            self.ops[function_name] = f_cf
+
+                            # Training
+                            if self.enable_training:
+                                # Input
+                                self.placeholders[label_name] = tf.placeholder(tf.int32, [None], name=label_name)
+                                labels = tf.one_hot(self.placeholders[label_name], choose_function_dims)        # [b, choose_function_dims]
+
+                                # Loss
+                                diff_loss = f_cf - labels                                                       # [b, choose_function_dims]
+                                loss_cf = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
+                                loss_cf = loss_cf * loss_scaling_factor
+
+                                self.ops['loss_cf'] = loss_cf
+                                losses.append(loss_cf)
+
+                        # Action type: choose number
+                        if action_meta['type'] == 'choose_number':
+                            # Model
+                            f_cn = self.state.weights[function_name](h_G)                                       # [b, 1]
+                            self.ops[function_name] = f_cn
+
+                            # Training
+                            if self.enable_training:
+                                # Input
+                                self.placeholders[label_name] = tf.placeholder(tf.float32, [None],
+                                                                               name=label_name)
+                                labels = self.placeholders[label_name]                                          # [b, 1]
+
+                                # Loss
+                                diff_loss = f_cn - labels  # [b, choose_function_dims]
+                                loss_cn = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
+                                loss_cn = loss_cn * loss_scaling_factor
+
+                                self.ops['loss_cn'] = loss_cn
+                                losses.append(loss_cn)
+
                         # Action type: add edge to
                         if action_meta['type'] == 'add_edge_to':
                             # Model
@@ -266,6 +343,7 @@ class DeepGMGCell(object):
 
                             # Softmax
                             # a) Normalize probabilities
+
                             s_u_max = tf.unsorted_segment_max(data=s_u,
                                                               segment_ids=embeddings_to_graph_mappings_existent,
                                                               num_segments=num_graphs)                          # [b, e]
@@ -288,6 +366,7 @@ class DeepGMGCell(object):
 
                             # - Build softmax
                             f_nodes = es / es_sum                                                               # [b*v, e]
+
 
                             self.ops[function_name] = f_nodes
 

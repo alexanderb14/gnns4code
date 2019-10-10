@@ -1,0 +1,920 @@
+get_global_id;i64;i32
+get_local_id;i64;i32
+barrier;void;i32
+get_group_id;i64;i32
+get_global_size;i64;i32
+llvm.fmuladd.v4f32;<4 x float>;<4 x float>, <4 x float>, <4 x float>
+_Z4tanhDv4_f;<4 x float>;<4 x float>
+_Z4haddii;i32;i32, i32
+llvm.fmuladd.f32;float;float, float, float
+llvm.lifetime.start.p0i8;void;i64, i8*
+_Z6rotatemm;i64;i64, i64
+_Z9bitselectmmm;i64;i64, i64, i64
+llvm.lifetime.end.p0i8;void;i64, i8*
+_Z3minjj;i32;i32, i32
+_Z10atomic_addPU8CLglobalVjj;i32;i32*, i32
+_Z21async_work_group_copyPU7CLlocaliPU8CLglobalKim9ocl_event;%opencl.event_t*;i32*, i32*, i64, %opencl.event_t*
+wait_group_events;void;i32, %opencl.event_t**
+get_local_size;i64;i32
+__translate_sampler_initializer;%opencl.sampler_t*;i32
+D;<4 x i32>;<4 x i32>, i32*, i32
+B;i32;i32, i32*, i32
+_Z6rotatejj;i32;i32, i32
+_Z3dotDv4_fS_;float;<4 x float>, <4 x float>
+_Z5crossDv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z8distanceDv4_fS_;float;<4 x float>, <4 x float>
+_Z6lengthDv4_f;float;<4 x float>
+_Z9normalizeDv4_f;<4 x float>;<4 x float>
+_Z13fast_distanceDv4_fS_;float;<4 x float>, <4 x float>
+_Z11fast_lengthDv4_f;float;<4 x float>
+_Z14fast_normalizeDv4_f;<4 x float>;<4 x float>
+_Z4exp2Dv3_f;<3 x float>;<3 x float>
+_Z3maxff;float;float, float
+_Z3minff;float;float, float
+_Z3expf;float;float
+llvm.fabs.f32;float;float
+_Z1Nj;i64;i32
+_Z1Pj;i64;i32
+_Z1Ej;void;i32
+_Z6mul_hiDv4_iS_;<4 x i32>;<4 x i32>, <4 x i32>
+_Z7mad_satDv4_iS_S_;<4 x i32>;<4 x i32>, <4 x i32>, <4 x i32>
+_Z5mad24Dv4_iS_S_;<4 x i32>;<4 x i32>, <4 x i32>, <4 x i32>
+_Z5cospif;float;float
+llvm.fmuladd.f64;double;double, double, double
+_Z11islessequalDv3_fS_;<3 x i32>;<3 x float>, <3 x float>
+_Z4fmaxDv3_fS_;<3 x float>;<3 x float>, <3 x float>
+_Z4fminDv3_fS_;<3 x float>;<3 x float>, <3 x float>
+_Z4fmaxff;float;float, float
+_Z4fminff;float;float, float
+_Z5crossDv3_fS_;<3 x float>;<3 x float>, <3 x float>
+_Z3dotDv3_fS_;float;<3 x float>, <3 x float>
+_Z5clampiii;i32;i32, i32, i32
+_Z3mixDv4_fS_f;<4 x float>;<4 x float>, <4 x float>, float
+_Z5atan2ff;float;float, float
+_Z5hypotff;float;float, float
+_Z3maxii;i32;i32, i32
+llvm.ceil.f32;float;float
+_Z4sqrtf;float;float
+_Z6sincosfPU9CLprivatef;float;float, float*
+llvm.floor.f32;float;float
+_Z16convert_char_rtec;i8;i8
+llvm.memcpy.p0i8.p0i8.i64;void;i8*, i8*, i64, i32, i1
+L;i32;
+M;i32;
+N;i32;
+O;i32;
+P;i32;
+Q;i32;
+R;i32;
+S;i32;
+T;i32;
+U;i32;
+V;i32;
+W;i32;
+X;i32;
+Y;i32;
+Z;i32;
+AA;i32;
+AB;i32;
+AC;i32;
+AD;i32;
+AE;i32;
+AF;i32;
+AG;i32;
+A;i32;i8*
+_Z5mad24jjj;i32;i32, i32, i32
+_Z6mul_hijj;i32;i32, i32
+_Z14convert_float4Dv4_j;<4 x float>;<4 x i32>
+_Z5frexpfPU8CLglobali;float;float, i32*
+_Z3expDv4_f;<4 x float>;<4 x float>
+_Z5rhaddii;i32;i32, i32
+_Z3minii;i32;i32, i32
+_Z4sqrtd;double;double
+llvm.fabs.f64;double;double
+_Z3madfff;float;float, float, float
+_Z3dotff;float;float, float
+get_num_groups;i64;i32
+_Z4signf;float;float
+_Z3minDv3_jj;<3 x i32>;<3 x i32>, i32
+_Z4acosf;float;float
+_Z5clampfff;float;float, float, float
+_Z10half_rsqrtf;float;float
+_Z5asinhDv3_f;<3 x float>;<3 x float>
+_Z3sind;double;double
+_Z3cosd;double;double
+_Z3expd;double;double
+llvm.memset.p0i8.i64;void;i8*, i8, i64, i32, i1
+E;void;i32*, i32*, i32*
+C;void;i32*, i32*
+llvm.bswap.i32;i32;i32
+_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_i;<4 x i32>;%opencl.image2d_ro_t*, %opencl.sampler_t*, double
+_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f;<4 x float>;%opencl.image2d_ro_t*, %opencl.sampler_t*, double
+_Z5mad24Dv3_jS_S_;<3 x i32>;<3 x i32>, <3 x i32>, <3 x i32>
+get_global_offset;i64;i32
+_Z14convert_float8Dv8_c;<8 x float>;double
+_Z14convert_float8Dv8_h;<8 x float>;double
+_Z14convert_float8Dv8_s;<8 x float>;<8 x i16>
+_Z14convert_float8Dv8_t;<8 x float>;<8 x i16>
+_Z14convert_float8Dv8_i;<8 x float>;<8 x i32>*
+_Z14convert_float8Dv8_j;<8 x float>;<8 x i32>*
+_Z7vstore4Dv4_hmPU8CLglobalh;void;i32, i64, i8*
+_Z3cosf;float;float
+_Z3sinf;float;float
+_Z4acosDv2_f;double;double
+llvm.pow.f32;float;float, float
+_Z3logf;float;float
+_Z3tanf;float;float
+_Z4asinf;float;float
+_Z4atanf;float;float
+_Z5ldexpfi;float;float, i32
+_Z3minDv4_ii;<4 x i32>;<4 x i32>, i32
+_Z6lgammaf;float;float
+_Z21async_work_group_copyPU7CLlocalfPU8CLglobalKfm9ocl_event;%opencl.event_t*;float*, float*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalfPU7CLlocalKfm9ocl_event;%opencl.event_t*;float*, float*, i64, %opencl.event_t*
+llvm.floor.f64;double;double
+llvm.ceil.f64;double;double
+_Z5clampDv3_iii;<3 x i32>;<3 x i32>, i32, i32
+_Z3absi;i32;i32
+_Z3clzi;i32;i32
+llvm.fabs.v4f64;<4 x double>;<4 x double>*
+llvm.fmuladd.v4f64;<4 x double>;<4 x double>, <4 x double>, <4 x double>
+_Z3expDv4_d;<4 x double>;<4 x double>*
+_Z4sqrtDv4_d;<4 x double>;<4 x double>*
+_Z3logDv4_d;<4 x double>;<4 x double>*
+_Z5mad24iii;i32;i32, i32, i32
+_Z5clampDv3_jjj;<3 x i32>;<3 x i32>, i32, i32
+_Z4tanhf;float;float
+llvm.fmuladd.v2f32;<2 x float>;<2 x float>, <2 x float>, <2 x float>
+_Z14isgreaterequalDv4_fS_;<4 x i32>;<4 x float>, <4 x float>
+_Z5clampjjj;i32;i32, i32, i32
+_Z11convert_intf;i32;float
+_Z7signbitf;i32;float
+_Z10atomic_minPU7CLlocalVjj;i32;i32*, i32
+_Z10smoothstepfff;float;float, float, float
+_Z5mul24ii;i32;i32, i32
+_Z7vload16mPU8CLglobalKc;<16 x i8>;i64, i8*
+_Z3allDv4_c;i32;i32
+_Z10atomic_addPU7CLlocalVii;i32;i32*, i32
+_Z10atomic_addPU8CLglobalVii;i32;i32*, i32
+_Z9normalizef;float;float
+llvm.round.f32;float;float
+_Z7add_satjj;i32;i32, i32
+_Z17convert_uchar_satf;i8;float
+llvm.trunc.f32;float;float
+_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i;<4 x float>;%opencl.image2d_ro_t*, %opencl.sampler_t*, double
+llvm.fmuladd.v3f32;<3 x float>;<3 x float>, <3 x float>, <3 x float>
+_Z4sqrtDv2_f;double;double
+_Z12convert_uintf;i32;float
+_Z13convert_floatj;float;i32
+_Z21async_work_group_copyPU7CLlocalcPU8CLglobalKcm9ocl_event;%opencl.event_t*;i8*, i8*, i64, %opencl.event_t*
+llvm.pow.f64;double;double, double
+_Z3tanDv4_f;<4 x float>;<4 x float>
+_Z9bitselectjjj;i32;i32, i32, i32
+llvm.pow.v4f32;<4 x float>;<4 x float>, <4 x float>
+_Z4fminDv2_ff;double;double, float
+_Z14isgreaterequalff;i32;float, float
+_Z8atom_addPU7CLlocalii;i32;i32*, i32
+_Z8atom_subPU7CLlocalii;i32;i32*, i32
+_Z9atom_xchgPU7CLlocalii;i32;i32*, i32
+_Z8atom_minPU7CLlocalii;i32;i32*, i32
+_Z8atom_maxPU7CLlocalii;i32;i32*, i32
+_Z8atom_andPU7CLlocalii;i32;i32*, i32
+_Z7atom_orPU7CLlocalii;i32;i32*, i32
+_Z8atom_xorPU7CLlocalii;i32;i32*, i32
+_Z8atom_incPU7CLlocali;i32;i32*
+_Z8atom_decPU7CLlocali;i32;i32*
+_Z12atom_cmpxchgPU7CLlocaliii;i32;i32*, i32, i32
+_Z8atom_addPU7CLlocaljj;i32;i32*, i32
+_Z8atom_subPU7CLlocaljj;i32;i32*, i32
+_Z9atom_xchgPU7CLlocaljj;i32;i32*, i32
+_Z8atom_minPU7CLlocaljj;i32;i32*, i32
+_Z8atom_maxPU7CLlocaljj;i32;i32*, i32
+_Z8atom_andPU7CLlocaljj;i32;i32*, i32
+_Z7atom_orPU7CLlocaljj;i32;i32*, i32
+_Z8atom_xorPU7CLlocaljj;i32;i32*, i32
+_Z8atom_incPU7CLlocalj;i32;i32*
+_Z8atom_decPU7CLlocalj;i32;i32*
+_Z12atom_cmpxchgPU7CLlocaljjj;i32;i32*, i32, i32
+_Z8atom_addPU8CLglobalii;i32;i32*, i32
+_Z8atom_subPU8CLglobalii;i32;i32*, i32
+_Z9atom_xchgPU8CLglobalii;i32;i32*, i32
+_Z8atom_minPU8CLglobalii;i32;i32*, i32
+_Z8atom_maxPU8CLglobalii;i32;i32*, i32
+_Z8atom_andPU8CLglobalii;i32;i32*, i32
+_Z7atom_orPU8CLglobalii;i32;i32*, i32
+_Z8atom_xorPU8CLglobalii;i32;i32*, i32
+_Z8atom_incPU8CLglobali;i32;i32*
+_Z8atom_decPU8CLglobali;i32;i32*
+_Z12atom_cmpxchgPU8CLglobaliii;i32;i32*, i32, i32
+_Z8atom_addPU8CLglobaljj;i32;i32*, i32
+_Z8atom_subPU8CLglobaljj;i32;i32*, i32
+_Z9atom_xchgPU8CLglobaljj;i32;i32*, i32
+_Z8atom_minPU8CLglobaljj;i32;i32*, i32
+_Z8atom_maxPU8CLglobaljj;i32;i32*, i32
+_Z8atom_andPU8CLglobaljj;i32;i32*, i32
+_Z7atom_orPU8CLglobaljj;i32;i32*, i32
+_Z8atom_xorPU8CLglobaljj;i32;i32*, i32
+_Z8atom_incPU8CLglobalj;i32;i32*
+_Z8atom_decPU8CLglobalj;i32;i32*
+_Z12atom_cmpxchgPU8CLglobaljjj;i32;i32*, i32, i32
+_Z9nextafterff;float;float, float
+_Z6lengthDv3_f;float;<3 x float>
+_Z9normalizeDv3_f;<3 x float>;<3 x float>
+_Z5isnanf;i32;float
+_Z14atomic_cmpxchgPU8CLglobalVjjj;i32;i32*, i32, i32
+G;i32;i32
+F;i32;i32
+_Z5mad24Dv2_iS_S_;double;double, double, double
+_Z13write_imageui14ocl_image2d_roDv2_iDv4_j;void;%opencl.image2d_ro_t*, double, <4 x i32>
+_Z9bitselectDv2_hS_S_;i16;i16, i16, i16
+_Z3maxDv3_ii;<3 x i32>;<3 x i32>, i32
+llvm.pow.v3f32;<3 x float>;<3 x float>, <3 x float>
+_Z5isnanDv4_f;<4 x i32>;<4 x float>
+_Z3absj;i32;i32
+_Z6tgammaf;float;float
+llvm.trunc.v4f32;<4 x float>;<4 x float>
+_Z7atan2piff;float;float, float
+_Z4acosDv3_f;<3 x float>;<3 x float>
+_Z11atomic_xchgPU8CLglobalVii;i32;i32*, i32
+_Z15get_image_width14ocl_image2d_ro;i32;%opencl.image2d_ro_t*
+_Z14convert_float3Dv3_h;<3 x float>;i32
+_Z8upsampleij;i64;i32, i32
+_Z3dotDv2_fS_;float;double, double
+_Z3maxDv4_ii;<4 x i32>;<4 x i32>, i32
+_Z6sincosfPU8CLglobalf;float;float, float*
+_Z3sinDv4_f;<4 x float>;<4 x float>
+_Z5exp10f;float;float
+llvm.rint.v4f32;<4 x float>;<4 x float>
+llvm.round.v4f32;<4 x float>;<4 x float>
+llvm.ceil.v4f32;<4 x float>;<4 x float>
+llvm.floor.v4f32;<4 x float>;<4 x float>
+_Z5clampDv2_fff;double;double, float, float
+_Z5isnanDv2_f;double;double
+_Z10atomic_subPU8CLglobalVjj;i32;i32*, i32
+_Z11convert_inth;i32;i8
+_Z13convert_ucharf;i8;float
+_Z4exp2f;float;float
+_Z10atomic_addPU7CLlocalVjj;i32;i32*, i32
+_Z3mixDv2_fS_S_;double;double, double, double
+_Z5clampDv2_fS_S_;double;double, double, double
+_Z6lengthDv2_f;float;double
+_Z9normalizeDv2_f;double;double
+llvm.fma.f64;double;double, double, double
+_Z5isinff;i32;float
+_Z4log2f;float;float
+_Z3maxjj;i32;i32, i32
+_Z3mixfff;float;float, float, float
+llvm.fma.f32;float;float, float, float
+_Z4pownDv4_fDv4_i;<4 x float>;<4 x float>, <4 x i32>
+llvm.fmuladd.v2f64;<2 x double>;<2 x double>, <2 x double>, <2 x double>
+_Z3minDv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z3maxDv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z3minDv2_ff;double;double, float
+_Z5clampDv4_fff;<4 x float>;<4 x float>, float, float
+_Z4fmodDv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z6vload2mPU8CLglobalKj;double;i64, i32*
+llvm.powi.f32;float;float, i32
+_Z5mul24jj;i32;i32, i32
+_Z7radiansDv3_f;<3 x float>;<3 x float>
+_Z3expDv3_f;<3 x float>;<3 x float>
+_Z14convert_float4Dv4_i;<4 x float>;<4 x i32>
+_Z3cosDv4_f;<4 x float>;<4 x float>
+_Z5fractDv4_fPU8CLglobalS_;<4 x float>;<4 x float>, <4 x float>*
+_Z5mul24Dv2_iS_;double;double, double
+_Z23get_image_channel_order14ocl_image2d_ro;i32;%opencl.image2d_ro_t*
+_Z13convert_floati;float;i32
+_Z13convert_floatd;float;double
+_Z12convert_int3Dv3_f;<3 x i32>;<3 x float>
+_Z14convert_float3Dv3_i;<3 x float>;<3 x i32>
+_Z3maxhh;i8;i8, i8
+_Z14isgreaterequalDv2_fS_;double;double, double
+_Z5log10f;float;float
+_Z4fmodff;float;float, float
+_Z14atomic_cmpxchgPU8CLglobalViii;i32;i32*, i32, i32
+J;<3 x float>;float, %struct.s_shader*
+_Z10atomic_minPU8CLglobalVii;i32;i32*, i32
+_Z7degreesf;float;float
+_Z21async_work_group_copyPU7CLlocalDv2_cPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i8>*, <2 x i8>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_cPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i8>*, <2 x i8>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_hPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i8>*, <2 x i8>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_hPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i8>*, <2 x i8>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_sPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i16>*, <2 x i16>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_sPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i16>*, <2 x i16>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_tPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i16>*, <2 x i16>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_tPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i16>*, <2 x i16>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_iPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i32>*, <2 x i32>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_iPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i32>*, <2 x i32>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_jPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i32>*, <2 x i32>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_jPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i32>*, <2 x i32>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_lPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i64>*, <2 x i64>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_lPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i64>*, <2 x i64>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_mPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x i64>*, <2 x i64>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_mPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x i64>*, <2 x i64>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv2_fPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<2 x float>*, <2 x float>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobalDv2_fPU7CLlocalKS_m9ocl_event;%opencl.event_t*;<2 x float>*, <2 x float>*, i64, %opencl.event_t*
+_Z4fmaxDv4_ff;<4 x float>;<4 x float>, float
+_Z7radiansDv4_f;<4 x float>;<4 x float>
+_Z11native_log2f;float;float
+_Z9atomic_orPU8CLglobalVjj;i32;i32*, i32
+_Z3maxDv4_jj;<4 x i32>;<4 x i32>, i32
+_Z11atomic_xchgPU8CLglobalVjj;i32;i32*, i32
+_Z10atomic_minPU8CLglobalVjj;i32;i32*, i32
+_Z11atomic_xchgPU7CLlocalVii;i32;i32*, i32
+_Z10atomic_subPU7CLlocalVii;i32;i32*, i32
+_Z10atomic_andPU7CLlocalVii;i32;i32*, i32
+_Z9atomic_orPU7CLlocalVii;i32;i32*, i32
+_Z10atomic_xorPU7CLlocalVii;i32;i32*, i32
+_Z10atomic_minPU7CLlocalVii;i32;i32*, i32
+_Z10atomic_maxPU7CLlocalVii;i32;i32*, i32
+_Z10atomic_maxPU7CLlocalVjj;i32;i32*, i32
+_Z14atomic_cmpxchgPU7CLlocalViii;i32;i32*, i32, i32
+_Z10atomic_subPU8CLglobalVii;i32;i32*, i32
+_Z10atomic_andPU8CLglobalVii;i32;i32*, i32
+_Z9atomic_orPU8CLglobalVii;i32;i32*, i32
+_Z10atomic_xorPU8CLglobalVii;i32;i32*, i32
+_Z10atomic_maxPU8CLglobalVii;i32;i32*, i32
+_Z10atomic_maxPU8CLglobalVjj;i32;i32*, i32
+_Z3absDv3_i;<3 x i32>;<3 x i32>
+_Z6islessff;i32;float, float
+_Z10native_logf;float;float
+_Z23get_image_channel_order14ocl_image3d_ro;i32;%opencl.image3d_ro_t*
+_Z5fractDv4_fPU9CLprivateS_;<4 x float>;<4 x float>, <4 x float>*
+_Z3maxDv3_ff;<3 x float>;<3 x float>, float
+_Z5isinfDv4_f;<4 x i32>;<4 x float>
+_Z21async_work_group_copyPU7CLlocalDv4_jPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<4 x i32>*, <4 x i32>*, i64, %opencl.event_t*
+_Z7vstore4Dv4_cmPU8CLglobalc;void;i32, i64, i8*
+_Z6vload4mPU8CLglobalKc;i32;i64, i8*
+_Z6vload2mPU8CLglobalKc;i16;i64, i8*
+_Z6mul_hiii;i32;i32, i32
+_Z8isfinitef;i32;float
+_Z6sincosDv4_fPU8CLglobalS_;<4 x float>;<4 x float>, <4 x float>*
+_Z3expDv2_f;double;double
+_Z6vload4mPU8CLglobalKf;<4 x float>;i64, float*
+_Z29async_work_group_strided_copyPU7CLlocalfPU8CLglobalKfmm9ocl_event;%opencl.event_t*;float*, float*, i64, i64, %opencl.event_t*
+_Z8prefetchPU8CLglobalKfm;void;float*, i64
+_Z6islessDv3_fS_;<3 x i32>;<3 x float>, <3 x float>
+_Z4log2Dv3_f;<3 x float>;<3 x float>
+_Z5mul24Dv2_jS_;double;double, double
+_Z3logd;double;double
+_Z4signDv3_f;<3 x float>;<3 x float>
+_Z13convert_uchari;i8;i32
+I;float;float*, float*, i32
+_Z13convert_shorth;i16;i8
+_Z12convert_chari;i8;i32
+_Z1A11ocl_sampler14ocl_image1d_ro;void;%opencl.sampler_t*, %opencl.image1d_ro_t*
+_Z1A11ocl_sampler14ocl_image2d_ro;void;%opencl.sampler_t*, %opencl.image2d_ro_t*
+_Z4fmoddd;double;double, double
+_Z3absDv4_j;<4 x i32>;<4 x i32>
+_Z7radiansDv2_f;double;double
+llvm.trunc.f64;double;double
+_Z7vstore4Dv4_fmPU8CLglobalf;void;<4 x float>, i64, float*
+_Z14convert_ulong4Dv4_l;<4 x i64>;<4 x i64>*
+_Z13convert_uint4Dv4_i;<4 x i32>;<4 x i32>
+_Z15convert_ushort4Dv4_s;double;double
+_Z14convert_uchar4Dv4_c;i32;i32
+llvm.usub.with.overflow.i32;{ i32, i1 };i32, i32
+_Z10isnotequalff;i32;float, float
+__syncthreads;i32;
+_Z4log2Dv4_f;<4 x float>;<4 x float>
+_Z3maxDv2_ff;double;double, float
+_Z14convert_float3Dv3_c;<3 x float>;i32
+_Z3minDv3_ff;<3 x float>;<3 x float>, float
+_Z21async_work_group_copyPU7CLlocalDv16_hPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<16 x i8>*, <16 x i8>*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU7CLlocalDv8_fPU8CLglobalKS_m9ocl_event;%opencl.event_t*;<8 x float>*, <8 x float>*, i64, %opencl.event_t*
+llvm.fma.v8f32;<8 x float>;<8 x float>*, <8 x float>*, <8 x float>*
+_Z21async_work_group_copyPU7CLlocaljPU8CLglobalKjm9ocl_event;%opencl.event_t*;i32*, i32*, i64, %opencl.event_t*
+_Z21async_work_group_copyPU8CLglobaljPU7CLlocalKjm9ocl_event;%opencl.event_t*;i32*, i32*, i64, %opencl.event_t*
+_Z6acospiDv2_f;double;double
+_Z18convert_uchar8_satDv8_h;double;double
+_Z21convert_uchar_sat_rtef;i8;float
+_Z11vstore_halffmPU8CLglobalDh;void;float, i64, half*
+_Z23convert_ushort2_sat_rteDv2_f;i32;double
+_Z12vstore_half4Dv4_fmPU8CLglobalDh;void;<4 x float>, i64, half*
+_Z5log10Dv2_f;double;double
+_Z3maxDv4_ff;<4 x float>;<4 x float>, float
+_Z4stepDv2_fS_;double;double, double
+_Z14convert_float4Dv4_h;<4 x float>;i32
+_Z14convert_uchar4Dv4_f;i32;<4 x float>
+_Z5hypotDv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z6acospif;float;float
+_Z10isnotequalDv2_fS_;double;double, double
+_Z3minhh;i8;i8, i8
+llvm.fabs.v4f32;<4 x float>;<4 x float>
+_Z4sqrtDv4_f;<4 x float>;<4 x float>
+_Z3logDv4_f;<4 x float>;<4 x float>
+_Z21async_work_group_copyPU8CLglobalcPU7CLlocalKcm9ocl_event;%opencl.event_t*;i8*, i8*, i64, %opencl.event_t*
+_Z4stepff;float;float, float
+_Z7vload16mPU8CLglobalKf;<16 x float>;i64, float*
+_Z8vstore16Dv16_fmPU8CLglobalf;void;<16 x float>*, i64, float*
+_Z5atanhf;float;float
+_Z3minDv2_ii;double;double, i32
+K;i32;i32*, i32, i32*, i32, i32
+_Z4signd;double;double
+_Z3absDv2_j;double;double
+_Z6vload4mPU8CLglobalKi;<4 x i32>;i64, i32*
+_Z3tand;double;double
+_Z21async_work_group_copyPU7CLlocalsPU8CLglobalKsm9ocl_event;%opencl.event_t*;i16*, i16*, i64, %opencl.event_t*
+_Z4tanhDv2_f;double;double
+_Z6mul_hill;i64;i64, i64
+_Z7mad_satlll;i64;i64, i64, i64
+_Z3minDv3_ii;<3 x i32>;<3 x i32>, i32
+_Z5fractDv2_fPU9CLprivateS_;double;double, <2 x float>*
+_Z4sqrtDv8_f;<8 x float>;<8 x float>*
+llvm.fmuladd.v8f32;<8 x float>;<8 x float>, <8 x float>, <8 x float>
+_Z12convert_int8Dv8_f;<8 x i32>;<8 x float>*
+_Z3maxDv4_iS_;<4 x i32>;<4 x i32>, <4 x i32>
+_Z3maxDv2_iS_;double;double, double
+_Z13convert_uint8Dv8_f;<8 x i32>;<8 x float>*
+_Z6vload2mPU8CLglobalKf;double;i64, float*
+_Z13convert_floath;float;i8
+_Z9bitselectfff;float;float, float, float
+_Z8abs_diffjj;i32;i32, i32
+_Z7add_satii;i32;i32, i32
+_Z7mad_satiii;i32;i32, i32, i32
+_Z6rotateii;i32;i32, i32
+_Z7sub_satii;i32;i32, i32
+_Z7vstore2Dv2_cmPU9CLprivatec;void;i16, i64, i8*
+_Z7vstore2Dv2_hmPU9CLprivateh;void;i16, i64, i8*
+_Z7vstore2Dv2_imPU9CLprivatei;void;double, i64, i32*
+_Z7vstore2Dv2_jmPU9CLprivatej;void;double, i64, i32*
+_Z7vstore2Dv2_fmPU9CLprivatef;void;double, i64, float*
+_Z3maxdd;double;double, double
+_Z1Al;void;i64
+_Z13convert_floats;float;i16
+_Z13convert_shortf;i16;float
+_Z9half_sqrtf;float;float
+_Z5isinfDv2_f;double;double
+_Z3sinDv3_f;<3 x float>;<3 x float>
+_Z3minDv2_jj;double;double, i32
+_Z3cosDv2_f;double;double
+_Z3clzDv2_j;double;double
+_Z21async_work_group_copyPU8CLglobaliPU7CLlocalKim9ocl_event;%opencl.event_t*;i32*, i32*, i64, %opencl.event_t*
+_Z6asinpiDv2_f;double;double
+_Z3absDv2_i;double;double
+_Z3absDv4_i;<4 x i32>;<4 x i32>
+_Z3absDv8_i;<8 x i32>;<8 x i32>*
+_Z3absDv16_i;<16 x i32>;<16 x i32>*
+_Z3absDv3_j;<3 x i32>;<3 x i32>
+_Z3absDv8_j;<8 x i32>;<8 x i32>*
+_Z3absDv16_j;<16 x i32>;<16 x i32>*
+_Z3absc;i8;i8
+_Z3absDv2_c;i16;i16
+_Z3absDv3_c;i32;i32
+_Z3absDv4_c;i32;i32
+_Z3absDv8_c;double;double
+_Z3absDv16_c;<16 x i8>;<16 x i8>
+_Z3absh;i8;i8
+_Z3absDv2_h;i16;i16
+_Z3absDv3_h;i32;i32
+_Z3absDv4_h;i32;i32
+_Z3absDv8_h;double;double
+_Z3absDv16_h;<16 x i8>;<16 x i8>
+_Z3abss;i16;i16
+_Z3absDv2_s;i32;i32
+_Z3absDv3_s;double;double
+_Z3absDv4_s;double;double
+_Z3absDv8_s;<8 x i16>;<8 x i16>
+_Z3absDv16_s;<16 x i16>;<16 x i16>*
+_Z3abst;i16;i16
+_Z3absDv2_t;i32;i32
+_Z3absDv3_t;double;double
+_Z3absDv4_t;double;double
+_Z3absDv8_t;<8 x i16>;<8 x i16>
+_Z3absDv16_t;<16 x i16>;<16 x i16>*
+_Z14atomic_cmpxchgPU7CLlocalVjjj;i32;i32*, i32, i32
+_Z17convert_uint3_rtzDv3_f;<3 x i32>;<3 x float>
+_Z14convert_uchar3Dv3_j;i32;<3 x i32>
+_Z3clzDv3_j;<3 x i32>;<3 x i32>
+_Z3mincc;i8;i8, i8
+llvm.round.v3f32;<3 x float>;<3 x float>
+_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i;<4 x i32>;%opencl.image2d_ro_t*, %opencl.sampler_t*, double
+_Z3allDv4_i;i32;<4 x i32>
+_Z5mad24Dv2_jS_S_;double;double, double, double
+_Z13get_image_dim14ocl_image2d_ro;double;%opencl.image2d_ro_t*
+llvm.fabs.v2f64;<2 x double>;<2 x double>
+_Z29async_work_group_strided_copyPU7CLlocalDv4_cPU8CLglobalKS_mm9ocl_event;%opencl.event_t*;<4 x i8>*, <4 x i8>*, i64, i64, %opencl.event_t*
+_Z29async_work_group_strided_copyPU8CLglobalDv4_cPU7CLlocalKS_mm9ocl_event;%opencl.event_t*;<4 x i8>*, <4 x i8>*, i64, i64, %opencl.event_t*
+_Z10native_logDv2_f;double;double
+_Z5sinpif;float;float
+_Z8lgamma_rfPU8CLglobali;float;float, i32*
+_Z3clzDv3_i;<3 x i32>;<3 x i32>
+_Z11atomic_xchgPU7CLlocalVff;float;float*, float
+_Z11atomic_xchgPU8CLglobalVff;float;float*, float
+_Z7vstore2Dv2_cmPU8CLglobalc;void;i16, i64, i8*
+_Z10native_logDv3_f;<3 x float>;<3 x float>
+_Z5clampDv2_iii;double;double, i32, i32
+_Z7vstore8Dv8_fmPU8CLglobalf;void;<8 x float>*, i64, float*
+_Z6vload8mPU8CLglobalKf;<8 x float>;i64, float*
+_Z3maxDv8_fS_;<8 x float>;<8 x float>*, <8 x float>*
+_Z3expDv8_f;<8 x float>;<8 x float>*
+_Z3maxDv16_fS_;<16 x float>;<16 x float>*, <16 x float>*
+_Z3expDv16_f;<16 x float>;<16 x float>*
+_Z15get_image_width14ocl_image3d_ro;i32;%opencl.image3d_ro_t*
+_Z7sub_satcc;i8;i8, i8
+_Z7sub_sathh;i8;i8, i8
+_Z7sub_satss;i16;i16, i16
+_Z7sub_sattt;i16;i16, i16
+_Z7sub_satjj;i32;i32, i32
+_Z5frexpDv2_fPU8CLglobalDv2_i;double;double, <2 x i32>*
+_Z16get_image_height14ocl_image2d_ro;i32;%opencl.image2d_ro_t*
+_Z15convert_int_rtef;i32;float
+_Z14convert_float2Dv2_i;double;double
+_Z14convert_float2Dv2_f;double;double
+_Z12convert_int4Dv4_f;<4 x i32>;<4 x float>
+_Z3logDv2_f;double;double
+_Z4coshDv2_f;double;double
+_Z10isnotequalDv4_fS_;<4 x i32>;<4 x float>, <4 x float>
+_Z3alli;i32;i32
+_Z5log10Dv4_f;<4 x float>;<4 x float>
+_Z5exp10Dv4_f;<4 x float>;<4 x float>
+_Z11native_log2Dv3_f;<3 x float>;<3 x float>
+_Z10atomic_xorPU8CLglobalVjj;i32;i32*, i32
+_Z4atanDv3_f;<3 x float>;<3 x float>
+_Z3erff;float;float
+_Z7vstore4Dv4_imPU8CLglobali;void;<4 x i32>, i64, i32*
+_Z6vload2mPU10CLconstantKf;double;i64, float*
+_Z5frexpDv4_fPU9CLprivateDv4_i;<4 x float>;<4 x float>, <4 x i32>*
+_Z27get_image_channel_data_type14ocl_image3d_ro;i32;%opencl.image3d_ro_t*
+_Z3logDv3_f;<3 x float>;<3 x float>
+_Z7vload16mPU8CLglobalKh;<16 x i8>;i64, i8*
+_Z8vstore16Dv16_hmPU8CLglobalh;void;<16 x i8>, i64, i8*
+_Z3sinDv2_f;double;double
+_Z8distanceDv3_fS_;float;<3 x float>, <3 x float>
+_Z5asinhDv4_f;<4 x float>;<4 x float>
+llvm.fmuladd.v16f32;<16 x float>;<16 x float>, <16 x float>, <16 x float>
+_Z5acoshf;float;float
+llvm.trap;void;
+_Z5ldexpDv3_fDv3_i;<3 x float>;<3 x float>, <3 x i32>
+_Z8upsamplest;i32;i16, i16
+_Z3clzm;i64;i64
+_Z3clzj;i32;i32
+_Z3clzt;i16;i16
+_Z3clzh;i8;i8
+_Z3clzl;i64;i64
+_Z3clzs;i16;i16
+_Z3clzc;i8;i8
+_Z10half_rsqrtDv3_f;<3 x float>;<3 x float>
+llvm.round.f64;double;double
+_Z1A14ocl_image1d_ro;void;%opencl.image1d_ro_t*
+_Z1A14ocl_image1d_wo;void;%opencl.image1d_wo_t*
+_Z16get_image_height14ocl_image3d_ro;i32;%opencl.image3d_ro_t*
+_Z3maxDv3_jj;<3 x i32>;<3 x i32>, i32
+_Z4stepDv3_fS_;<3 x float>;<3 x float>, <3 x float>
+_Z5log10Dv3_f;<3 x float>;<3 x float>
+_Z6rotateDv8_jS_;<8 x i32>;<8 x i32>*, <8 x i32>*
+_Z9bitselectDv8_jS_S_;<8 x i32>;<8 x i32>*, <8 x i32>*, <8 x i32>*
+_Z4fmaxDv2_ff;double;double, float
+_Z4signDv4_f;<4 x float>;<4 x float>
+_Z5exp10Dv2_f;double;double
+_Z4log2Dv2_f;double;double
+_Z3madDv3_fS_S_;<3 x float>;<3 x float>, <3 x float>, <3 x float>
+_Z9isgreaterff;i32;float, float
+H;void;i32, i32, i32, i32, i32, i32, i32*, i32, i32, i32, i32
+_Z6islessDv4_fS_;<4 x i32>;<4 x float>, <4 x float>
+_Z3anyDv4_i;i32;<4 x i32>
+_Z14convert_uchar4Dv4_i;i32;<4 x i32>
+_Z12vstore_half2Dv2_fmPU8CLglobalDh;void;double, i64, half*
+ldexpf;float;float, i32
+_Z4exp2Dv4_f;<4 x float>;<4 x float>
+_Z7signbitDv3_f;<3 x i32>;<3 x float>
+_Z7mad_satsss;i16;i16, i16, i16
+llvm.floor.v3f32;<3 x float>;<3 x float>
+_Z11islessequalDv4_fS_;<4 x i32>;<4 x float>, <4 x float>
+_Z5exp10Dv3_f;<3 x float>;<3 x float>
+_Z5asinhDv2_f;double;double
+_Z5isnanDv3_f;<3 x i32>;<3 x float>
+_Z7add_satcc;i8;i8, i8
+_Z7add_sathh;i8;i8, i8
+_Z7add_satss;i16;i16, i16
+_Z7add_sattt;i16;i16, i16
+_Z5frexpfPU7CLlocali;float;float, i32*
+_Z15convert_short16Dv16_h;<16 x i16>;<16 x i8>
+_Z8vstore16Dv16_cmPU8CLglobalc;void;<16 x i8>, i64, i8*
+_Z14convert_char16Dv16_s;<16 x i8>;<16 x i16>*
+llvm.trunc.v3f32;<3 x float>;<3 x float>
+_Z7atan2piDv3_fS_;<3 x float>;<3 x float>, <3 x float>
+_Z3cosDv3_f;<3 x float>;<3 x float>
+_Z5atanhDv2_f;double;double
+_Z14convert_float4Dv4_c;<4 x float>;i32
+_Z14convert_float4Dv4_s;<4 x float>;double
+_Z14convert_float4Dv4_t;<4 x float>;double
+_Z5rhaddmm;i64;i64, i64
+_Z6vload8mPU8CLglobalKs;<8 x i16>;i64, i16*
+_Z7vstore8Dv8_hmPU8CLglobalh;void;double, i64, i8*
+_Z6vload4mPU8CLglobalKd;<4 x double>;i64, double*
+_Z7vstore4Dv4_dmPU8CLglobald;void;<4 x double>*, i64, double*
+_Z7vstore3Dv3_cmPU8CLglobalc;void;i32, i64, i8*
+_Z6vload2mPU9CLprivateKc;i16;i64, i8*
+_Z6vload2mPU9CLprivateKh;i16;i64, i8*
+_Z6vload2mPU9CLprivateKs;i32;i64, i16*
+_Z6vload2mPU9CLprivateKt;i32;i64, i16*
+_Z6vload2mPU9CLprivateKi;double;i64, i32*
+_Z6vload2mPU9CLprivateKj;double;i64, i32*
+_Z6vload2mPU9CLprivateKf;double;i64, float*
+_Z5acoshDv2_f;double;double
+_Z5mul24Dv3_jS_;<3 x i32>;<3 x i32>, <3 x i32>
+_Z3maxDv2_ii;double;double, i32
+_Z5atan2Dv3_fS_;<3 x float>;<3 x float>, <3 x float>
+_Z4coshDv4_f;<4 x float>;<4 x float>
+_Z5acoshDv3_f;<3 x float>;<3 x float>
+_Z8abs_diffii;i32;i32, i32
+_Z3madDv4_fS_S_;<4 x float>;<4 x float>, <4 x float>, <4 x float>
+frexpf;float;float, i32*
+_Z9isgreaterDv4_fS_;<4 x i32>;<4 x float>, <4 x float>
+_Z7atan2piDv2_fS_;double;double, double
+_Z3clzDv2_i;double;double
+llvm.bswap.v4i32;<4 x i32>;<4 x i32>
+_Z11islessequalDv2_fS_;double;double, double
+llvm.fabs.v2f32;<2 x float>;<2 x float>
+_Z10half_rsqrtDv2_f;double;double
+_Z6acospiDv4_f;<4 x float>;<4 x float>
+_Z5atan2Dv2_fS_;double;double, double
+_Z5fractDv3_fPU9CLprivateS_;<3 x float>;<3 x float>, <3 x float>*
+_Z5frexpDv4_fPU8CLglobalDv4_i;<4 x float>;<4 x float>, <4 x i32>*
+_Z13convert_floatf;float;float
+_Z17convert_float_rtef;float;float
+_Z17convert_float_rtzf;float;float
+_Z17convert_float_rtpf;float;float
+_Z17convert_float_rtnf;float;float
+_Z21convert_float_sat_rtef;float;float
+_Z21convert_float_sat_rtzf;float;float
+_Z21convert_float_sat_rtpf;float;float
+_Z21convert_float_sat_rtnf;float;float
+llvm.bswap.i16;i16;i16
+llvm.bswap.i64;i64;i64
+_Z3logDv8_f;<8 x float>;<8 x float>*
+_Z6vload3mPU8CLglobalKj;<3 x i32>;i64, i32*
+_Z7vstore3Dv3_jmPU8CLglobalj;void;<3 x i32>, i64, i32*
+_Z5asinhf;float;float
+_Z4sqrtDv3_f;<3 x float>;<3 x float>
+_Z18convert_uchar8_satDv8_f;double;<8 x float>*
+llvm.fabs.v8f32;<8 x float>;<8 x float>*
+_Z3minDv8_fS_;<8 x float>;<8 x float>*, <8 x float>*
+_Z3minDv8_ff;<8 x float>;<8 x float>*, float
+_Z3maxDv8_ff;<8 x float>;<8 x float>*, float
+_Z3sinDv8_f;<8 x float>;<8 x float>*
+_Z3cosDv8_f;<8 x float>;<8 x float>*
+_Z4stepDv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z4stepDv8_fS_;<8 x float>;<8 x float>*, <8 x float>*
+_Z4stepDv16_fS_;<16 x float>;<16 x float>*, <16 x float>*
+_Z4stepfDv2_f;double;float, double
+_Z4stepfDv3_f;<3 x float>;float, <3 x float>
+_Z4stepfDv4_f;<4 x float>;float, <4 x float>
+_Z4stepfDv8_f;<8 x float>;float, <8 x float>*
+_Z4stepfDv16_f;<16 x float>;float, <16 x float>*
+_Z10isnotequalDv3_fS_;<3 x i32>;<3 x float>, <3 x float>
+_Z8abs_diffcc;i8;i8, i8
+_Z6vload3mPU8CLglobalKs;double;i64, i16*
+_Z7vstore3Dv3_tmPU8CLglobalt;void;double, i64, i16*
+_Z8abs_diffDv2_cS_;i16;i16, i16
+_Z5atanhDv4_f;<4 x float>;<4 x float>
+_Z3sinDv16_f;<16 x float>;<16 x float>*
+_Z3cosDv16_f;<16 x float>;<16 x float>*
+llvm.ctlz.i32;i32;i32, i1
+llvm.ctlz.i64;i64;i64, i1
+llvm.exp2.f32;float;float
+_Z12convert_int4Dv4_j;<4 x i32>;<4 x i32>
+_Z13convert_uint4Dv4_h;<4 x i32>;i32
+_Z12convert_int4Dv4_h;<4 x i32>;i32
+_Z7vstore3Dv3_imPU8CLglobali;void;<3 x i32>, i64, i32*
+_Z6vload3mPU8CLglobalKi;<3 x i32>;i64, i32*
+_Z5mul24Dv3_iS_;<3 x i32>;<3 x i32>, <3 x i32>
+_Z5frexpDv3_fPU7CLlocalDv3_i;<3 x float>;<3 x float>, <3 x i32>*
+_Z5mad24Dv3_iS_S_;<3 x i32>;<3 x i32>, <3 x i32>, <3 x i32>
+_Z5frexpfPU9CLprivatei;float;float, i32*
+_Z4fminDv2_fS_;double;double, double
+_Z4fmodDv3_fS_;<3 x float>;<3 x float>, <3 x float>
+_Z7isequalDv4_fS_;<4 x i32>;<4 x float>, <4 x float>
+_Z14isgreaterequalDv3_fS_;<3 x i32>;<3 x float>, <3 x float>
+_Z3mixDv2_fS_f;double;double, double, float
+_Z6asinpif;float;float
+_Z6atanpif;float;float
+_Z6islessDv2_fS_;double;double, double
+_Z9half_sqrtDv3_f;<3 x float>;<3 x float>
+_Z4exp2Dv2_f;double;double
+_Z5ldexpDv4_fDv4_i;<4 x float>;<4 x float>, <4 x i32>
+_Z4asinDv4_f;<4 x float>;<4 x float>
+_Z9half_sqrtDv4_f;<4 x float>;<4 x float>
+_Z6vload2mPU8CLglobalKi;double;i64, i32*
+_Z3allDv3_s;i32;double
+_Z5frexpDv4_fPU7CLlocalDv4_i;<4 x float>;<4 x float>, <4 x i32>*
+_Z9isgreaterDv3_fS_;<3 x i32>;<3 x float>, <3 x float>
+_Z7atan2piDv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z3mixDv3_fS_f;<3 x float>;<3 x float>, <3 x float>, float
+_Z4atanDv4_f;<4 x float>;<4 x float>
+_Z15get_image_depth14ocl_image3d_ro;i32;%opencl.image3d_ro_t*
+_Z3clzDv4_j;<4 x i32>;<4 x i32>
+_Z3madDv2_fS_S_;double;double, double, double
+_Z4fmaxDv3_ff;<3 x float>;<3 x float>, float
+llvm.pow.v2f32;<2 x float>;<2 x float>, <2 x float>
+_Z3tanDv2_f;double;double
+_Z7isequalDv2_fS_;double;double, double
+_Z7degreesDv2_f;double;double
+_Z27get_image_channel_data_type14ocl_image2d_ro;i32;%opencl.image2d_ro_t*
+_Z4tanhDv3_f;<3 x float>;<3 x float>
+_Z3tanDv3_f;<3 x float>;<3 x float>
+_Z5clampDv4_iii;<4 x i32>;<4 x i32>, i32, i32
+_Z3mindd;double;double, double
+_Z1Oim;i32;i32, i64
+_Z1Oimm;i32;i32, i64, i64
+_Z1Oimmm;i32;i32, i64, i64, i64
+_Z1Ojm;i32;i32, i64
+_Z1Ojmm;i32;i32, i64, i64
+_Z1Ojmmm;i32;i32, i64, i64, i64
+_Z1Olm;i64;i64, i64
+_Z1Olmm;i64;i64, i64, i64
+_Z1Olmmm;i64;i64, i64, i64, i64
+_Z1Omm;i64;i64, i64
+_Z1Ommm;i64;i64, i64, i64
+_Z1Ommmm;i64;i64, i64, i64, i64
+_Z1Ofm;float;float, i64
+_Z1Ofmm;float;float, i64, i64
+_Z1Ofmmm;float;float, i64, i64, i64
+_Z1Odm;double;double, i64
+_Z1Odmm;double;double, i64, i64
+_Z1Odmmm;double;double, i64, i64, i64
+_Z1Pbi;i32;i1, i32
+_Z1Pbj;i32;i1, i32
+_Z1Pbl;i64;i1, i64
+_Z1Pbm;i64;i1, i64
+_Z1Pbf;float;i1, float
+_Z1Pbd;double;i1, double
+_Z1Qbi;i32;i1, i32
+_Z1Qbj;i32;i1, i32
+_Z1Qbl;i64;i1, i64
+_Z1Qbm;i64;i1, i64
+_Z1Qbf;float;i1, float
+_Z1Qbd;double;i1, double
+_Z1Rbi;i32;i1, i32
+_Z1Rbj;i32;i1, i32
+_Z1Rbl;i64;i1, i64
+_Z1Rbm;i64;i1, i64
+_Z1Rbf;float;i1, float
+_Z1Rbd;double;i1, double
+_Z1Sbi;i32;i1, i32
+_Z1Sbj;i32;i1, i32
+_Z1Sbl;i64;i1, i64
+_Z1Sbm;i64;i1, i64
+_Z1Sbf;float;i1, float
+_Z1Sbd;double;i1, double
+_Z1Tbi;i32;i1, i32
+_Z1Tbj;i32;i1, i32
+_Z1Tbl;i64;i1, i64
+_Z1Tbm;i64;i1, i64
+_Z1Tbf;float;i1, float
+_Z1Tbd;double;i1, double
+_Z1Ubi;i32;i1, i32
+_Z1Ubj;i32;i1, i32
+_Z1Ubl;i64;i1, i64
+_Z1Ubm;i64;i1, i64
+_Z1Ubf;float;i1, float
+_Z1Ubd;double;i1, double
+_Z1Vbi;i32;i1, i32
+_Z1Vbj;i32;i1, i32
+_Z1Vbl;i64;i1, i64
+_Z1Vbm;i64;i1, i64
+_Z1Vbf;float;i1, float
+_Z1Vbd;double;i1, double
+_Z1Wbi;i32;i1, i32
+_Z1Wbj;i32;i1, i32
+_Z1Wbl;i64;i1, i64
+_Z1Wbm;i64;i1, i64
+_Z1Wbf;float;i1, float
+_Z1Wbd;double;i1, double
+_Z1Xbi;i32;i1, i32
+_Z1Xbj;i32;i1, i32
+_Z1Xbl;i64;i1, i64
+_Z1Xbm;i64;i1, i64
+_Z1Xbf;float;i1, float
+_Z1Xbd;double;i1, double
+_Z6lengthf;float;float
+_Z5clampDv2_jjj;double;double, i32, i32
+_Z4cbrtf;float;float
+_Z11native_log2Dv2_f;double;double
+_Z7degreesDv4_f;<4 x float>;<4 x float>
+_Z4fminDv3_ff;<3 x float>;<3 x float>, float
+_Z6asinpiDv3_f;<3 x float>;<3 x float>
+_Z7radiansf;float;float
+_Z3minmm;i64;i64, i64
+_Z3maxmm;i64;i64, i64
+fet_global_size;i32;
+gt_global_size;i32;
+iget_global_id;i32;
+_Z6vload4mPU8CLglobalKh;i32;i64, i8*
+_Z22convert_uchar4_sat_rteDv4_f;i32;<4 x float>
+_Z10native_logDv4_f;<4 x float>;<4 x float>
+_Z10atomic_subPU7CLlocalVjj;i32;i32*, i32
+_Z11atomic_xchgPU7CLlocalVjj;i32;i32*, i32
+_Z10atomic_andPU7CLlocalVjj;i32;i32*, i32
+_Z9atomic_orPU7CLlocalVjj;i32;i32*, i32
+_Z10atomic_xorPU7CLlocalVjj;i32;i32*, i32
+_Z10atomic_andPU8CLglobalVjj;i32;i32*, i32
+llvm.ceil.v3f32;<3 x float>;<3 x float>
+_Z5mad24Dv4_jS_S_;<4 x i32>;<4 x i32>, <4 x i32>, <4 x i32>
+_Z3allDv2_i;i32;double
+_Z5atan2Dv4_fS_;<4 x float>;<4 x float>, <4 x float>
+_Z4fminDv4_ff;<4 x float>;<4 x float>, float
+_Z4asinDv2_f;double;double
+_Z11native_log2Dv4_f;<4 x float>;<4 x float>
+_Z5frexpDv2_fPU9CLprivateDv2_i;double;double, <2 x i32>*
+_Z4fmodDv2_fS_;double;double, double
+_Z6vload4mPU10CLconstantKf;<4 x float>;i64, float*
+_Z7vstore4Dv4_fmPU9CLprivatef;void;<4 x float>, i64, float*
+_Z4asinDv3_f;<3 x float>;<3 x float>
+_Z8distanceff;float;float, float
+_Z5atanhDv3_f;<3 x float>;<3 x float>
+_Z4coshf;float;float
+_Z12convert_uintm;i32;i64
+_Z3anyi;i32;i32
+_Z13fast_distanceff;float;float, float
+_Z13fast_distanceDv3_fS_;float;<3 x float>, <3 x float>
+_Z4atanDv2_f;double;double
+_Z6acospiDv3_f;<3 x float>;<3 x float>
+_Z7isequalDv3_fS_;<3 x i32>;<3 x float>, <3 x float>
+llvm.powi.f64;double;double, i32
+_Z16convert_char_sath;i8;i8
+_Z16convert_char_sats;i8;i16
+_Z16convert_char_satt;i8;i16
+_Z16convert_char_sati;i8;i32
+_Z16convert_char_satj;i8;i32
+_Z16convert_char_satl;i8;i64
+_Z16convert_char_satm;i8;i64
+_Z16convert_char_satf;i8;float
+_Z17convert_uchar_satc;i8;i8
+_Z17convert_uchar_sats;i8;i16
+_Z17convert_uchar_satt;i8;i16
+_Z17convert_uchar_sati;i8;i32
+_Z17convert_uchar_satj;i8;i32
+_Z17convert_uchar_satl;i8;i64
+_Z17convert_uchar_satm;i8;i64
+_Z17convert_short_satt;i16;i16
+_Z17convert_short_sati;i16;i32
+_Z17convert_short_satj;i16;i32
+_Z17convert_short_satl;i16;i64
+_Z17convert_short_satm;i16;i64
+_Z17convert_short_satf;i16;float
+_Z18convert_ushort_sats;i16;i16
+_Z18convert_ushort_sati;i16;i32
+_Z18convert_ushort_satj;i16;i32
+_Z18convert_ushort_satl;i16;i64
+_Z18convert_ushort_satm;i16;i64
+_Z18convert_ushort_satf;i16;float
+_Z15convert_int_satj;i32;i32
+_Z15convert_int_satl;i32;i64
+_Z15convert_int_satm;i32;i64
+_Z15convert_int_satf;i32;float
+_Z16convert_uint_sati;i32;i32
+_Z16convert_uint_satl;i32;i64
+_Z16convert_uint_satm;i32;i64
+_Z16convert_uint_satf;i32;float
+_Z16convert_long_satm;i64;i64
+_Z16convert_long_satf;i64;float
+_Z17convert_ulong_satl;i64;i64
+_Z17convert_ulong_satf;i64;float
+_Z5clampDv4_jjj;<4 x i32>;<4 x i32>, i32, i32
+_Z3madddd;double;double, double, double
+_Z3clzDv4_i;<4 x i32>;<4 x i32>
+_Z15convert_ushort4Dv4_f;double;<4 x float>
+_Z13convert_uint4Dv4_f;<4 x i32>;<4 x float>
+_Z3maxDv2_jj;double;double, i32
+_Z5ldexpDv2_fDv2_i;double;double, double
+_Z6vload4mPU7CLlocalKf;<4 x float>;i64, float*
+_Z6vload4mPU9CLprivateKf;<4 x float>;i64, float*
+llvm.fabs.v3f32;<3 x float>;<3 x float>
+_Z5isinfDv3_f;<3 x i32>;<3 x float>
+_Z8distanceDv2_fS_;float;double, double
+_Z3minDv4_jj;<4 x i32>;<4 x i32>, i32
+_Z5frexpDv2_fPU7CLlocalDv2_i;double;double, <2 x i32>*
+_Z4acosDv4_f;<4 x float>;<4 x float>
+_Z6sincosDv3_fPU9CLprivateS_;<3 x float>;<3 x float>, <3 x float>*
+_Z4coshDv3_f;<3 x float>;<3 x float>
+_Z5mul24Dv4_jS_;<4 x i32>;<4 x i32>, <4 x i32>
+_Z5mul24Dv4_iS_;<4 x i32>;<4 x i32>, <4 x i32>
+_Z5clampDv3_fff;<3 x float>;<3 x float>, float, float
+_Z7signbitDv2_f;double;double
+_Z5frexpDv3_fPU9CLprivateDv3_i;<3 x float>;<3 x float>, <3 x i32>*
+llvm.fmuladd.v8f64;<8 x double>;<8 x double>, <8 x double>, <8 x double>
+llvm.fmuladd.v16f64;<16 x double>;<16 x double>, <16 x double>, <16 x double>
+_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f;<4 x i32>;%opencl.image2d_ro_t*, %opencl.sampler_t*, double
+_Z5acoshDv4_f;<4 x float>;<4 x float>
+_Z7signbitDv4_f;<4 x i32>;<4 x float>
+_Z7isequalff;i32;float, float
+_Z6vload3mPU8CLglobalKf;<3 x float>;i64, float*
+_Z7vstore3Dv3_fmPU8CLglobalf;void;<3 x float>, i64, float*
+_Z4modffPU9CLprivatef;float;float, float*
+_Z10half_rsqrtDv4_f;<4 x float>;<4 x float>
+_Z11islessequalff;i32;float, float
+_Z9isgreaterDv2_fS_;double;double, double
+_Z3anyDv2_i;i32;double
+_Z3minDv4_ff;<4 x float>;<4 x float>, float
+_Z7degreesDv3_f;<3 x float>;<3 x float>
+_Z9half_sqrtDv2_f;double;double
+_Z6asinpiDv4_f;<4 x float>;<4 x float>
+_Z4signDv2_f;double;double
+_Z7vstore3Dv3_hmPU8CLglobalh;void;i32, i64, i8*
+_Z14convert_uchar3Dv3_f;i32;<3 x float>
+_Z5frexpDv3_fPU8CLglobalDv3_i;<3 x float>;<3 x float>, <3 x i32>*
+_Z3anyDv3_i;i32;<3 x i32>
+_Z5fractfPU9CLprivatef;float;float, float*
+_Z14convert_float2Dv2_j;double;double
+_Z3allDv3_i;i32;<3 x i32>
