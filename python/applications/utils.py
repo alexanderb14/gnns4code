@@ -8,11 +8,6 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 import utils
 
 
-def get_env(variable_name):
-    if variable_name in os.environ:
-        return os.environ[variable_name]
-    return ""
-
 def print_process_stdout_continuously(process, prefix):
     while True:
         line = process.stdout.readline()
@@ -79,10 +74,20 @@ def format_c_code(c_code:str):
     return stdout.decode("utf-8"), process.returncode
 
 
+def get_llvm_build_dir():
+    # First check for custom provided build
+    env_var_name = 'LLVM_BUILD'
+    if env_var_name in os.environ:
+        return os.environ[env_var_name]
+
+    # Then default to project build
+    return os.path.join(SCRIPT_DIR, '../../dependencies/llvm-project/build')
+
+
 # Executables / Libraries
-CLANG_EXECUTABLE = os.path.join(get_env('LLVM_BUILD'), 'bin/clang')
-CLANG_FORMAT_EXECUTABLE = os.path.join(get_env('LLVM_BUILD'), 'bin/clang-format')
-OPT_EXECUTABLE = os.path.join(get_env('LLVM_BUILD'), 'bin/opt')
+CLANG_EXECUTABLE = os.path.join(get_llvm_build_dir(), 'bin/clang')
+CLANG_FORMAT_EXECUTABLE = os.path.join(get_llvm_build_dir(), 'bin/clang-format')
+OPT_EXECUTABLE = os.path.join(get_llvm_build_dir(), 'bin/opt')
 
 MINER_PASS_SHARED_LIBRARY = \
     build_with_cmake(os.path.join(SCRIPT_DIR, '../../c/miner_llvm_pass'),
