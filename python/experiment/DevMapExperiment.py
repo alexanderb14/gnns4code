@@ -770,9 +770,6 @@ class DeepTune(HeterogemeousMappingModel):
         from keras.layers.normalization import BatchNormalization
         from keras.models import Model
 
-        srcs = '\n'.join(self.dataset['src'].values)
-        self.atomizer = GreedyAtomizer.from_text(srcs)
-
         # Language model. Takes as inputs source code sequences.
         code_in = Input(shape=(1024,), dtype="int32", name="code_in")
         x = Embedding(input_dim=self.atomizer.vocab_size + 1, input_length=1024,
@@ -922,14 +919,6 @@ def report_to_json(report: pd.DataFrame):
             'speedup': round(speedup, 4)}
 
 
-def prepare_preprocessing_artifact_dir(base_dir):
-    utils.delete_and_create_folder(base_dir)
-    utils.delete_and_create_folder(os.path.join(base_dir, 'out'))
-    utils.delete_and_create_folder(os.path.join(base_dir, 'bad_code'))
-    utils.delete_and_create_folder(os.path.join(base_dir, 'good_code'))
-    utils.delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
-
-
 def build_run_id(report_write_dir):
     num_files = int(len(
         [f for f in os.listdir(report_write_dir) if os.path.isfile(os.path.join(report_write_dir, f))]))
@@ -995,14 +984,14 @@ def main():
         #
         preprocessing_artifact_dir_clang = os.path.join(args.preprocessing_artifact_dir, 'clang')
         preprocessing_artifact_dir_llvm = os.path.join(args.preprocessing_artifact_dir, 'llvm')
-        prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_clang)
-        prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm)
+        utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_clang)
+        utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm)
 
         # Find all .cl files and extract code graphs from them
         files = utils.get_files_by_extension(args.code_dir, '.cl')
 
-        clang_preprocess.process_sources(files, preprocessing_artifact_dir_clang, args.code_dir)
-        llvm_preprocess.process_sources(files, preprocessing_artifact_dir_llvm, args.code_dir)
+        clang_preprocess.process_source_directory(files, preprocessing_artifact_dir_clang, args.code_dir)
+        llvm_preprocess.process_source_directory(files, preprocessing_artifact_dir_llvm, args.code_dir)
 
         # Extract oracle from the cgo17 dataframe
         # 
@@ -1087,32 +1076,15 @@ def main():
         print('num_graphs:', len(preprocessed))
 
         # CodeGraph -> graph
-        nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False, with_callnames=False)
-        for graph in preprocessed:
-            graph.accept(nic_vstr)
-        node_types = nic_vstr.node_type_ids_by_statements
+        node_types = clang_codegraph_models.assign_node_types(with_functionnames=False, with_callnames=False)
         print('num_node_types:', len(node_types))
 
         graphs_export = []
         names_export = []
 
         for graph in preprocessed:
-            # Extract node infos
-            ni_vstr = clang_codegraph_models.NodeInfoExtractionVisitor()
-            graph.accept(ni_vstr)
-            nodes = ni_vstr.node_types()
-            node_values = ni_vstr.node_values()
+            graph_export = clang_codegraph_models.graph_to_export_format(graph)
 
-            # Extract edges
-            ee_vstr = clang_codegraph_models.EdgeExtractionVisitor(edge_types={'AST': 0, 'LIVE': 1})
-            graph.accept(ee_vstr)
-            edges = ee_vstr.edges
-
-            graph_export = {
-                utils.T.NODES: nodes,
-                utils.T.NODE_VALUES: node_values,
-                utils.T.EDGES: edges
-            }
             # if graph.oracle == 'CPU':
             #     graph_export[utils.L.LABEL_0] = 0
             # elif graph.oracle == 'GPU':
@@ -1369,7 +1341,7 @@ def main():
                 "clamp_gradient_norm": 1.0,
                 "L2_loss_factor": 0.1,
 
-                "batch_size": 64,
+                "batch_size": 10,
                 "num_epochs": 1500,
                 "out_dir": "/tmp",
 
@@ -1429,7 +1401,7 @@ def main():
                 "L2_loss_factor": 0,
 
                 "batch_size": 64,
-                "num_epochs": 400,
+                "num_epochs": 1500,
                 "out_dir": "/tmp",
 
                 "tie_fwd_bkwd": 0,

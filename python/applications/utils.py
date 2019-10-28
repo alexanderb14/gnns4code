@@ -81,7 +81,7 @@ def get_llvm_build_dir():
         return os.environ[env_var_name]
 
     # Then default to project build
-    return os.path.join(SCRIPT_DIR, '../../dependencies/llvm-project/build')
+    return os.path.join(SCRIPT_DIR, '/devel/git/llvm-project/build')
 
 
 # Executables / Libraries

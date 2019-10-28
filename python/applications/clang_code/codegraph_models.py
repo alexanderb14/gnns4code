@@ -818,7 +818,7 @@ class NodeInfoExtractionVisitor(VisitorBase):
 
     def node_types(self):
         ret = []
-        for idx in range(0, max(self.__node_types, key=int)):
+        for idx in range(0, max(self.__node_types.keys()) + 1):
             if idx not in self.__node_types:
                 raise Exception()
 
@@ -1043,6 +1043,40 @@ def assign_node_ids_in_bfs_order(graph: object):
 
     for idx, node in enumerate(nodes):
         node.node_id = idx
+
+def assign_node_types(graphs, with_functionnames, with_callnames):
+    nic_vstr = NodeTypeIdCreateVisitor(with_functionnames=with_functionnames, with_callnames=with_callnames)
+
+    if type(graphs) == list:
+        for graph in graphs:
+            graph.accept(nic_vstr)
+    elif type(graphs) == dict:
+        for _, graph in graphs.items():
+            graph.accept(nic_vstr)
+
+    node_types = nic_vstr.node_type_ids_by_statements
+
+    return node_types
+
+def graph_to_export_format(graph):
+    # Extract node infos
+    ni_vstr = NodeInfoExtractionVisitor()
+    graph.accept(ni_vstr)
+    nodes = ni_vstr.node_types()
+    node_values = ni_vstr.node_values()
+
+    # Extract edges
+    ee_vstr = EdgeExtractionVisitor(edge_types={'AST': 0, 'LIVE': 1})
+    graph.accept(ee_vstr)
+    edges = ee_vstr.edges
+
+    graph_export = {
+        utils.T.NODES: nodes,
+        utils.T.NODE_VALUES: node_values,
+        utils.T.EDGES: edges
+    }
+
+    return graph_export
 
 def create_action_sequence(graph: object, debug: bool = False):
     # Assign node ids

@@ -34,7 +34,34 @@ def opencl_kernel_c_code_to_llvm_graph(c_code:str):
     return llvm_graph
 
 
-def process_sources(files, preprocessing_artifact_dir, substract_str=None, optimize_for_size=False):
+def process_source_file(src_file, out_filename='/tmp/out', additional_args=[], is_opencl_source=True):
+    # C -> LLVM IR
+    cmd_start = [app_utils.CLANG_EXECUTABLE,
+                 '-I' + app_utils.LIBCLC_DIR,
+                 '-include', app_utils.OPENCL_SHIM_FILE]
+
+    cmd_end = ['-emit-llvm', '-xcl', '-c', src_file, '-o', out_filename + '.ll']
+    cmd_compile = cmd_start + additional_args + cmd_end
+    print(' '.join(cmd_compile))
+
+    process = subprocess.Popen(cmd_compile, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout_compile, stderr_compile = process.communicate()
+    result_compile = process.returncode
+
+    # LLVM IR -> Graph
+    cmd_miner = [app_utils.OPT_EXECUTABLE,
+                 '-load', app_utils.MINER_PASS_SHARED_LIBRARY,
+                 '-miner', out_filename + '.ll', '-f', '-o', '/dev/null']
+    print(' '.join(cmd_miner))
+
+    process = subprocess.Popen(cmd_miner, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    stdout_miner, stderr_miner = process.communicate(stdout_compile)
+    result_miner = process.returncode
+
+    return stdout_miner, stderr_miner, result_miner
+
+
+def process_source_directory(files, preprocessing_artifact_dir, substract_str=None, optimize_for_size=False):
     out_dir = os.path.join(preprocessing_artifact_dir, 'out')
     good_code_dir = os.path.join(preprocessing_artifact_dir, 'bad_code')
     bad_code_dir = os.path.join(preprocessing_artifact_dir, 'good_code')

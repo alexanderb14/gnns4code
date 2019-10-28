@@ -424,6 +424,14 @@ def write_error_report_file(src_filename, report_filename, stdouts, stderrs, ret
         f.write(report)
 
 
+def prepare_preprocessing_artifact_dir(base_dir):
+    delete_and_create_folder(base_dir)
+    delete_and_create_folder(os.path.join(base_dir, 'out'))
+    delete_and_create_folder(os.path.join(base_dir, 'bad_code'))
+    delete_and_create_folder(os.path.join(base_dir, 'good_code'))
+    delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
+
+
 def min_max_avg(l: list) -> dict:
     return {
         'min': min(l),
