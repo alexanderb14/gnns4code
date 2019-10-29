@@ -429,7 +429,7 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd):
 
     X_seq = None  # defer sequence encoding (it's expensive)
 
-    for i, platform in enumerate(["Cypress", "Tahiti", "Fermi", "Kepler"]):
+    for i, platform in enumerate(["Cypress"]): #, "Tahiti", "Fermi", "Kepler"]):
         platform_name = platform2str(platform)
 
         # load data
@@ -451,10 +451,8 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd):
             model_basename = model.__basename__
 
             # encode source codes
-            if model.__class__.__name__ == 'Magni' and X_seq is None:
-                srcs = '\n'.join(df_devmap_amd['src'].values)
-                atomizer = GreedyAtomizer.from_text(srcs)
-                X_seq = encode_srcs(atomizer, df_runtimes["kernel"].values, df_runtimes["src"].values)
+            if (model.__class__.__name__ == 'Magni' or model.__class__.__name__ == 'DeepTune') and X_seq is None:
+                X_seq = encode_srcs(model.atomizer, df_runtimes["kernel"].values, df_runtimes["src"].values)
 
             # create a new model and train it
             model.init(seed=seed)
@@ -509,7 +507,8 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd):
                 "Oracle-CF": o,
                 "Predicted-CF": p,
                 "Speedup": p_speedup,
-                "Oracle": p_oracle
+                "Oracle": p_oracle,
+                "num_trainable_parameters": model.get_num_trainable_parameters()
             })
 
             progressbar[0] += 1  # update progress bar
@@ -549,8 +548,7 @@ class ThreadCoarseningModel(object):
         """
         pass
 
-    def train(self, cascading_features: np.array, cascading_y: np.array,
-              sequences: np.array, y_1hot: np.array, verbose: bool=False) -> None:
+    def train(self, **data) -> None:
         """
         Train a model.
 
@@ -576,7 +574,7 @@ class ThreadCoarseningModel(object):
         """
         raise NotImplementedError
 
-    def predict(self, cascading_features: np.array, sequences: np.array) -> np.array:
+    def predict(self, **data) -> np.array:
         """
         Make predictions for programs.
 
@@ -596,6 +594,9 @@ class ThreadCoarseningModel(object):
             Predicted 'y' values (optimal thread coarsening factors) with shape (n,1).
         """
         raise NotImplementedError
+
+    def get_num_trainable_parameters(self):
+        return None
 
 
 class Magni(ThreadCoarseningModel):
@@ -674,7 +675,7 @@ class DeepTune(ThreadCoarseningModel):
         np.random.seed(seed)
 
         # Vocabulary has a padding character
-        vocab_size = atomizer.vocab_size + 1
+        vocab_size = self.atomizer.vocab_size + 1
 
         # Language model. Takes as inputs source code sequences.
         seq_inputs = Input(shape=(1024,), dtype="int32")
@@ -692,15 +693,17 @@ class DeepTune(ThreadCoarseningModel):
         self.model = Model(inputs=seq_inputs, outputs=outputs)
         self.model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=['accuracy'])
 
-    def train(self, cascading_features: np.array, cascading_y: np.array,
-              sequences: np.array, y_1hot: np.array, verbose: bool = False) -> None:
-        self.model.fit(sequences, y_1hot, epochs=50, batch_size=64, verbose=verbose, shuffle=True)
+    def train(self, **data) -> None:
+        self.model.fit(data['sequences'], data['y_1hot'], epochs=50, batch_size=64, verbose=data['verbose'], shuffle=True)
 
-    def predict(self, cascading_features: np.array, sequences: np.array) -> np.array:
+    def predict(self, **data) -> np.array:
         # directly predict optimal thread coarsening factor from source sequences:
-        p = np.array(self.model.predict(sequences, batch_size=64, verbose=0))
+        p = np.array(self.model.predict(data['sequences'], batch_size=64, verbose=0))
         indices = [np.argmax(x) for x in p]
         return [cfs[x] for x in indices]
+
+    def get_num_trainable_parameters(self):
+        return self.model.count_params()
 
 
 class DeepGNN(ThreadCoarseningModel):
@@ -750,6 +753,9 @@ class DeepGNN(ThreadCoarseningModel):
     def get_num_trainable_parameters(self):
         return self.state.count_number_trainable_params()
 
+    def get_num_trainable_parameters(self):
+        return self.state.count_number_trainable_params()
+
 
 class DeepGNNAST(DeepGNN):
     __name__ = "DeepGNN AST"
@@ -757,6 +763,39 @@ class DeepGNNAST(DeepGNN):
 
     def __init__(self, config):
         DeepGNN.__init__(self, config)
+
+
+def parse_report_to_summary(report: pd.DataFrame):
+    report_str = ''
+
+    report_str += 'Grouped by Platform\n'
+    report_str += str(report.groupby('Platform')['Platform', 'Speedup', 'Oracle'].mean())
+    report_str += '\n\n'
+
+    return report_str
+
+
+def print_and_save_report(report_write_dir, run_id, config, model, report):
+    # Print report
+    report_summary = parse_report_to_summary(report)
+    print(report_summary)
+
+
+    # Write to files
+    # Config
+    filename = model.__basename__ + '_' + str(run_id) + '_config.txt'
+    with open(os.path.join(report_write_dir, filename), 'w') as f:
+        f.write(json.dumps(config))
+
+    # Summary
+    filename = model.__basename__ + '_' + str(run_id) + '_summary.txt'
+    with open(os.path.join(report_write_dir, filename), 'w') as f:
+        f.write(report_summary)
+
+    # Raw
+    filename = model.__basename__ + '_' + str(run_id) + '_raw.txt'
+    with open(os.path.join(report_write_dir, filename), 'w') as f:
+        f.write(report.to_csv())
 
 
 def main():
@@ -794,14 +833,20 @@ def main():
         df_oracles = pd.read_csv(args.oracles_csv)
         df_devmap_amd = pd.read_csv(args.devmap_amd_csv)
 
-        # Build run id
         run_id = str(os.getpid())
+        config = {}
 
         if args.Magni:
             model = Magni()
 
+            srcs = '\n'.join(df_devmap_amd['src'].values)
+            model.atomizer = GreedyAtomizer.from_text(srcs)
+
         if args.DeepTuneLSTM:
             model = DeepTune()
+
+            srcs = '\n'.join(df_devmap_amd['src'].values)
+            model.atomizer = GreedyAtomizer.from_text(srcs)
 
         if args.DeepTuneGNNClang:
             config = {
@@ -866,8 +911,6 @@ def main():
         print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 
         report = evaluate(model, df_runtimes, df_oracles, df_devmap_amd)
-        print(report)
-        print(report.groupby('Platform')['Platform', 'Speedup', 'Oracle'].mean())
 
         print_and_save_report(args.report_write_dir, run_id, config, model, report)
 
