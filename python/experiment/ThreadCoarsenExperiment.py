@@ -1002,6 +1002,9 @@ def main():
 
         # Clang
         # ############################################
+        utils.print_dash()
+        print('Preprocessing Clang...')
+        utils.print_dash()
 
         # 1) Extract graphs
         clang_graphs = {}
@@ -1022,8 +1025,8 @@ def main():
 
         # assert len(clang_graphs) == 17
 
-        # 2) Assign node type ids
-        node_types = clang_codegraph_models.assign_node_types(clang_graphs, with_functionnames=False, with_callnames=False)
+        # 2) Get node type ids
+        node_types = clang_codegraph_models.get_node_types(clang_graphs, with_functionnames=False, with_callnames=False)
         print('num_node_types:', len(node_types))
 
         # 3) Add to dataframe
@@ -1036,42 +1039,45 @@ def main():
 
                 df_runtimes.loc[row_idx, 'clang_graph'] = json.dumps(graph_export)
 
+        # LLVM
+        # ############################################
+        utils.print_dash()
+        print('Preprocessing LLVM...')
+        utils.print_dash()
+
+        # 1) Extract graphs
+        llvm_graphs = {}
+        for kernel_name_in_cgo17, data in sample_to_src_mapping.items():
+            src_file = os.path.join(args.code_dir, data['src_location'])
+            # LLVM
+            miner_out, _, _ = llvm_preprocess.process_source_file(src_file)
+            graphs = llvm_codegraph_models.codegraphs_create_from_miner_output(json.loads(miner_out))
+            # Get correct function
+            for graph in graphs:
+                f = graph.functions[0]
+                if f.name == data['kernel_name']:
+                    matched_graph = graph
+            assert matched_graph
+
+            llvm_graphs[kernel_name_in_cgo17] = matched_graph
+
+        # assert len(llvm_graphs) == 17
+
+        # 2) Get node type ids
+        node_types = llvm_codegraph_models.get_node_types(llvm_graphs)
+        print('num_node_types:', len(node_types))
+
+        # 3) Add to dataframe
+        df_runtimes['llvm_graph'] = None
+        for row_idx, row in df_runtimes.iterrows():
+            kernel_name = row['kernel']
+            if kernel_name in llvm_graphs:
+                graph = llvm_graphs[kernel_name]
+                graph_export = llvm_codegraph_models.graph_to_export_format(graph, node_types)
+
+                df_runtimes.loc[row_idx, 'llvm_graph'] = json.dumps(graph_export)
+
         print(df_runtimes)
-
-
-        # # LLVM
-        # # ############################################
-        #
-        # # 1) Extract graphs
-        # llvm_graphs = {}
-        # for kernel_name_in_cgo17, data in sample_to_src_mapping.items():
-        #     src_file = os.path.join(args.code_dir, data['src_location'])
-        #     # LLVM
-        #     miner_out, _, _ = llvm_preprocess.process_source_file(src_file)
-        #     graphs = llvm_codegraph_models.codegraphs_create_from_miner_output(json.loads(miner_out))
-        #     # Get correct function
-        #     for graph in graphs:
-        #         f = graph.functions[0]
-        #         if f.name == data['kernel_name']:
-        #             function = f
-        #     assert function
-        #
-        #     llvm_graphs[kernel_name_in_cgo17] = function
-        #
-        # # assert len(llvm_graphs) == 17
-        #
-        # # 2) Assign node type ids
-        #
-        #
-        # # 3) Add to dataframe
-        # df_runtimes['llvm_graph'] = None
-        # for row_idx, row in df_runtimes.iterrows():
-        #     kernel_name = row['kernel']
-        #     if kernel_name in clang_graphs:
-        #         df_runtimes.loc[row_idx, 'llvm_graph'] = json.dumps(llvm_graphs[kernel_name])
-        #
-        # print(df_runtimes)
-
 
         # Write to out csv file
         if args.cgo17_runtimes_csv_out:

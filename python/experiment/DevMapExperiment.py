@@ -1076,7 +1076,7 @@ def main():
         print('num_graphs:', len(preprocessed))
 
         # CodeGraph -> graph
-        node_types = clang_codegraph_models.assign_node_types(with_functionnames=False, with_callnames=False)
+        node_types = clang_codegraph_models.get_node_types(preprocessed, with_functionnames=False, with_callnames=False)
         print('num_node_types:', len(node_types))
 
         graphs_export = []
@@ -1190,11 +1190,7 @@ def main():
         print('num_graphs:', len(preprocessed))
 
         # CodeGraph -> graph
-        stats_vstr = llvm_codegraph_models.StatisticsVisitor()
-        for graph in preprocessed:
-            graph.visit(stats_vstr)
-        summary = stats_vstr.get_summary()
-        node_types_of_all_graphs = summary['node_types']
+        node_types_of_all_graphs = llvm_codegraph_models.get_node_types(preprocessed)
         print('num_node_types:', len(node_types_of_all_graphs))
         utils.pretty_print_dict(node_types_of_all_graphs)
 
@@ -1202,27 +1198,7 @@ def main():
         names_export = []
 
         for graph in preprocessed:
-            # Create node ids
-            node_id_vstr = llvm_codegraph_models.NodeIdCreateVisitor()
-            graph.visit(node_id_vstr)
-
-            # Extract node infos
-            ni_vstr = llvm_codegraph_models.NodeInfoExtractionVisitor(node_types_of_all_graphs)
-            graph.visit(ni_vstr)
-            nodes = ni_vstr.get_node_types()
-            # print(node_types)
-
-            # Extract edges
-            ee_vstr = llvm_codegraph_models.EdgeExtractionVisitor(edge_types={'cfg': 0, 'dataflow': 1,
-                                                                               'memaccess': 2, 'call': 3})
-            graph.visit(ee_vstr)
-            edges = ee_vstr.edges
-
-            graph_export = {
-                utils.T.NODES: nodes,
-                # utils.T.NODE_VALUES: node_values,
-                utils.T.EDGES: edges
-            }
+            graph_export = llvm_codegraph_models.graph_to_export_format(graph, node_types_of_all_graphs)
 
             graphs_export.append(graph_export)
             names_export.append(graph.name)
@@ -1235,6 +1211,7 @@ def main():
             for row_idx, row in df_benchmarks.iterrows():
                 for name, graph in zip(names_export, graphs_export):
                     if row['benchmark'] == name:
+                        print(name)
                         df_benchmarks.loc[row_idx, 'llvm_graph'] = json.dumps(graph)
 
             df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)

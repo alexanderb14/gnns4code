@@ -1044,7 +1044,7 @@ def assign_node_ids_in_bfs_order(graph: object):
     for idx, node in enumerate(nodes):
         node.node_id = idx
 
-def assign_node_types(graphs, with_functionnames, with_callnames):
+def get_node_types(graphs, with_functionnames, with_callnames):
     nic_vstr = NodeTypeIdCreateVisitor(with_functionnames=with_functionnames, with_callnames=with_callnames)
 
     if type(graphs) == list:
