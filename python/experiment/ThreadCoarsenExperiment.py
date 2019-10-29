@@ -855,7 +855,7 @@ def main():
                 "graph_rnn_cell": "GRU",
 
                 "num_timesteps": 4,
-                "hidden_size_orig": 60,
+                "hidden_size_orig": 46,
                 "gnn_h_size": 4,
                 "gnn_m_size": 2,
 
@@ -889,10 +889,10 @@ def main():
 
                 "learning_rate": 0.0005,
                 "clamp_gradient_norm": 1.0,
-                "L2_loss_factor": 0,
+                "L2_loss_factor": 0.01,
 
                 "batch_size": 16,
-                "num_epochs": 1,
+                "num_epochs": 500,
                 "out_dir": "/tmp",
 
                 "tie_fwd_bkwd": 1,
