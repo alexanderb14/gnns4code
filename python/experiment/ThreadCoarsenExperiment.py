@@ -17,9 +17,6 @@ import applications.code.preprocess as llvm_preprocess
 from model.PredictionModel import PredictionModel, PredictionModelState
 
 
-seed = 204
-
-
 #########################################################
 class CLgenError(Exception):
   """Top level error. Never directly thrown."""
@@ -418,7 +415,7 @@ def platform2str(platform):
         raise LookupError
 
 
-def evaluate(model, df_runtimes, df_oracles, df_devmap_amd):
+def evaluate(model, df_runtimes, df_oracles, df_devmap_amd, seed):
     from sklearn.model_selection import KFold
 
     # report progress:
@@ -641,22 +638,21 @@ class Magni(ThreadCoarseningModel):
 
         self.model = GridSearchCV(nn, cv=inner_cv, param_grid=params, n_jobs=-1)
 
-    def train(self, cascading_features: np.array, cascading_y: np.array,
-              sequences: np.array, y_1hot: np.array, verbose: bool=False) -> None:
-        self.model.fit(cascading_features, cascading_y)
+    def train(self, **data) -> None:
+        self.model.fit(data['cascading_features'], data['cascading_y'])
 
-    def predict(self, cascading_features: np.array, sequences: np.array) -> np.array:
+    def predict(self, **data) -> np.array:
         # we only support leave-one-out cross-validation (implementation detail):
-        assert(len(sequences) == 1)
+        assert(len(data['sequences']) == 1)
 
         # The binary cascading model:
         #
         # iteratively apply thread coarsening, using a new feature vector
         # every time coarsening is applied
-        for i in range(len(cascading_features)):
+        for i in range(len(data['cascading_features'])):
             # predict whether to coarsen, using the program features of
             # the current coarsening level:
-            should_coarsen = self.model.predict([cascading_features[i]])[0]
+            should_coarsen = self.model.predict([data['cascading_features'][i]])[0]
             if not should_coarsen:
                 break
         p = cfs[i]
@@ -824,6 +820,7 @@ def main():
         parser_exp.add_argument('--oracles_csv')
         parser_exp.add_argument('--devmap_amd_csv')
 
+        parser_exp.add_argument('--seed')
         parser_exp.add_argument('--report_write_dir')
 
         args = parser_exp.parse_args(sys.argv[2:])
@@ -834,6 +831,7 @@ def main():
         df_devmap_amd = pd.read_csv(args.devmap_amd_csv)
 
         run_id = str(os.getpid())
+        seed = int(args.seed)
         config = {}
 
         if args.Magni:
@@ -900,17 +898,17 @@ def main():
                 "use_edge_msg_avg_aggregation": 0,
 
                 "use_node_values": 0,
-
                 "save_best_model_interval": 1,
+                "with_aux_in": 0,
 
-                "with_aux_in": 0
+                "seed": seed
             }
 
             model = DeepGNNAST(config)
 
         print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 
-        report = evaluate(model, df_runtimes, df_oracles, df_devmap_amd)
+        report = evaluate(model, df_runtimes, df_oracles, df_devmap_amd, seed)
 
         print_and_save_report(args.report_write_dir, run_id, config, model, report)
 

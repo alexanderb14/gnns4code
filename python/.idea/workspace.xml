@@ -2,24 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="bf6fe145-a820-4a83-a7c8-00a3c2d46471" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/../c/clang_miner/clang_miner.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/../c/clang_miner/clang_miner.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_evaluate.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_evaluate.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_evaluate_w_node_values.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_evaluate_w_node_values.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_experiment_GNN_Clang.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_experiment_GNN_Clang.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_experiment_GNN_LLVM.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_experiment_GNN_LLVM.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_experiment_Grewe.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_experiment_Grewe.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_experiment_LSTM.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_experiment_LSTM.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_experiment_RandomMapping.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_experiment_RandomMapping.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_experiment_StaticMapping.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/DevMapExperiment_experiment_StaticMapping.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/PredictionExperiment_preprocess.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/applications/clang_code/codegraph_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/applications/clang_code/codegraph_models.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/applications/clang_code/preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/applications/clang_code/preprocess.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/applications/code/preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/applications/code/preprocess.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/applications/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/applications/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/experiment/AlgoClassificationExperiment.py" beforeDir="false" afterPath="$PROJECT_DIR$/experiment/AlgoClassificationExperiment.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/experiment/PredictionExperiment.py" beforeDir="false" afterPath="$PROJECT_DIR$/experiment/DevMapExperiment.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/model/cell/PredictionCell.py" beforeDir="false" afterPath="$PROJECT_DIR$/model/cell/PredictionCell.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" beforeDir="false" afterPath="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -71,7 +55,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.ThreadCoarsenExperiment experiment GNN Clang">
+  <component name="RunManager" selected="Python.ThreadCoarsenExperiment experiment Magni">
     <configuration name="DevMapExperiment preprocess" type="PythonConfigurationType" factoryName="Python">
       <module name="python" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -116,7 +100,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="ThreadCoarsenExperiment experiment GNN Clang" type="PythonConfigurationType" factoryName="Python">
+    <configuration name="ThreadCoarsenExperiment experiment DeepTuneLSTM" type="PythonConfigurationType" factoryName="Python">
       <module name="python" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -130,7 +114,29 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" />
-      <option name="PARAMETERS" value="experiment --DeepTuneGNNClang --runtimes_csv $PROJECT_DIR$/../data/thread_coarsen_task/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv" />
+      <option name="PARAMETERS" value="experiment --DeepTuneLSTM --runtimes_csv $PROJECT_DIR$/../data/thread_coarsen_task/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv --report_write_dir /tmp/out --seed 1" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="ThreadCoarsenExperiment experiment GNN Clang" type="PythonConfigurationType" factoryName="Python" singleton="false">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$PROJECT_DIR$/../../../envs/gnns4code/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/experiment" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" />
+      <option name="PARAMETERS" value="experiment --DeepTuneGNNClang --runtimes_csv $PROJECT_DIR$/../data/thread_coarsen_task/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv --report_write_dir /tmp/out --seed 1" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -152,7 +158,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" />
-      <option name="PARAMETERS" value="experiment --Magni --runtimes_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv" />
+      <option name="PARAMETERS" value="experiment --Magni --runtimes_csv $PROJECT_DIR$/../data/thread_coarsen_task/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv --seed 1" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -212,6 +218,7 @@
       <item itemvalue="Python.DevMapExperiment experiment StaticMapping" />
       <item itemvalue="Python.ThreadCoarsenExperiment preprocess" />
       <item itemvalue="Python.ThreadCoarsenExperiment experiment Magni" />
+      <item itemvalue="Python.ThreadCoarsenExperiment experiment DeepTuneLSTM" />
       <item itemvalue="Python.ThreadCoarsenExperiment experiment GNN Clang" />
       <item itemvalue="Python.Spawner" />
       <item itemvalue="Python.actionize" />
@@ -248,6 +255,8 @@
       <workItem from="1572268556518" duration="1508000" />
       <workItem from="1572270087064" duration="28438000" />
       <workItem from="1572302159353" duration="25000" />
+      <workItem from="1572309017307" duration="2151000" />
+      <workItem from="1572345420259" duration="7915000" />
     </task>
     <servers />
   </component>
@@ -271,11 +280,6 @@
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py</url>
-          <line>993</line>
-          <option name="timeStamp" value="12" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/applications/clang_code/codegraph_models.py</url>
           <line>1064</line>
           <option name="timeStamp" value="16" />
@@ -285,11 +289,13 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/python$DevMapExperiment_preprocess.coverage" NAME="ThreadCoarsenExperiment preprocess Coverage Results" MODIFIED="1572297786330" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
-    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_GNN_Clang.coverage" NAME="ThreadCoarsenExperiment experiment GNN Clang Coverage Results" MODIFIED="1572300369432" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_GNN_Clang.coverage" NAME="ThreadCoarsenExperiment experiment GNN Clang Coverage Results" MODIFIED="1572357013339" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/python$PredictionExperiment.coverage" NAME="PredictionExperiment Coverage Results" MODIFIED="1567327678180" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_DeepTune.coverage" NAME="ThreadCoarsenExperiment experiment DeepTuneLSTM Coverage Results" MODIFIED="1572311148884" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/python$PredictionExperiment_experiment_Grewe.coverage" NAME="PredictionExperiment experiment Grewe Coverage Results" MODIFIED="1572258237074" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_DeepTuneLSTM.coverage" NAME="ThreadCoarsenExperiment experiment DeepTuneLSTM Coverage Results" MODIFIED="1572347213886" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/python$pytest_in_test_codegraph_models_py.coverage" NAME="pytest in test_codegraph_models.py Coverage Results" MODIFIED="1570481639329" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
     <SUITE FILE_PATH="coverage/python$PredictionExperiment_preprocess.coverage" NAME="DevMapExperiment preprocess Coverage Results" MODIFIED="1572267418460" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
-    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_Magni.coverage" NAME="ThreadCoarsenExperiment experiment Magni Coverage Results" MODIFIED="1572275872755" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_Magni.coverage" NAME="ThreadCoarsenExperiment experiment Magni Coverage Results" MODIFIED="1572357311185" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
   </component>
 </project>

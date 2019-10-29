@@ -86,6 +86,8 @@ def min_max_avg(l: list) -> dict:
 
 def glorot_init(shape):
     initialization_range = np.sqrt(6.0 / (shape[-2] + shape[-1]))
+    print(np.random.uniform(low=-initialization_range, high=initialization_range, size=shape).astype(np.float32))
+
     return np.random.uniform(low=-initialization_range, high=initialization_range, size=shape).astype(np.float32)
 
 def graph_to_adj_mat(graph, max_n_nodes, num_edge_types):
