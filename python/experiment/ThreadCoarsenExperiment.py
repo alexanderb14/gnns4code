@@ -437,6 +437,7 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd, seed):
         X_cc, y_cc = get_magni_features(df_runtimes, df_oracles, platform)
 
         clang_graphs = np.array(consolidate_by_kernel_name(df_runtimes["kernel"].values, df_runtimes["clang_graph"].values))
+        llvm_graphs = np.array(consolidate_by_kernel_name(df_runtimes["kernel"].values, df_runtimes["llvm_graph"].values))
 
         # LOOCV
         kf = KFold(n_splits=len(y), shuffle=False)
@@ -459,6 +460,10 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd, seed):
                                             clang_graphs[train_index]],
                         clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
                                            clang_graphs[test_index]],
+                        llvm_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
+                                            llvm_graphs[train_index]],
+                        llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
+                                            llvm_graphs[test_index]],
                         sequences=X_seq[train_index] if X_seq is not None else None,
                         verbose=True,  # TODO
                         y_1hot=y_1hot[train_index],
@@ -469,6 +474,8 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd, seed):
             p = model.predict(cascading_features=X_cc[test_index[0]],
                               clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
                                                  clang_graphs[test_index]],
+                              llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
+                                                 llvm_graphs[test_index]],
                               sequences=X_seq[test_index] if X_seq is not None else None,
                               y_naturals_test=y_naturals[test_index]
                               )[0]
@@ -761,6 +768,14 @@ class DeepGNNAST(DeepGNN):
         DeepGNN.__init__(self, config)
 
 
+class DeepGNNLLVM(DeepGNN):
+    __name__ = "DeepGNN LLVM"
+    __basename__ = "deepgnn-llvm"
+
+    def __init__(self, config):
+        DeepGNN.__init__(self, config)
+
+
 def parse_report_to_summary(report: pd.DataFrame):
     report_str = ''
 
@@ -905,6 +920,66 @@ def main():
             }
 
             model = DeepGNNAST(config)
+
+        if args.DeepTuneGNNLLVM:
+            config = {
+                "run_id": 'deepgnn-llvm' + '_' + str(run_id),
+
+                "graph_rnn_cell": "GRU",
+
+                "num_timesteps": 4,
+                "hidden_size_orig": 54,
+                "gnn_h_size": 4,
+                "gnn_m_size": 2,
+
+                "num_edge_types": 4,
+
+                "prediction_cell": {
+                    "mlp_f_m_dims": [],
+                    "mlp_f_m_activation": "relu",
+
+                    "mlp_g_m_dims": [],
+                    "mlp_g_m_activation": "sigmoid",
+
+                    "mlp_reduce_dims": [],
+                    "mlp_reduce_activation": "relu",
+
+                    "mlp_reduce_after_aux_in_1_dims": [],
+                    "mlp_reduce_after_aux_in_1_activation": "relu",
+                    "mlp_reduce_after_aux_in_1_out_dim": 4,
+
+                    "mlp_reduce_after_aux_in_2_dims": [],
+                    "mlp_reduce_after_aux_in_2_activation": "sigmoid",
+                    "mlp_reduce_after_aux_in_2_out_dim": 6,
+
+                    "output_dim": 6,
+                },
+
+                "embedding_layer": {
+                    "mapping_dims": []
+                },
+
+
+                "learning_rate": 0.0005,
+                "clamp_gradient_norm": 1.0,
+                "L2_loss_factor": 0,
+
+                "batch_size": 16,
+                "num_epochs": 500,
+                "out_dir": "/tmp",
+
+                "tie_fwd_bkwd": 1,
+                "use_edge_bias": 0,
+                "use_edge_msg_avg_aggregation": 0,
+
+                "use_node_values": 0,
+                "save_best_model_interval": 1,
+                "with_aux_in": 0,
+
+                "seed": seed
+            }
+
+            model = DeepGNNLLVM(config)
 
         print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 

@@ -272,7 +272,7 @@ class NodeInfoExtractionVisitor(VisitorBase):
 
     def get_node_types(self):
         ret = []
-        for idx in range(0, max(self.__node_types, key=int)):
+        for idx in range(0, max(self.__node_types.keys()) + 1):
             if idx not in self.__node_types:
                 raise Exception()
 
