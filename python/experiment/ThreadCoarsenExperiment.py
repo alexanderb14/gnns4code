@@ -429,7 +429,7 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd):
 
     X_seq = None  # defer sequence encoding (it's expensive)
 
-    for i, platform in enumerate(["Cypress"]): #, "Tahiti", "Fermi", "Kepler"]):
+    for i, platform in enumerate(["Cypress", "Tahiti", "Fermi", "Kepler"]):
         platform_name = platform2str(platform)
 
         # load data
