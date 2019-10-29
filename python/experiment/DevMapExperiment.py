@@ -20,9 +20,6 @@ import applications.code.preprocess as llvm_preprocess
 from model.PredictionModel import PredictionModel, PredictionModelState
 
 
-seed = 204
-
-
 #########################################################
 class CLgenError(Exception):
   """Top level error. Never directly thrown."""
@@ -533,7 +530,7 @@ class HeterogemeousMappingModel(object):
         pass
 
 
-def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd) -> pd.DataFrame:
+def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd, seed) -> pd.DataFrame:
     """
     Evaluate a model.
 
@@ -584,7 +581,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
 
         # 10-fold cross-validation
         if fold_mode == 'random_10fold':
-            kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+            kfold_seed = 204
+            kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=kfold_seed)
             split = kf.split(features, y)
         elif fold_mode == 'benchmark_grouped_7fold':
             benchmark_suites = [x.split('-')[0] for x in list(df['benchmark'])]
@@ -615,7 +613,7 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
                         y_train=y[train_index],
                         y_test=y[test_index],
                         y_1hot=y_1hot[train_index],
-                        verbose=False)
+                        verbose=True)
 
             # test model
             p = model.predict(
@@ -735,7 +733,7 @@ class Grewe(HeterogemeousMappingModel):
         from sklearn.tree import DecisionTreeClassifier
 
         self.model = DecisionTreeClassifier(
-            splitter="best",
+            random_state=seed, splitter="best",
             criterion="entropy", max_depth=5,
             min_samples_leaf=5)
         return self
@@ -769,6 +767,9 @@ class DeepTune(HeterogemeousMappingModel):
         from keras.layers.merge import Concatenate
         from keras.layers.normalization import BatchNormalization
         from keras.models import Model
+
+        srcs = '\n'.join(self.dataset['src'].values)
+        self.atomizer = GreedyAtomizer.from_text(srcs)
 
         # Language model. Takes as inputs source code sequences.
         code_in = Input(shape=(1024,), dtype="int32", name="code_in")
@@ -1235,6 +1236,7 @@ def main():
         parser_exp.add_argument('--fold_mode')
         parser_exp.add_argument('--datasets', '--names-list', nargs='+', default=[])
 
+        parser_exp.add_argument('--seed')
         parser_exp.add_argument('--report_write_dir')
 
         args = parser_exp.parse_args(sys.argv[2:])
@@ -1245,6 +1247,7 @@ def main():
 
         # Build run id
         run_id = str(os.getpid())
+        seed = int(args.seed)
 
         if args.RandomMapping:
             config = {
@@ -1318,7 +1321,7 @@ def main():
                 "clamp_gradient_norm": 1.0,
                 "L2_loss_factor": 0.1,
 
-                "batch_size": 10,
+                "batch_size": 64,
                 "num_epochs": 1500,
                 "out_dir": "/tmp",
 
@@ -1327,10 +1330,10 @@ def main():
                 "use_edge_msg_avg_aggregation": 0,
 
                 "use_node_values": 0,
-
                 "save_best_model_interval": 1,
+                "with_aux_in": 1,
 
-                "with_aux_in": 1
+                "seed": seed
             }
 
             model = DeepGNNAST(config)
@@ -1386,17 +1389,17 @@ def main():
                 "use_edge_msg_avg_aggregation": 0,
 
                 "use_node_values": 0,
-
                 "save_best_model_interval": 1,
+                "with_aux_in": 1,
 
-                "with_aux_in": 1
+                "seed": seed
             }
 
             model = DeepGNNLLVM(config)
 
         print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 
-        report = evaluate(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd)
+        report = evaluate(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd, seed)
         print_and_save_report(args.report_write_dir, run_id, config, model, report)
 
     # Evaluate command

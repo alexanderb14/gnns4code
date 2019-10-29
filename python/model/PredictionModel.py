@@ -338,7 +338,7 @@ class PredictionModel(object):
         """
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            trainable_vars = self.state.sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+            trainable_vars = tf.get_default_graph().get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
 
             optimizer = tf.train.AdamOptimizer(self.config['learning_rate'])
             grads_and_vars = optimizer.compute_gradients(self.ops['loss'], var_list=trainable_vars)
