@@ -116,10 +116,13 @@ def build_tc_experiment_args(method, report_write_dir, seed):
     return args
 
 
-def build_tc_experiment_infos(report_write_root_dir, num_iterations):
+def build_tc_experiment_infos(report_write_root_dir, num_iterations, methods):
     cmds = []
 
-    for method in ['DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'Magni']:    # 'DeepTuneLSTM'
+    if len(methods) == 0:
+        methods = ['DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'DeepTuneLSTM', 'Magni']
+
+    for method in methods:
         for seed in range(1, num_iterations + 1):
             # Create report dir
             report_write_dir = os.path.join(report_write_root_dir, 'tc_%s' % (method))
@@ -154,10 +157,13 @@ def build_devmap_experiment_args(method, fold_mode, report_write_dir, seed):
     return args
 
 
-def build_devmap_experiment_infos(report_write_root_dir, num_iterations):
+def build_devmap_experiment_infos(report_write_root_dir, num_iterations, methods):
     cmds = []
 
-    for method in ['RandomMapping', 'StaticMapping', 'Grewe', 'DeepTuneLSTM', 'DeepTuneGNNClang', 'DeepTuneGNNLLVM']:
+    if len(methods) == 0:
+        methods = ['DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'RandomMapping', 'StaticMapping', 'Grewe', 'DeepTuneLSTM']
+
+    for method in methods:
         for fold_mode in ['random_10fold', 'benchmark_grouped_7fold']:
             for seed in range(1, num_iterations + 1):
                 # Create report dir
@@ -184,6 +190,7 @@ def main():
     parser.add_argument('--environment')
     parser.add_argument('--num_iterations')
     parser.add_argument('--report_write_root_dir')
+    parser.add_argument('--methods', '--names-list', nargs='+', default=[])
 
     args = parser.parse_args()
 
@@ -191,11 +198,13 @@ def main():
     if args.experiment == 'devmap':
         infos = build_devmap_experiment_infos(
             os.path.join(args.report_write_root_dir, 'devmap'),
-            int(args.num_iterations))
+            int(args.num_iterations),
+            args.methods)
     elif args.experiment == 'tc':
         infos = build_tc_experiment_infos(
             os.path.join(args.report_write_root_dir, 'tc'),
-            int(args.num_iterations))
+            int(args.num_iterations),
+            args.methods)
 
     print('Number of jobs: %i' % len(infos))
 
