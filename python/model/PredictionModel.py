@@ -24,6 +24,7 @@ class PredictionModelState(object):
     State of the Prediction model.
     """
     def __init__(self, config):
+        self.graph = tf.Graph()
 
         self.best_epoch_weights = None
 
@@ -33,18 +34,19 @@ class PredictionModelState(object):
 
         tf_config = tf.ConfigProto()
         tf_config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=tf_config)
+        self.sess = tf.Session(graph=self.graph, config=tf_config)
 
-        self.embedding_layer_state = EmbeddingLayerState(config)
-        self.ggnn_layer_state = GGNNModelLayerState(config)
-        self.prediction_cell_state = PredictionCellState(config)
+        with self.graph.as_default():
+            self.embedding_layer_state = EmbeddingLayerState(config)
+            self.ggnn_layer_state = GGNNModelLayerState(config)
+            self.prediction_cell_state = PredictionCellState(config)
 
     def __get_weights(self):
         """
         Get model weights
         """
         weights = {}
-        for variable in tf.get_default_graph().get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+        for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
             weights[variable.name] = self.sess.run(variable)
 
         return weights
@@ -57,7 +59,7 @@ class PredictionModelState(object):
         with tf.name_scope("restore"):
             restore_ops = []
             used_vars = set()
-            for variable in tf.get_default_graph().get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+            for variable in self.sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
                 used_vars.add(variable.name)
                 if variable.name in weights:
                     restore_ops.append(variable.assign(weights[variable.name]))
@@ -109,7 +111,7 @@ class PredictionModelState(object):
         Taken from https://stackoverflow.com/questions/38160940/how-to-count-total-number-of-trainable-parameters-in-a-tensorflow-model
         """
         tot_nb_params = 0
-        for trainable_variable in tf.get_default_graph().get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
+        for trainable_variable in self.sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
             shape = trainable_variable.get_shape()  # e.g [D,F] or [W,H,C]
             current_nb_params = self.get_nb_params_shape(shape)
             tot_nb_params = tot_nb_params + current_nb_params
@@ -138,8 +140,9 @@ class PredictionModel(object):
         self.ggnn_layers = []
         self.cells = []
 
-        self.ops = {}
-        self.placeholders = {}
+        with self.state.graph.as_default():
+            self.ops = {}
+            self.placeholders = {}
 
         self.with_gradient_monitoring = True if 'gradient_monitoring' in self.config and self.config['gradient_monitoring'] == 1 else False
         self.with_aux_in = True if 'with_aux_in' in self.config and self.config['with_aux_in'] == 1 else False
@@ -147,10 +150,11 @@ class PredictionModel(object):
         # Dump config to stdout
         utils.pretty_print_dict(self.config)
 
-        # Create and initialize model
-        self._make_model(True)
-        self._make_train_step()
-        self._initialize_model()
+        with self.state.graph.as_default():
+            # Create and initialize model
+            self._make_model(True)
+            self._make_train_step()
+            self._initialize_model()
 
         # # Configure directories and save model configuration
         # SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -338,7 +342,7 @@ class PredictionModel(object):
         """
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            trainable_vars = tf.get_default_graph().get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+            trainable_vars = self.state.sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
 
             optimizer = tf.train.AdamOptimizer(self.config['learning_rate'])
             grads_and_vars = optimizer.compute_gradients(self.ops['loss'], var_list=trainable_vars)
