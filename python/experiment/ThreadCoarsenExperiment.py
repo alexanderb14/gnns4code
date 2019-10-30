@@ -643,7 +643,7 @@ class Magni(ThreadCoarseningModel):
             ]
         }
 
-        self.model = GridSearchCV(nn, cv=inner_cv, param_grid=params, n_jobs=-1)
+        self.model = GridSearchCV(nn, cv=inner_cv, param_grid=params, n_jobs=-1, verbose=2)
 
     def train(self, **data) -> None:
         self.model.fit(data['cascading_features'], data['cascading_y'])
@@ -674,6 +674,14 @@ class DeepTune(ThreadCoarseningModel):
         from keras.layers import Input, Dropout, Embedding, merge, LSTM, Dense
         from keras.layers.normalization import BatchNormalization
         from keras.models import Model, Sequential, load_model
+        #
+        # from keras.backend.tensorflow_backend import set_session
+        # import tensorflow as tf
+        # config = tf.ConfigProto()
+        # config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+        # config.log_device_placement = True  # to log device placement (on which device the operation ran)
+        # sess = tf.Session(config=config)
+        # set_session(sess)  # set this TensorFlow session as the default session for Keras
 
         np.random.seed(seed)
 
