@@ -4,40 +4,101 @@ import subprocess
 
 
 CONFIG_DIR = 'gnns4code/taurus'
-DEVMAP_CONFIG_MAPPINGS = {
+TC_CONFIGS = {
+    'Magni': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 1,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneLSTM': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 1,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNClang': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNLLVM': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    }
+}
+DEVMAP_CONFIGS = {
     'RandomMapping': {
-        'slurm_config': 'ml.slurm',
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 2,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
     },
     'StaticMapping': {
-        'slurm_config': 'ml.slurm',
+        'slurm': {
+            'config': 'ml.slurm',
+        },
+        'workstation': {
+            'concurrency': 2,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
     },
     'Grewe': {
-        'slurm_config': 'ml.slurm',
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 2,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
     },
     'DeepTuneLSTM': {
-        'slurm_config': 'ml.slurm',
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 1,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
     },
     'DeepTuneGNNClang': {
-        'slurm_config': 'ml.slurm',
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 2,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
     },
     'DeepTuneGNNLLVM': {
-        'slurm_config': 'ml.slurm',
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 2,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
     }
 }
-TC_CONFIG_MAPPINGS = {
-    'Magni': {
-        'slurm_config': 'ml.slurm',
-    },
-    'DeepTuneLSTM': {
-        'slurm_config': 'ml.slurm',
-    },
-    'DeepTuneGNNClang': {
-        'slurm_config': 'ml.slurm',
-    },
-    'DeepTuneGNNLLVM': {
-        'slurm_config': 'ml.slurm',
-    }
-}
+
 
 # ThreadCoarsening experiment
 def build_tc_experiment_args(method, report_write_dir, seed):
@@ -58,7 +119,7 @@ def build_tc_experiment_args(method, report_write_dir, seed):
 def build_tc_experiment_infos(report_write_root_dir, num_iterations):
     cmds = []
 
-    for method in ['Magni', 'DeepTuneLSTM', 'DeepTuneGNNClang', 'DeepTuneGNNLLVM']:
+    for method in ['DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'Magni']:    # 'DeepTuneLSTM'
         for seed in range(1, num_iterations + 1):
             # Create report dir
             report_write_dir = os.path.join(report_write_root_dir, 'tc_%s' % (method))
@@ -66,12 +127,12 @@ def build_tc_experiment_infos(report_write_root_dir, num_iterations):
                 os.makedirs(report_write_dir)
 
             # Build command
-            cmd = ['python', 'gnns4code/python/experiment/ThreadCoarsenExperiment.py']
+            cmd = ['gnns4code/python/experiment/ThreadCoarsenExperiment.py']
             cmd += build_tc_experiment_args(method, report_write_dir, seed)
 
             cmds.append({
                 'cmd': cmd,
-                'slurm_config': TC_CONFIG_MAPPINGS[method]['slurm_config']
+                'config': TC_CONFIGS[method]
             })
 
     return cmds
@@ -105,12 +166,12 @@ def build_devmap_experiment_infos(report_write_root_dir, num_iterations):
                     os.makedirs(report_write_dir)
 
                 # Build command
-                cmd = ['python', 'gnns4code/python/experiment/DevMapExperiment.py']
+                cmd = ['gnns4code/python/experiment/DevMapExperiment.py']
                 cmd += build_devmap_experiment_args(method, fold_mode, report_write_dir, seed)
 
                 cmds.append({
                     'cmd': cmd,
-                    'slurm_config': DEVMAP_CONFIG_MAPPINGS[method]['slurm_config']
+                    'config': DEVMAP_CONFIGS[method]
                 })
 
     return cmds
@@ -118,11 +179,15 @@ def build_devmap_experiment_infos(report_write_root_dir, num_iterations):
 
 def main():
     parser = argparse.ArgumentParser()
+
     parser.add_argument('--experiment')
+    parser.add_argument('--environment')
     parser.add_argument('--num_iterations')
     parser.add_argument('--report_write_root_dir')
+
     args = parser.parse_args()
 
+    # Build job list
     if args.experiment == 'devmap':
         infos = build_devmap_experiment_infos(
             os.path.join(args.report_write_root_dir, 'devmap'),
@@ -134,14 +199,59 @@ def main():
 
     print('Number of jobs: %i' % len(infos))
 
-    for info in infos:
-        # Build complete command
-        complete_command = ' '.join(['sbatch'] + [os.path.join(CONFIG_DIR, info['slurm_config'])] +
-                                    ['\"'] +
-                                    info['cmd'] +
-                                    ['\"'])
-        print(complete_command)
-        os.system(complete_command)
+    # Execute jobs
+    if args.environment == 'slurm':
+        for info in infos:
+            # Build complete command
+            complete_command = ' '.join(['sbatch'] + [os.path.join(CONFIG_DIR, info['config']['slurm']['config'])] +
+                                        ['\"'] +
+                                        ['python'] + info['cmd'] +
+                                        ['\"'])
+            print(complete_command)
+            os.system(complete_command)
+
+    elif args.environment == 'workstation':
+        import concurrent.futures
+        import subprocess
+
+        jobs_by_concurrency = {}
+        for i, info in enumerate(infos):
+            complete_command = ' '.join([os.path.join(info['config']['workstation']['env'], 'bin/python')] + info['cmd'])
+            complete_command = complete_command.split(' ')
+
+            concurrency = info['config']['workstation']['concurrency']
+
+            job = {
+                'cmd': complete_command,
+                'id': i
+            }
+
+            if concurrency not in jobs_by_concurrency:
+                jobs_by_concurrency[concurrency] = []
+            jobs_by_concurrency[concurrency].append(job)
+
+        for concurrency, jobs in jobs_by_concurrency.items():
+            def print_process_stdout_continuously(process, prefix):
+                while True:
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+                    print(str(prefix) + ': ' + str(line.rstrip(), 'utf-8'))
+
+                process.wait()
+                print(prefix + ' RETURNCODE: ' + str(process.returncode))
+
+            def exec_job(job):
+                print("job %i: \n%s" % (job['id'], job['cmd']))
+                process = subprocess.Popen(job['cmd'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.getcwd())
+                stdout, stderr = process.communicate()
+
+                #print(stdout, stderr)
+                #print_process_stdout_continuously(process, job['id'])
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
+                executor.map(exec_job, jobs)
+
 
 if __name__ == '__main__':
     main()
