@@ -861,7 +861,11 @@ def main():
         parser_exp.add_argument('--Magni', action='store_true')
         parser_exp.add_argument('--DeepTuneLSTM', action='store_true')
         parser_exp.add_argument('--DeepTuneGNNClang', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNClangASTEdges', action='store_true')
         parser_exp.add_argument('--DeepTuneGNNLLVM', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNLLVMCFGEdges', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNLLVMCFGDataflowEdges', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNLLVMCFGDataflowCallEdges', action='store_true')
 
         parser_exp.add_argument('--runtimes_csv')
         parser_exp.add_argument('--oracles_csv')
@@ -893,7 +897,7 @@ def main():
             srcs = '\n'.join(df_devmap_amd['src'].values)
             model.atomizer = GreedyAtomizer.from_text(srcs)
 
-        if args.DeepTuneGNNClang:
+        if args.DeepTuneGNNClang or args.DeepTuneGNNClangASTEdges:
             config = {
                 "run_id": 'deepgnn-ast' + '_' + str(run_id),
 
@@ -951,9 +955,13 @@ def main():
                 "seed": seed
             }
 
+            if args.DeepTuneGNNClangASTEdges:
+                config['edge_type_filter'] = [0]
+                config['num_edge_types'] = 1
+
             model = DeepGNNAST(config)
 
-        if args.DeepTuneGNNLLVM:
+        if args.DeepTuneGNNLLVM or args.DeepTuneGNNLLVMCFGEdges or args.DeepTuneGNNLLVMCFGDataflowEdges or args.DeepTuneGNNLLVMCFGDataflowCallEdges:
             config = {
                 "run_id": 'deepgnn-llvm' + '_' + str(run_id),
 
@@ -1010,6 +1018,18 @@ def main():
 
                 "seed": seed
             }
+
+            if args.DeepTuneGNNLLVMCFGEdges:
+                config['edge_type_filter'] = [0]
+                config['num_edge_types'] = 1
+
+            if args.DeepTuneGNNLLVMCFGDataflowEdges:
+                config['edge_type_filter'] = [0, 1]
+                config['num_edge_types'] = 2
+
+            if args.DeepTuneGNNLLVMCFGDataflowCallEdges:
+                config['edge_type_filter'] = [0, 1, 2]
+                config['num_edge_types'] = 3
 
             model = DeepGNNLLVM(config)
 

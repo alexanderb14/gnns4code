@@ -272,11 +272,14 @@ def apply_action_to_graph(graph:dict, action:dict) -> None:
         ])
 
 
-def graph_to_adjacency_lists(graph, tie_fwd_bkwd) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
+def graph_to_adjacency_lists(graph, tie_fwd_bkwd, edge_type_filter = []) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
     adj_lists = defaultdict(list)
     num_incoming_edges_dicts_per_type = defaultdict(lambda: defaultdict(lambda: 0))
     for src, e, dest in graph:
         fwd_edge_type = e
+        if fwd_edge_type not in edge_type_filter and len(edge_type_filter) > 0:
+            continue
+
         adj_lists[fwd_edge_type].append((src, dest))
         num_incoming_edges_dicts_per_type[fwd_edge_type][dest] += 1
 

@@ -32,7 +32,43 @@ TC_CONFIGS = {
             'env': '/devel/envs/brauckmann-diploma-2019'
         }
     },
+    'DeepTuneGNNClangASTEdges': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
     'DeepTuneGNNLLVM': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNLLVMCFGEdges': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNLLVMCFGDataflowEdges': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNLLVMCFGDataflowCallEdges': {
         'slurm': {
             'config': 'ml.slurm'
         },
@@ -84,7 +120,16 @@ DEVMAP_CONFIGS = {
             'config': 'ml.slurm'
         },
         'workstation': {
-            'concurrency': 2,
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNClangASTEdges': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
             'env': '/devel/envs/brauckmann-diploma-2019'
         }
     },
@@ -93,7 +138,34 @@ DEVMAP_CONFIGS = {
             'config': 'ml.slurm'
         },
         'workstation': {
-            'concurrency': 2,
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNLLVMCFGEdges': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNLLVMCFGDataflowEdges': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
+            'env': '/devel/envs/brauckmann-diploma-2019'
+        }
+    },
+    'DeepTuneGNNLLVMCFGDataflowCallEdges': {
+        'slurm': {
+            'config': 'ml.slurm'
+        },
+        'workstation': {
+            'concurrency': 4,
             'env': '/devel/envs/brauckmann-diploma-2019'
         }
     }
@@ -120,7 +192,7 @@ def build_tc_experiment_infos(report_write_root_dir, num_iterations, methods):
     cmds = []
 
     if len(methods) == 0:
-        methods = ['DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'DeepTuneLSTM', 'Magni']
+        methods = ['DeepTuneGNNClang', 'DeepTuneGNNClangASTEdges', 'DeepTuneGNNLLVM', 'DeepTuneGNNLLVMCFGEdges', 'DeepTuneGNNLLVMCFGDataflowEdges', 'DeepTuneGNNLLVMCFGDataflowCallEdges', 'DeepTuneLSTM', 'Magni']
 
     for method in methods:
         for seed in range(1, num_iterations + 1):
@@ -161,7 +233,7 @@ def build_devmap_experiment_infos(report_write_root_dir, num_iterations, methods
     cmds = []
 
     if len(methods) == 0:
-        methods = ['DeepTuneLSTM', 'DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'RandomMapping', 'StaticMapping', 'Grewe']
+        methods = ['DeepTuneGNNClang', 'DeepTuneGNNClangASTEdges', 'DeepTuneGNNLLVM', 'DeepTuneGNNLLVMCFGEdges', 'DeepTuneGNNLLVMCFGDataflowEdges', 'DeepTuneGNNLLVMCFGDataflowCallEdges', 'DeepTuneLSTM', 'RandomMapping', 'StaticMapping', 'Grewe']
 
     for method in methods:
         for fold_mode in ['random_10fold', 'benchmark_grouped_7fold']:

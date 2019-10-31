@@ -229,11 +229,13 @@ class PredictionModel(object):
             # Graph model: Adj list
             adj_lists = graph[utils.AE.ADJ_LIST]
             for idx, adj_list in adj_lists.items():
+                if idx >= self.config['num_edge_types']:
+                    continue
                 batch_data['adjacency_lists'][idx].append(adj_list)
 
             if self.config['use_edge_bias'] == 1:
                 # Graph model: Incoming edge numbers
-                num_incoming_edges_dicts_per_type = action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'])[0]
+                num_incoming_edges_dicts_per_type = action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'], self.config['edge_type_filter'])[0]
                 num_incoming_edges_per_type = np.zeros((num_nodes, num_edge_types))
                 for (e_type, num_incoming_edges_per_type_dict) in num_incoming_edges_dicts_per_type.items():
                     for (node_id, edge_count) in num_incoming_edges_per_type_dict.items():
