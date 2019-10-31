@@ -1378,13 +1378,15 @@ def main():
                     "mlp_reduce_dims": [64, 64],
                     "mlp_reduce_activation": "relu",
 
-                    "mlp_reduce_after_aux_in_1_dims": [],
+                    "mlp_reduce_after_aux_in_1_dims": [64, 32],
                     "mlp_reduce_after_aux_in_1_activation": "relu",
                     "mlp_reduce_after_aux_in_1_out_dim": 32,
 
                     "mlp_reduce_after_aux_in_2_dims": [],
                     "mlp_reduce_after_aux_in_2_activation": "sigmoid",
                     "mlp_reduce_after_aux_in_2_out_dim": 2,
+
+                    "output_dim": 2,
                 },
 
                 "embedding_layer": {
