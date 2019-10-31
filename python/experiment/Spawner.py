@@ -161,7 +161,7 @@ def build_devmap_experiment_infos(report_write_root_dir, num_iterations, methods
     cmds = []
 
     if len(methods) == 0:
-        methods = ['DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'RandomMapping', 'StaticMapping', 'Grewe', 'DeepTuneLSTM']
+        methods = ['DeepTuneLSTM', 'DeepTuneGNNClang', 'DeepTuneGNNLLVM', 'RandomMapping', 'StaticMapping', 'Grewe']
 
     for method in methods:
         for fold_mode in ['random_10fold', 'benchmark_grouped_7fold']:
@@ -189,6 +189,7 @@ def main():
     parser.add_argument('--experiment')
     parser.add_argument('--environment')
     parser.add_argument('--num_iterations')
+    parser.add_argument('--max_threads')
     parser.add_argument('--report_write_root_dir')
     parser.add_argument('--methods', '--names-list', nargs='+', default=[])
 
@@ -258,7 +259,8 @@ def main():
                 #print(stdout, stderr)
                 #print_process_stdout_continuously(process, job['id'])
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
+            num_workers = max(concurrency, int(args.max_threads))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
                 executor.map(exec_job, jobs)
 
 

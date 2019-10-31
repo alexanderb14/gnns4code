@@ -7,6 +7,7 @@ import pickle
 import sys
 from collections import Counter, defaultdict
 from pandas.io.json import json_normalize
+import time
 from typing import List
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -601,29 +602,40 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
                 sequences = encode_srcs(model.atomizer, df["src"].values)
 
+            clang_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]]
+            clang_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]]
+            llvm_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_index]]
+            llvm_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]]
+
+            train_time_start = time.time()
             model.train(df=df,
                         features=features[train_index],
                         aux_in_train=aux_in[train_index],
                         aux_in_test=aux_in[test_index],
-                        clang_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
-                        clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
-                        llvm_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_index]],
-                        llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]],
+                        clang_graphs_train=clang_graphs_train,
+                        clang_graphs_test=clang_graphs_test,
+                        llvm_graphs_train=llvm_graphs_train,
+                        llvm_graphs_test=llvm_graphs_test,
                         sequences=sequences[train_index] if sequences is not None else None,
                         y_train=y[train_index],
                         y_test=y[test_index],
                         y_1hot=y_1hot[train_index],
                         verbose=True)
+            train_time_end = time.time()
+            train_time = train_time_end - train_time_start
 
             # test model
+            inference_time_start = time.time()
             p = model.predict(
                 features=features[test_index],
                 aux_in_test=aux_in[test_index],
-                clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
-                llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]],
+                clang_graphs_test=clang_graphs_test,
+                llvm_graphs_test=llvm_graphs_test,
                 sequences=sequences[test_index] if sequences is not None else None,
                 y_test=y[test_index],
                 verbose=False)
+            inference_time_end = time.time()
+            inference_time = inference_time_end - inference_time_start
 
             # benchmarks
             benchmarks = df['benchmark'].values[test_index]
@@ -655,6 +667,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
                     "Speedup": p_speedup_,
                     "Fold": j,
                     "num_trainable_parameters": model.get_num_trainable_parameters(),
+                    "train_time": train_time,
+                    "inference_time": inference_time
                 })
 
             # update progress bar
@@ -673,6 +687,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             "Speedup",
             "Fold",
             "num_trainable_parameters",
+            "train_time",
+            "inference_time"
         ])
 
 # Experiment: Random mapping

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import sys
+import time
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
@@ -454,31 +455,42 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd, seed):
 
             # create a new model and train it
             model.init(seed=seed)
+
+            clang_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in
+                                            clang_graphs[train_index]]
+            clang_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in
+                                           clang_graphs[test_index]]
+            llvm_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in
+                                            llvm_graphs[train_index]]
+            llvm_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in
+                                            llvm_graphs[test_index]]
+
+            train_time_start = time.time()
             model.train(cascading_features=np.concatenate(X_cc[train_index]),
                         cascading_y=np.concatenate(y_cc[train_index]),
-                        clang_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
-                                            clang_graphs[train_index]],
-                        clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
-                                           clang_graphs[test_index]],
-                        llvm_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
-                                            llvm_graphs[train_index]],
-                        llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
-                                            llvm_graphs[test_index]],
+                        clang_graphs_train=clang_graphs_train,
+                        clang_graphs_test=clang_graphs_test,
+                        llvm_graphs_train=llvm_graphs_train,
+                        llvm_graphs_test=llvm_graphs_test,
                         sequences=X_seq[train_index] if X_seq is not None else None,
                         verbose=True,  # TODO
                         y_1hot=y_1hot[train_index],
                         y_naturals_train=y_naturals[train_index],
                         y_naturals_test=y_naturals[test_index])
+            train_time_end = time.time()
+            train_time = train_time_end - train_time_start
 
             # make prediction
+            inference_time_start = time.time()
             p = model.predict(cascading_features=X_cc[test_index[0]],
-                              clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
-                                                 clang_graphs[test_index]],
-                              llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in
-                                                 llvm_graphs[test_index]],
+                              clang_graphs_test=clang_graphs_test,
+                              llvm_graphs_test=llvm_graphs_test,
                               sequences=X_seq[test_index] if X_seq is not None else None,
                               y_naturals_test=y_naturals[test_index]
                               )[0]
+            inference_time_end = time.time()
+            inference_time = inference_time_end - inference_time_start
+
             p = min(p, 2 ** (len(X_cc[test_index[0]]) - 1))
 
             # oracle prediction
@@ -512,14 +524,26 @@ def evaluate(model, df_runtimes, df_oracles, df_devmap_amd, seed):
                 "Predicted-CF": p,
                 "Speedup": p_speedup,
                 "Oracle": p_oracle,
-                "num_trainable_parameters": model.get_num_trainable_parameters()
+                "num_trainable_parameters": model.get_num_trainable_parameters(),
+                "train_time": train_time,
+                "inference_time": inference_time
             })
 
             progressbar[0] += 1  # update progress bar
             progressbar[1].update(progressbar[0])
 
-    return pd.DataFrame(data, columns=[
-        "Model", "Platform", "Kernel", "Oracle-CF", "Predicted-CF", "Speedup", "Oracle"])
+    return pd.DataFrame(
+        data, columns=[
+            "Model",
+            "Platform",
+            "Kernel",
+            "Oracle-CF",
+            "Predicted-CF",
+            "Speedup",
+            "Oracle",
+            "num_trainable_parameters",
+            "train_time",
+            "inference_time"])
 
 
 class ThreadCoarseningModel(object):
