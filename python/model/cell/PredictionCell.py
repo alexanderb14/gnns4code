@@ -44,7 +44,7 @@ class PredictionCellState(object):
                                                'mlp_reduce')
 
         offset = 0
-        if config['with_aux_in']:
+        if config['with_aux_in'] == 1:
             offset = 2
         self.weights['mlp_reduce_after_aux_in_1'] = utils.MLP(h_size * m_size + offset,
                                                               self.config['prediction_cell']['mlp_reduce_after_aux_in_1_out_dim'],

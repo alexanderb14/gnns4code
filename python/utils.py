@@ -272,11 +272,14 @@ def apply_action_to_graph(graph:dict, action:dict) -> None:
         ])
 
 
-def graph_to_adjacency_lists(graph, tie_fwd_bkwd) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
+def graph_to_adjacency_lists(graph, tie_fwd_bkwd, edge_type_filter = []) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
     adj_lists = defaultdict(list)
     num_incoming_edges_dicts_per_type = defaultdict(lambda: defaultdict(lambda: 0))
     for src, e, dest in graph:
         fwd_edge_type = e
+        if fwd_edge_type not in edge_type_filter and len(edge_type_filter) > 0:
+            continue
+
         adj_lists[fwd_edge_type].append((src, dest))
         num_incoming_edges_dicts_per_type[fwd_edge_type][dest] += 1
 
@@ -422,6 +425,14 @@ def write_error_report_file(src_filename, report_filename, stdouts, stderrs, ret
 
     with open(report_filename, 'w+') as f:
         f.write(report)
+
+
+def prepare_preprocessing_artifact_dir(base_dir):
+    delete_and_create_folder(base_dir)
+    delete_and_create_folder(os.path.join(base_dir, 'out'))
+    delete_and_create_folder(os.path.join(base_dir, 'bad_code'))
+    delete_and_create_folder(os.path.join(base_dir, 'good_code'))
+    delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
 
 
 def min_max_avg(l: list) -> dict:

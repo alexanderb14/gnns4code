@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="bf6fe145-a820-4a83-a7c8-00a3c2d46471" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/applications/clang_code/codegraph_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/applications/clang_code/codegraph_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/applications/code/codegraph_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/applications/code/codegraph_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/experiment/DevMapExperiment.py" beforeDir="false" afterPath="$PROJECT_DIR$/experiment/DevMapExperiment.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" beforeDir="false" afterPath="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="IgnoredFileRootStore">
+    <option name="generatedRoots">
+      <set>
+        <option value="$PROJECT_DIR$/.idea" />
+      </set>
+    </option>
+  </component>
+  <component name="JsFlowSettings">
+    <service-enabled>true</service-enabled>
+    <exe-path />
+    <other-services-enabled>true</other-services-enabled>
+    <auto-save>true</auto-save>
+  </component>
+  <component name="ProjectConfigurationFiles">
+    <option name="files">
+      <list>
+        <option value="$PROJECT_DIR$/.idea/.gitignore" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectId" id="1Pb835YeZmwq37rLF22mzOpTD9e" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="PropertiesComponent">
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+    <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="Python.DevMapExperiment preprocess">
+    <configuration name="DevMapExperiment preprocess" type="PythonConfigurationType" factoryName="Python">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$PROJECT_DIR$/../../../envs/gnns4code/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/experiment" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/DevMapExperiment.py" />
+      <option name="PARAMETERS" value="preprocess --code_dir $PROJECT_DIR$/../../gpgpu_benchmarks_early_export/datasets/benchmarks/gpgpu --preprocessing_artifact_dir $PROJECT_DIR$/../../../tmp/gnns4code --cgo17_benchmarks_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-nvidia.csv --cgo17_benchmarks_csv_out /tmp/out.csv" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="DevMapExperiment" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$PROJECT_DIR$/../../../envs/gnns4code/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/experiment" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/DevMapExperiment.py" />
+      <option name="PARAMETERS" value="experiment --datasets ab cd" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="ThreadCoarsenExperiment experiment DeepTuneLSTM" type="PythonConfigurationType" factoryName="Python">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$PROJECT_DIR$/../../../envs/gnns4code/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/experiment" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" />
+      <option name="PARAMETERS" value="experiment --DeepTuneLSTM --runtimes_csv $PROJECT_DIR$/../data/thread_coarsen_task/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv --report_write_dir /tmp/out --seed 1" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="ThreadCoarsenExperiment experiment GNN Clang" type="PythonConfigurationType" factoryName="Python" singleton="false">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$PROJECT_DIR$/../../../envs/gnns4code/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/experiment" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" />
+      <option name="PARAMETERS" value="experiment --DeepTuneGNNClang --runtimes_csv $PROJECT_DIR$/../data/thread_coarsen_task/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv --report_write_dir /tmp/out --seed 1" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="ThreadCoarsenExperiment experiment Magni" type="PythonConfigurationType" factoryName="Python">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="$PROJECT_DIR$/../../../envs/gnns4code/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/experiment" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py" />
+      <option name="PARAMETERS" value="experiment --Magni --runtimes_csv $PROJECT_DIR$/../data/thread_coarsen_task/pact-2014-runtimes.csv --oracles_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-b/pact-2014-oracles.csv --devmap_amd_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-amd.csv --seed 1" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="PythonConfigurationType" factoryName="Python">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="pytest in test_codegraph_models.py" type="tests" factoryName="py.test" nameIsGenerated="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/../../../envs/gnns4code/bin/python" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/test/applications/clang_code/test_codegraph_models.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Python.AlgoClassificationExperiment experiment" />
+      <item itemvalue="Python.AlgoClassificationExperiment preprocess" />
+      <item itemvalue="Python.DevMapExperiment evaluate" />
+      <item itemvalue="Python.DevMapExperiment evaluate w node values" />
+      <item itemvalue="Python.DevMapExperiment preprocess" />
+      <item itemvalue="Python.DevMapExperiment experiment GNN Clang" />
+      <item itemvalue="Python.DevMapExperiment experiment GNN LLVM" />
+      <item itemvalue="Python.DevMapExperiment experiment Grewe" />
+      <item itemvalue="Python.DevMapExperiment experiment LSTM" />
+      <item itemvalue="Python.DevMapExperiment experiment RandomMapping" />
+      <item itemvalue="Python.DevMapExperiment experiment StaticMapping" />
+      <item itemvalue="Python.ThreadCoarsenExperiment preprocess" />
+      <item itemvalue="Python.ThreadCoarsenExperiment experiment Magni" />
+      <item itemvalue="Python.ThreadCoarsenExperiment experiment DeepTuneLSTM" />
+      <item itemvalue="Python.ThreadCoarsenExperiment experiment GNN Clang" />
+      <item itemvalue="Python.Spawner" />
+      <item itemvalue="Python.actionize" />
+      <item itemvalue="Python.generate" />
+      <item itemvalue="Python.preprocess" />
+      <item itemvalue="Python.train DeepGMGModel" />
+      <item itemvalue="Python.train PredictionModel" />
+      <item itemvalue="Python.DevMapExperiment" />
+      <item itemvalue="Python tests.pytest in test_codegraph_models.py" />
+    </list>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="bf6fe145-a820-4a83-a7c8-00a3c2d46471" name="Default Changelist" comment="" />
+      <created>1566131232038</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1566131232038</updated>
+      <workItem from="1566131233198" duration="119000" />
+      <workItem from="1567326908163" duration="2724000" />
+      <workItem from="1569590801769" duration="232000" />
+      <workItem from="1570231105745" duration="59000" />
+      <workItem from="1570236027215" duration="298000" />
+      <workItem from="1570481200351" duration="482000" />
+      <workItem from="1571576869969" duration="69000" />
+      <workItem from="1571928341150" duration="15000" />
+      <workItem from="1572205108676" duration="2729000" />
+      <workItem from="1572257770117" duration="190000" />
+      <workItem from="1572257989634" duration="4061000" />
+      <workItem from="1572267494197" duration="1031000" />
+      <workItem from="1572268556518" duration="1508000" />
+      <workItem from="1572270087064" duration="28438000" />
+      <workItem from="1572302159353" duration="25000" />
+      <workItem from="1572309017307" duration="2151000" />
+      <workItem from="1572345420259" duration="10406000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="COLUMN_ORDER" />
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/applications/clang_code/codegraph_models.py</url>
+          <line>1064</line>
+          <option name="timeStamp" value="16" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/applications/code/codegraph_models.py</url>
+          <line>236</line>
+          <option name="timeStamp" value="18" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/experiment/ThreadCoarsenExperiment.py</url>
+          <line>1056</line>
+          <option name="timeStamp" value="22" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_GNN_Clang.coverage" NAME="ThreadCoarsenExperiment experiment GNN Clang Coverage Results" MODIFIED="1572357013339" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$DevMapExperiment_preprocess.coverage" NAME="DevMapExperiment preprocess Coverage Results" MODIFIED="1572359703006" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$PredictionExperiment.coverage" NAME="PredictionExperiment Coverage Results" MODIFIED="1567327678180" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_DeepTune.coverage" NAME="ThreadCoarsenExperiment experiment DeepTuneLSTM Coverage Results" MODIFIED="1572311148884" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$PredictionExperiment_experiment_Grewe.coverage" NAME="PredictionExperiment experiment Grewe Coverage Results" MODIFIED="1572258237074" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_DeepTuneLSTM.coverage" NAME="ThreadCoarsenExperiment experiment DeepTuneLSTM Coverage Results" MODIFIED="1572347213886" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$pytest_in_test_codegraph_models_py.coverage" NAME="pytest in test_codegraph_models.py Coverage Results" MODIFIED="1570481639329" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/python$PredictionExperiment_preprocess.coverage" NAME="DevMapExperiment preprocess Coverage Results" MODIFIED="1572267418460" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_experiment_Magni.coverage" NAME="ThreadCoarsenExperiment experiment Magni Coverage Results" MODIFIED="1572357399330" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/python$ThreadCoarsenExperiment_preprocess.coverage" NAME="ThreadCoarsenExperiment preprocess Coverage Results" MODIFIED="1572358972899" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+  </component>
+</project>

@@ -272,7 +272,7 @@ class NodeInfoExtractionVisitor(VisitorBase):
 
     def get_node_types(self):
         ret = []
-        for idx in range(0, max(self.__node_types, key=int)):
+        for idx in range(0, max(self.__node_types.keys()) + 1):
             if idx not in self.__node_types:
                 raise Exception()
 
@@ -803,6 +803,43 @@ def __get_edge_dests_by_type(edges, type):
 
     return edges_filtered
 
+def get_node_types(graphs):
+    stats_vstr = StatisticsVisitor()
+
+    if type(graphs) == list:
+        for graph in graphs:
+            graph.visit(stats_vstr)
+    elif type(graphs) == dict:
+        for _, graph in graphs.items():
+            graph.visit(stats_vstr)
+
+    summary = stats_vstr.get_summary()
+    node_types = summary['node_types']
+
+    return node_types
+
+def graph_to_export_format(graph, node_types):
+    # Create node ids
+    node_id_vstr = NodeIdCreateVisitor()
+    graph.visit(node_id_vstr)
+
+    # Extract node infos
+    ni_vstr = NodeInfoExtractionVisitor(node_types)
+    graph.visit(ni_vstr)
+    nodes = ni_vstr.get_node_types()
+
+    # Extract edges
+    ee_vstr = EdgeExtractionVisitor(edge_types={'cfg': 0, 'dataflow': 1, 'memaccess': 2, 'call': 3})
+    graph.visit(ee_vstr)
+    edges = ee_vstr.edges
+
+    graph_export = {
+        utils.T.NODES: nodes,
+        # utils.T.NODE_VALUES: node_values,
+        utils.T.EDGES: edges
+    }
+
+    return graph_export
 
 def codegraphs_create_from_miner_output(jRoot: dict) -> object:
     """

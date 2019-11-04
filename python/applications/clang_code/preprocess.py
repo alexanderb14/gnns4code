@@ -63,7 +63,31 @@ def opencl_kernel_c_code_to_llvm_graph(c_code:str):
         return graph
 
 
-def process_sources(files, preprocessing_artifact_dir, substract_str, is_opencl_source=True):
+def process_source_file(src_file, additional_args=[], is_opencl_source=True):
+    cmd = [app_utils.CLANG_MINER_EXECUTABLE]
+
+    if is_opencl_source:
+        cmd += ['-extra-arg-before=-xcl',
+               '-extra-arg=-I' + app_utils.LIBCLC_DIR]
+        cmd += ['-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE]
+
+    else:
+        cmd += ['-extra-arg=-I/Library/Developer/CommandLineTools/usr/include/c++/v1/',
+                '-extra-arg=-I/devel/git/llvm_build/build/lib/clang/8.0.0/include/']
+
+    cmd += additional_args
+    cmd += [src_file]
+
+    print(' '.join(cmd))
+
+    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+
+    result = process.wait()
+
+    return stdout, stderr, result
+
+def process_source_directory(files, preprocessing_artifact_dir, substract_str, is_opencl_source=True):
     out_dir = os.path.join(preprocessing_artifact_dir, 'out')
     good_code_dir = os.path.join(preprocessing_artifact_dir, 'bad_code')
     bad_code_dir = os.path.join(preprocessing_artifact_dir, 'good_code')
@@ -79,29 +103,20 @@ def process_sources(files, preprocessing_artifact_dir, substract_str, is_opencl_
         else:
             out_filename = filename
 
-        cmd = [app_utils.CLANG_MINER_EXECUTABLE]
-
+        additional_args = []
         if is_opencl_source:
-            cmd += ['-extra-arg-before=-xcl',
-                   '-extra-arg=-I' + app_utils.LIBCLC_DIR]
-            cmd += ['-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE]
+            additional_args += ['-extra-arg-before=-xcl',
+                                '-extra-arg=-I' + app_utils.LIBCLC_DIR]
+            additional_args += ['-extra-arg=-include' + app_utils.OPENCL_SHIM_FILE]
             if 'npb' in filename:
-                cmd += ['-extra-arg=-DM=1']
+                additional_args += ['-extra-arg=-DM=1']
             if 'nvidia' in filename or ('rodinia' in filename and 'pathfinder' not in filename):
-                cmd += ['-extra-arg=-DBLOCK_SIZE=64']
+                additional_args += ['-extra-arg=-DBLOCK_SIZE=64']
 
-        else:
-            cmd += ['-extra-arg=-I/Library/Developer/CommandLineTools/usr/include/c++/v1/',
-                    '-extra-arg=-I/devel/git/llvm_build/build/lib/clang/8.0.0/include/']
+        stdout, stderr, result = process_source_file(filename, additional_args=additional_args)
 
-        cmd += [filename, '-o', out_filename]
-
-        print(' '.join(cmd))
-
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        stdout, stderr = process.communicate()
-        result = process.wait()
+        with open(out_filename, 'wb') as f:
+            f.write(stdout)
 
         # In case of an error
         if result != 0:
@@ -173,7 +188,7 @@ def main():
     if command_arg.command == 'generative':
         filenames = utils.get_files_by_file_size(args.code_dir, False)
 
-        process_sources(filenames, args.out_dir, args.good_code_dir,
+        process_source_directory(filenames, args.out_dir, args.good_code_dir,
                       args.bad_code_dir, args.error_log_dir)
 
         # Write to file

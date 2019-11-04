@@ -7,6 +7,7 @@ import pickle
 import sys
 from collections import Counter, defaultdict
 from pandas.io.json import json_normalize
+import time
 from typing import List
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -18,9 +19,6 @@ import applications.clang_code.preprocess as clang_preprocess
 import applications.code.codegraph_models as llvm_codegraph_models
 import applications.code.preprocess as llvm_preprocess
 from model.PredictionModel import PredictionModel, PredictionModelState
-
-
-seed = 204
 
 
 #########################################################
@@ -533,7 +531,7 @@ class HeterogemeousMappingModel(object):
         pass
 
 
-def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd) -> pd.DataFrame:
+def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd, seed) -> pd.DataFrame:
     """
     Evaluate a model.
 
@@ -584,7 +582,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
 
         # 10-fold cross-validation
         if fold_mode == 'random_10fold':
-            kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+            kfold_seed = 204
+            kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=kfold_seed)
             split = kf.split(features, y)
         elif fold_mode == 'benchmark_grouped_7fold':
             benchmark_suites = [x.split('-')[0] for x in list(df['benchmark'])]
@@ -603,29 +602,40 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
                 sequences = encode_srcs(model.atomizer, df["src"].values)
 
+            clang_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]]
+            clang_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]]
+            llvm_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_index]]
+            llvm_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]]
+
+            train_time_start = time.time()
             model.train(df=df,
                         features=features[train_index],
                         aux_in_train=aux_in[train_index],
                         aux_in_test=aux_in[test_index],
-                        clang_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]],
-                        clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
-                        llvm_graphs_train=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_index]],
-                        llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]],
+                        clang_graphs_train=clang_graphs_train,
+                        clang_graphs_test=clang_graphs_test,
+                        llvm_graphs_train=llvm_graphs_train,
+                        llvm_graphs_test=llvm_graphs_test,
                         sequences=sequences[train_index] if sequences is not None else None,
                         y_train=y[train_index],
                         y_test=y[test_index],
                         y_1hot=y_1hot[train_index],
-                        verbose=False)
+                        verbose=True)
+            train_time_end = time.time()
+            train_time = train_time_end - train_time_start
 
             # test model
+            inference_time_start = time.time()
             p = model.predict(
                 features=features[test_index],
                 aux_in_test=aux_in[test_index],
-                clang_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]],
-                llvm_graphs_test=[json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]],
+                clang_graphs_test=clang_graphs_test,
+                llvm_graphs_test=llvm_graphs_test,
                 sequences=sequences[test_index] if sequences is not None else None,
                 y_test=y[test_index],
                 verbose=False)
+            inference_time_end = time.time()
+            inference_time = inference_time_end - inference_time_start
 
             # benchmarks
             benchmarks = df['benchmark'].values[test_index]
@@ -657,6 +667,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
                     "Speedup": p_speedup_,
                     "Fold": j,
                     "num_trainable_parameters": model.get_num_trainable_parameters(),
+                    "train_time": train_time,
+                    "inference_time": inference_time
                 })
 
             # update progress bar
@@ -675,6 +687,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             "Speedup",
             "Fold",
             "num_trainable_parameters",
+            "train_time",
+            "inference_time"
         ])
 
 # Experiment: Random mapping
@@ -735,7 +749,7 @@ class Grewe(HeterogemeousMappingModel):
         from sklearn.tree import DecisionTreeClassifier
 
         self.model = DecisionTreeClassifier(
-            splitter="best",
+            random_state=seed, splitter="best",
             criterion="entropy", max_depth=5,
             min_samples_leaf=5)
         return self
@@ -922,14 +936,6 @@ def report_to_json(report: pd.DataFrame):
             'speedup': round(speedup, 4)}
 
 
-def prepare_preprocessing_artifact_dir(base_dir):
-    utils.delete_and_create_folder(base_dir)
-    utils.delete_and_create_folder(os.path.join(base_dir, 'out'))
-    utils.delete_and_create_folder(os.path.join(base_dir, 'bad_code'))
-    utils.delete_and_create_folder(os.path.join(base_dir, 'good_code'))
-    utils.delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
-
-
 def build_run_id(report_write_dir):
     num_files = int(len(
         [f for f in os.listdir(report_write_dir) if os.path.isfile(os.path.join(report_write_dir, f))]))
@@ -995,14 +1001,14 @@ def main():
         #
         preprocessing_artifact_dir_clang = os.path.join(args.preprocessing_artifact_dir, 'clang')
         preprocessing_artifact_dir_llvm = os.path.join(args.preprocessing_artifact_dir, 'llvm')
-        prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_clang)
-        prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm)
+        utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_clang)
+        utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm)
 
         # Find all .cl files and extract code graphs from them
         files = utils.get_files_by_extension(args.code_dir, '.cl')
 
-        clang_preprocess.process_sources(files, preprocessing_artifact_dir_clang, args.code_dir)
-        llvm_preprocess.process_sources(files, preprocessing_artifact_dir_llvm, args.code_dir)
+        clang_preprocess.process_source_directory(files, preprocessing_artifact_dir_clang, args.code_dir)
+        llvm_preprocess.process_source_directory(files, preprocessing_artifact_dir_llvm, args.code_dir)
 
         # Extract oracle from the cgo17 dataframe
         # 
@@ -1087,32 +1093,15 @@ def main():
         print('num_graphs:', len(preprocessed))
 
         # CodeGraph -> graph
-        nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False, with_callnames=False)
-        for graph in preprocessed:
-            graph.accept(nic_vstr)
-        node_types = nic_vstr.node_type_ids_by_statements
+        node_types = clang_codegraph_models.get_node_types(preprocessed, with_functionnames=False, with_callnames=False)
         print('num_node_types:', len(node_types))
 
         graphs_export = []
         names_export = []
 
         for graph in preprocessed:
-            # Extract node infos
-            ni_vstr = clang_codegraph_models.NodeInfoExtractionVisitor()
-            graph.accept(ni_vstr)
-            nodes = ni_vstr.node_types()
-            node_values = ni_vstr.node_values()
+            graph_export = clang_codegraph_models.graph_to_export_format(graph)
 
-            # Extract edges
-            ee_vstr = clang_codegraph_models.EdgeExtractionVisitor(edge_types={'AST': 0, 'LIVE': 1})
-            graph.accept(ee_vstr)
-            edges = ee_vstr.edges
-
-            graph_export = {
-                utils.T.NODES: nodes,
-                utils.T.NODE_VALUES: node_values,
-                utils.T.EDGES: edges
-            }
             # if graph.oracle == 'CPU':
             #     graph_export[utils.L.LABEL_0] = 0
             # elif graph.oracle == 'GPU':
@@ -1218,11 +1207,7 @@ def main():
         print('num_graphs:', len(preprocessed))
 
         # CodeGraph -> graph
-        stats_vstr = llvm_codegraph_models.StatisticsVisitor()
-        for graph in preprocessed:
-            graph.visit(stats_vstr)
-        summary = stats_vstr.get_summary()
-        node_types_of_all_graphs = summary['node_types']
+        node_types_of_all_graphs = llvm_codegraph_models.get_node_types(preprocessed)
         print('num_node_types:', len(node_types_of_all_graphs))
         utils.pretty_print_dict(node_types_of_all_graphs)
 
@@ -1230,27 +1215,7 @@ def main():
         names_export = []
 
         for graph in preprocessed:
-            # Create node ids
-            node_id_vstr = llvm_codegraph_models.NodeIdCreateVisitor()
-            graph.visit(node_id_vstr)
-
-            # Extract node infos
-            ni_vstr = llvm_codegraph_models.NodeInfoExtractionVisitor(node_types_of_all_graphs)
-            graph.visit(ni_vstr)
-            nodes = ni_vstr.get_node_types()
-            # print(node_types)
-
-            # Extract edges
-            ee_vstr = llvm_codegraph_models.EdgeExtractionVisitor(edge_types={'cfg': 0, 'dataflow': 1,
-                                                                               'memaccess': 2, 'call': 3})
-            graph.visit(ee_vstr)
-            edges = ee_vstr.edges
-
-            graph_export = {
-                utils.T.NODES: nodes,
-                # utils.T.NODE_VALUES: node_values,
-                utils.T.EDGES: edges
-            }
+            graph_export = llvm_codegraph_models.graph_to_export_format(graph, node_types_of_all_graphs)
 
             graphs_export.append(graph_export)
             names_export.append(graph.name)
@@ -1263,6 +1228,7 @@ def main():
             for row_idx, row in df_benchmarks.iterrows():
                 for name, graph in zip(names_export, graphs_export):
                     if row['benchmark'] == name:
+                        print(name)
                         df_benchmarks.loc[row_idx, 'llvm_graph'] = json.dumps(graph)
 
             df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
@@ -1278,7 +1244,11 @@ def main():
         parser_exp.add_argument('--Grewe', action='store_true')
         parser_exp.add_argument('--DeepTuneLSTM', action='store_true')
         parser_exp.add_argument('--DeepTuneGNNClang', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNClangASTEdges', action='store_true')
         parser_exp.add_argument('--DeepTuneGNNLLVM', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNLLVMCFGEdges', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNLLVMCFGDataflowEdges', action='store_true')
+        parser_exp.add_argument('--DeepTuneGNNLLVMCFGDataflowCallEdges', action='store_true')
 
         parser_exp.add_argument('--dataset_nvidia')
         parser_exp.add_argument('--dataset_amd')
@@ -1286,6 +1256,7 @@ def main():
         parser_exp.add_argument('--fold_mode')
         parser_exp.add_argument('--datasets', '--names-list', nargs='+', default=[])
 
+        parser_exp.add_argument('--seed')
         parser_exp.add_argument('--report_write_dir')
 
         args = parser_exp.parse_args(sys.argv[2:])
@@ -1296,6 +1267,7 @@ def main():
 
         # Build run id
         run_id = str(os.getpid())
+        seed = int(args.seed)
 
         if args.RandomMapping:
             config = {
@@ -1325,7 +1297,7 @@ def main():
 
             model = DeepTune()
 
-        if args.DeepTuneGNNClang:
+        if args.DeepTuneGNNClang or args.DeepTuneGNNClangASTEdges:
             config = {
                 "run_id": 'deepgnn-ast' + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
@@ -1378,15 +1350,19 @@ def main():
                 "use_edge_msg_avg_aggregation": 0,
 
                 "use_node_values": 0,
-
                 "save_best_model_interval": 1,
+                "with_aux_in": 1,
 
-                "with_aux_in": 1
+                "seed": seed
             }
+
+            if args.DeepTuneGNNClangASTEdges:
+                config['edge_type_filter'] = [0]
+                config['num_edge_types'] = 1
 
             model = DeepGNNAST(config)
 
-        if args.DeepTuneGNNLLVM:
+        if args.DeepTuneGNNLLVM or args.DeepTuneGNNLLVMCFGEdges or args.DeepTuneGNNLLVMCFGDataflowEdges or args.DeepTuneGNNLLVMCFGDataflowCallEdges:
             config = {
                 "run_id": 'deepgnn-llvm' + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
@@ -1410,13 +1386,15 @@ def main():
                     "mlp_reduce_dims": [64, 64],
                     "mlp_reduce_activation": "relu",
 
-                    "mlp_reduce_after_aux_in_1_dims": [],
+                    "mlp_reduce_after_aux_in_1_dims": [64, 32],
                     "mlp_reduce_after_aux_in_1_activation": "relu",
                     "mlp_reduce_after_aux_in_1_out_dim": 32,
 
                     "mlp_reduce_after_aux_in_2_dims": [],
                     "mlp_reduce_after_aux_in_2_activation": "sigmoid",
                     "mlp_reduce_after_aux_in_2_out_dim": 2,
+
+                    "output_dim": 2,
                 },
 
                 "embedding_layer": {
@@ -1429,7 +1407,7 @@ def main():
                 "L2_loss_factor": 0,
 
                 "batch_size": 64,
-                "num_epochs": 400,
+                "num_epochs": 1500,
                 "out_dir": "/tmp",
 
                 "tie_fwd_bkwd": 0,
@@ -1437,17 +1415,29 @@ def main():
                 "use_edge_msg_avg_aggregation": 0,
 
                 "use_node_values": 0,
-
                 "save_best_model_interval": 1,
+                "with_aux_in": 1,
 
-                "with_aux_in": 1
+                "seed": seed
             }
+
+            if args.DeepTuneGNNLLVMCFGEdges:
+                config['edge_type_filter'] = [0]
+                config['num_edge_types'] = 1
+
+            if args.DeepTuneGNNLLVMCFGDataflowEdges:
+                config['edge_type_filter'] = [0, 1]
+                config['num_edge_types'] = 2
+
+            if args.DeepTuneGNNLLVMCFGDataflowCallEdges:
+                config['edge_type_filter'] = [0, 1, 2]
+                config['num_edge_types'] = 3
 
             model = DeepGNNLLVM(config)
 
         print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 
-        report = evaluate(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd)
+        report = evaluate(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd, seed)
         print_and_save_report(args.report_write_dir, run_id, config, model, report)
 
     # Evaluate command

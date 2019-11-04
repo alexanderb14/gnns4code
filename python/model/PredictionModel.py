@@ -2,8 +2,6 @@ import argparse
 import json
 import os
 import pickle
-import random
-import shutil
 import sys
 import time
 
@@ -28,11 +26,15 @@ class PredictionModelState(object):
     def __init__(self, config):
         self.graph = tf.Graph()
 
+        self.best_epoch_weights = None
+
+        seed = config['seed']
+        tf.set_random_seed(seed)
+        np.random.seed(seed)
+
         tf_config = tf.ConfigProto()
         tf_config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=self.graph, config=tf_config)
-
-        self.best_epoch_weights = None
 
         with self.graph.as_default():
             self.embedding_layer_state = EmbeddingLayerState(config)
@@ -148,43 +150,43 @@ class PredictionModel(object):
         # Dump config to stdout
         utils.pretty_print_dict(self.config)
 
-        # Create and initialize model
         with self.state.graph.as_default():
+            # Create and initialize model
             self._make_model(True)
             self._make_train_step()
             self._initialize_model()
 
-        # Configure directories and save model configuration
-        SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-        if 'out_dir' in self.config:
-            self.out_dir = self.config['out_dir'] + '/_out/'
-        else:
-            self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
-
-        if not os.path.exists(self.out_dir):
-            os.makedirs(self.out_dir, exist_ok=True)
-
-        if 'run_id' in self.config:
-            self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-            self.out_dir = self.run_id
-        else:
-            self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-            self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
-        if os.path.exists(self.out_dir):
-            shutil.rmtree(self.out_dir)
-
-        model_path = self.out_dir + '/model'
-        os.makedirs(model_path, exist_ok=True)
-        self.model_file = os.path.join(model_path, 'model.pickle')
-
-        self.tensorboard_dir = self.out_dir + '/tensorboard'
-        os.makedirs(self.tensorboard_dir, exist_ok=True)
-
-        with open(self.out_dir + '/config.json', 'w') as fp:
-            json.dump(self.config, fp)
+        # # Configure directories and save model configuration
+        # SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+        # if 'out_dir' in self.config:
+        #     self.out_dir = self.config['out_dir'] + '/_out/'
+        # else:
+        #     self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
+        #
+        # if not os.path.exists(self.out_dir):
+        #     os.makedirs(self.out_dir, exist_ok=True)
+        #
+        # if 'run_id' in self.config:
+        #     self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
+        #     self.out_dir = self.run_id
+        # else:
+        #     self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
+        #     self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
+        # if os.path.exists(self.out_dir):
+        #     shutil.rmtree(self.out_dir)
+        #
+        # model_path = self.out_dir + '/model'
+        # os.makedirs(model_path, exist_ok=True)
+        # self.model_file = os.path.join(model_path, 'model.pickle')
+        #
+        # self.tensorboard_dir = self.out_dir + '/tensorboard'
+        # os.makedirs(self.tensorboard_dir, exist_ok=True)
+        #
+        # with open(self.out_dir + '/config.json', 'w') as fp:
+        #     json.dump(self.config, fp)
 
         # Configure TensorBoard
-        self.train_writer = tf.summary.FileWriter(os.path.join(self.tensorboard_dir, 'train'), graph=self.state.graph)
+        # self.train_writer = tf.summary.FileWriter(os.path.join(self.tensorboard_dir, 'train'), graph=self.state.graph)
 
     def _initialize_model(self) -> None:
         """
@@ -227,11 +229,13 @@ class PredictionModel(object):
             # Graph model: Adj list
             adj_lists = graph[utils.AE.ADJ_LIST]
             for idx, adj_list in adj_lists.items():
+                if idx >= self.config['num_edge_types']:
+                    continue
                 batch_data['adjacency_lists'][idx].append(adj_list)
 
             if self.config['use_edge_bias'] == 1:
                 # Graph model: Incoming edge numbers
-                num_incoming_edges_dicts_per_type = action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'])[0]
+                num_incoming_edges_dicts_per_type = action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'], self.config['edge_type_filter'])[0]
                 num_incoming_edges_per_type = np.zeros((num_nodes, num_edge_types))
                 for (e_type, num_incoming_edges_per_type_dict) in num_incoming_edges_dicts_per_type.items():
                     for (node_id, edge_count) in num_incoming_edges_per_type_dict.items():
@@ -418,7 +422,7 @@ class PredictionModel(object):
             batch_size = self.config['batch_size']
 
             lst = list(zip(graphs_train, graph_sizes))
-            random.shuffle(lst)
+            np.random.shuffle(lst)
             batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
                        range((len(lst) + batch_size - 1) // batch_size)]
 
@@ -467,9 +471,9 @@ class PredictionModel(object):
             epoch_time = epoch_end_time - epoch_start_time
 
             # Logging
-            summary = tf.Summary()
-            summary.value.add(tag='train_accuracy', simple_value=training_accuracy)
-            summary.value.add(tag='train_loss', simple_value=training_loss)
+            # summary = tf.Summary()
+            # summary.value.add(tag='train_accuracy', simple_value=training_accuracy)
+            # summary.value.add(tag='train_loss', simple_value=training_loss)
 
             # Testing
             # ############################################
@@ -487,8 +491,8 @@ class PredictionModel(object):
                 test_accuracy = np.sum(np.argmax(predictions, axis=1) == y_test) / len(predictions)
 
                 # Logging
-                summary.value.add(tag='valid_accuracy', simple_value=valid_accuracy)
-                summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
+                # summary.value.add(tag='valid_accuracy', simple_value=valid_accuracy)
+                # summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
                 print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, train_accuracy: %.4f, valid_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, training_accuracy, valid_accuracy, test_accuracy))
 
 
@@ -509,8 +513,8 @@ class PredictionModel(object):
                 test_accuracy = np.sum(np.argmax(predictions, axis=1) == y_test) / len(predictions)
 
                 # Logging
-                summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
-                summary.value.add(tag='test_loss', simple_value=test_loss)
+                # summary.value.add(tag='test_accuracy', simple_value=test_accuracy)
+                # summary.value.add(tag='test_loss', simple_value=test_loss)
                 print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, train_loss: %.8f, train_accuracy: %.4f, test_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, training_accuracy, test_accuracy))
 
                 if training_loss < best_epoch_loss:
@@ -536,7 +540,7 @@ class PredictionModel(object):
                         best_epoch_count = 0
 
             # Logging
-            self.train_writer.add_summary(summary, epoch)
+            #self.train_writer.add_summary(summary, epoch)
 
         self.state.restore_best_weights()
 

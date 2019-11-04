@@ -301,7 +301,7 @@ def main():
         #     files = utils.get_files_by_extension(class_code_dir, '.cpp')
         #     print(class_code_dir)
         #
-        #     clang_preprocess.process_sources(files, preprocessing_artifact_dir_clang, args.code_dir,
+        #     clang_preprocess.process_source_directory(files, preprocessing_artifact_dir_clang, args.code_dir,
         #                                      is_opencl_source=False)
 
 
