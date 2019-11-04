@@ -1,22 +1,24 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Spawner" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="ExperimentRunner" type="PythonConfigurationType" factoryName="Python">
     <module name="python" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
-    <option name="SDK_HOME" value="$PROJECT_DIR$/../../brauckmann-diploma-2019/implementation/python/env/bin/python3" />
+    <option name="SDK_HOME" value="" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-    <option name="IS_MODULE_SDK" value="false" />
+    <option name="IS_MODULE_SDK" value="true" />
     <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/Spawner.py" />
-    <option name="PARAMETERS" value="--command &quot;python experiment/PredictionExperiment.py --DeepTuneGNN --report_write_dir /tmp&quot; --num_command_iterations 10 --num_threads 2" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/experiment/runners/ExperimentRunner.py" />
+    <option name="PARAMETERS" value="--experiment tc --environment workstation --num_iterations 1 --methods DeepTuneGNNClang --report_write_root_dir /tmp --max_threads 1" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />
-    <method />
+    <option name="REDIRECT_INPUT" value="false" />
+    <option name="INPUT_FILE" value="" />
+    <method v="2" />
   </configuration>
 </component>
