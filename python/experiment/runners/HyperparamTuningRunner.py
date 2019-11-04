@@ -34,6 +34,7 @@ def get_slurm_job_stati():
     lines = execute_ssh_command('sacct -o JobID,State')
 
     completed_jobs = set()
+    failed_jobs = set()
     pending_jobs = set()
     running_jobs = set()
 
@@ -43,6 +44,8 @@ def get_slurm_job_stati():
 
         if job_status == 'COMPLETED':
             completed_jobs.add(job_id)
+        elif job_status == 'FAILED':
+            failed_jobs.add(job_id)
         elif job_status == 'PENDING':
             pending_jobs.add(job_id)
         elif job_status == 'RUNNING':
@@ -50,6 +53,7 @@ def get_slurm_job_stati():
 
     return {
         'completed': completed_jobs,
+        'failed': failed_jobs,
         'pending': pending_jobs,
         'running': running_jobs
     }
@@ -171,7 +175,7 @@ def f_gnn(*data):
     # Run several instances of the experiment on slurm
     triggered_jobs = set()
     for i in range(0, 2):
-        cmd = exp_utils.build_tc_experiment_cmd('DeepGMGClang', '/tmp', 0, config_str)
+        cmd = exp_utils.build_tc_experiment_cmd('DeepTuneGNNClang', '/tmp', 0, config_str)
         cmd = ' '.join(['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] +
                        ['\"'] +
                        ['python'] + cmd +
@@ -181,14 +185,13 @@ def f_gnn(*data):
         triggered_jobs.add(job_id)
 
     # Periodically poll and wait for completion
-    while len(triggered_jobs) > 0:
+    while len(triggered_jobs) != 0:
         time.sleep(30)
 
         stati = get_slurm_job_stati()
         print(stati)
 
-        completed_jobs = stati['completed']
-        triggered_jobs = triggered_jobs - completed_jobs
+        triggered_jobs = triggered_jobs - stati['completed']
 
     # When completed, aggregate all result csvs to geometric mean and report
 

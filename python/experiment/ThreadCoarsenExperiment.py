@@ -873,6 +873,7 @@ def main():
 
         parser_exp.add_argument('--seed')
         parser_exp.add_argument('--report_write_dir')
+        parser_exp.add_argument('--config')
 
         args = parser_exp.parse_args(sys.argv[2:])
 
@@ -898,7 +899,7 @@ def main():
             model.atomizer = GreedyAtomizer.from_text(srcs)
 
         if args.DeepTuneGNNClang or args.DeepTuneGNNClangASTEdges:
-            config = {
+            config = json.loads(args.config) if args.config else {
                 "run_id": 'deepgnn-ast' + '_' + str(run_id),
 
                 "graph_rnn_cell": "GRU",
@@ -962,7 +963,7 @@ def main():
             model = DeepGNNAST(config)
 
         if args.DeepTuneGNNLLVM or args.DeepTuneGNNLLVMCFGEdges or args.DeepTuneGNNLLVMCFGDataflowEdges or args.DeepTuneGNNLLVMCFGDataflowCallEdges:
-            config = {
+            config = json.loads(args.config) if args.config else {
                 "run_id": 'deepgnn-llvm' + '_' + str(run_id),
 
                 "graph_rnn_cell": "GRU",
