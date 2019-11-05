@@ -269,11 +269,11 @@ def f_gnn_ast_tc(*data):
 
 
 def f_gnn_ast_devmap_random(*data):
-    f_gnn_ast_devmap('random', '3', *data)
+    return f_gnn_ast_devmap('random', '3', *data)
 
 
 def f_gnn_ast_devmap_grouped(*data):
-    f_gnn_ast_devmap('grouped', '3', *data)
+    return f_gnn_ast_devmap('grouped', '3', *data)
 
 
 def f_gnn_ast_devmap(fold_mode, split_mode, *data):

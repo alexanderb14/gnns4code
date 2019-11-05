@@ -668,7 +668,7 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
             # validate and test model
             kfold_seed = 204
             kf = StratifiedKFold(n_splits=2, shuffle=True, random_state=kfold_seed)
-            remaining_split = kf.split(features, y)
+            remaining_split = kf.split(features[remaining_index], y[remaining_index])
 
             for j_remaining, (valid_index, test_index) in enumerate(remaining_split):
                 # validate
