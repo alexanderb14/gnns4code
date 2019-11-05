@@ -365,7 +365,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
     accuracy = scipy.stats.mean(results_df['set' == 'Valid']['Correct?'])
     print('Metric:', accuracy)
 
-    return accuracy
+    return accuracy * (-1)
 
 
 def main():
