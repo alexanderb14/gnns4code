@@ -379,14 +379,18 @@ def auxiliary_inputs(df: pd.DataFrame) -> np.array:
     ]).T
 
 def get_clang_graphs(df: pd.DataFrame) -> np.array:
-    return np.array(
+    graphs = np.array(
         df["clang_graph"].values,
     ).T
 
+    return np.array([json.loads(g, object_hook=utils.json_keys_to_int) for g in graphs])
+
 def get_llvm_graphs(df: pd.DataFrame) -> np.array:
-    return np.array(
+    graphs = np.array(
         df["llvm_graph"].values,
     ).T
+
+    return np.array([json.loads(g, object_hook=utils.json_keys_to_int) for g in graphs])
 
 def encode_1hot(y: np.array) -> np.array:
     """ 1-hot encode labels """
@@ -529,6 +533,211 @@ class HeterogemeousMappingModel(object):
 
     def construct(self):
         pass
+
+
+def predict(**data):
+    idx = data['idx']
+
+    # Predict on valid set
+    inference_time_start = time.time()
+    p = data['model'].predict(
+        features=data['features'][idx],
+        aux_in_test=data['aux_in'][idx],
+        clang_graphs_test=data['clang_graphs'][idx],
+        llvm_graphs_test=data['llvm_graphs'][idx],
+        sequences=data['sequences'][idx] if data['sequences'] is not None else None,
+        y_test=data['y'][idx],
+        verbose=False)
+    inference_time_end = time.time()
+    inference_time = inference_time_end - inference_time_start
+
+    # benchmarks
+    benchmarks = data['df']['benchmark'].values[idx]
+    # oracle device mappings
+    o = data['y'][idx]
+    # whether predictions were correct or not
+    correct = p == o
+    # runtimes of baseline mapping (CPU on AMD, GPU on NVIDIA)
+    zero_r_dev = "runtime_cpu" if data['platform'] == "amd" else "runtime_gpu"
+    zer_r_runtimes = data['df'][zero_r_dev][idx]
+    # speedups of predictions
+    runtimes = data['df'][['runtime_cpu', 'runtime_gpu']].values[idx]
+    p_runtimes = [r[p_] for p_, r in zip(p, runtimes)]
+    p_speedup = zer_r_runtimes / p_runtimes
+
+    # sanity check
+    assert (len(benchmarks) == len(o) == len(correct) == len(p) == len(p_speedup))
+
+    # record results
+    results = []
+    for benchmark_, o_, p_, correct_, p_speedup_ in zip(benchmarks, o, p, correct, p_speedup):
+        results.append({
+            "Model": data['model'].__name__,
+            "Platform": platform2str(data['platform']),
+            'Benchmark': escape_benchmark_name(benchmark_),
+            'Benchmark Suite': escape_suite_name(benchmark_),
+            "Oracle Mapping": o_,
+            "Predicted Mapping": p_,
+            "Correct?": correct_,
+            "Speedup": p_speedup_,
+            "Fold": data['fold_idx'],
+            "num_trainable_parameters": data['model'].get_num_trainable_parameters(),
+            "train_time": data['train_time'],
+            "inference_time": inference_time
+        })
+
+    return results
+
+
+def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd, seed) -> pd.DataFrame:
+    """
+    Evaluate a model.
+
+    Performs 3-split cross-validation of the model's effectiveness at predicting
+    OpenCL device mappings. Results are cached.
+
+    Parameters
+    ----------
+    model : HeterogeneousMappingModel
+        The predictive model to evaluate.
+
+    Returns
+    -------
+    pd.Dataframe
+        Evaluation results.
+    """
+    from sklearn.model_selection import StratifiedKFold, GroupKFold
+    from progressbar import ProgressBar
+
+    if len(datasets) == 0:
+        datasets = ["nvidia", "amd"]
+
+    data_valid = []
+    data_test = []
+    for i, platform in enumerate(datasets):
+        progressbar = [0, ProgressBar(max_value=10)]
+
+        platform_name = platform2str(platform)
+
+        # load runtime data
+        if platform == "nvidia":
+            model.dataset = dataset_nvidia
+        elif platform == "amd":
+            model.dataset = dataset_amd
+
+        df = model.dataset
+
+        sequences = None  # defer sequence encoding until needed (it's expensive)
+
+        # values used for training & predictions
+        features = grewe_features(df)
+        aux_in = auxiliary_inputs(df)
+        clang_graphs = get_clang_graphs(df)
+        llvm_graphs = get_llvm_graphs(df)
+
+        # optimal mappings
+        y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
+        y_1hot = encode_1hot(y)
+
+        # 5-fold cross-validation
+        if fold_mode == 'random':
+            kfold_seed = 204
+            kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=kfold_seed)
+            split = kf.split(features, y)
+
+        for j, (train_index, remaining_index) in enumerate(split):
+            # train model
+            model.init(seed=seed)
+
+            if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
+                sequences = encode_srcs(model.atomizer, df["src"].values)
+
+            train_time_start = time.time()
+            model.train(df=df,
+                        features=features[train_index],
+                        aux_in_train=aux_in[train_index],
+                        clang_graphs_train=clang_graphs[train_index],
+                        llvm_graphs_train=llvm_graphs[train_index],
+                        sequences=sequences[train_index] if sequences is not None else None,
+                        y_train=y[train_index],
+                        y_1hot=y_1hot[train_index],
+                        verbose=True)
+            train_time_end = time.time()
+            train_time = train_time_end - train_time_start
+
+            # validate and test model
+            kfold_seed = 204
+            kf = StratifiedKFold(n_splits=2, shuffle=True, random_state=kfold_seed)
+            remaining_split = kf.split(features, y)
+
+            for j_remaining, (valid_index, test_index) in enumerate(remaining_split):
+                # validate
+                data_valid += predict(
+                    idx=valid_index,
+                    model=model,
+                    features=features,
+                    aux_in=aux_in,
+                    platform=platform,
+                    clang_graphs=clang_graphs,
+                    llvm_graphs=llvm_graphs,
+                    sequences=sequences,
+                    y=y,
+                    df=df,
+                    fold_idx=j,
+                    train_time=train_time
+                )
+
+                # Test
+                data_test += predict(
+                    idx=test_index,
+                    model=model,
+                    features=features,
+                    aux_in=aux_in,
+                    platform=platform,
+                    clang_graphs=clang_graphs,
+                    llvm_graphs=llvm_graphs,
+                    sequences=sequences,
+                    y=y,
+                    df=df,
+                    fold_idx=j,
+                    train_time=train_time
+                )
+
+    df_valid = pd.DataFrame(
+        data_valid, index=range(1, len(data_valid) + 1), columns=[
+            "Model",
+            "Platform",
+            "Benchmark",
+            "Benchmark Suite",
+            "Oracle Mapping",
+            "Predicted Mapping",
+            "Correct?",
+            "Speedup",
+            "Fold",
+            "num_trainable_parameters",
+            "train_time",
+            "inference_time"
+        ])
+    df_valid['set'] = 'valid'
+
+    df_test = pd.DataFrame(
+        data_test, index=range(1, len(data_valid) + 1), columns=[
+            "Model",
+            "Platform",
+            "Benchmark",
+            "Benchmark Suite",
+            "Oracle Mapping",
+            "Predicted Mapping",
+            "Correct?",
+            "Speedup",
+            "Fold",
+            "num_trainable_parameters",
+            "train_time",
+            "inference_time"
+        ])
+    df_test['set'] = 'test'
+
+    return pd.concat([df_valid, df_test])
 
 
 def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd, seed) -> pd.DataFrame:
@@ -865,13 +1074,7 @@ class DeepGNN(HeterogemeousMappingModel):
             graph[utils.I.AUX_IN_0] = aux_in
             graphs_train.append(graph)
 
-        graphs_test = []
-        for graph, aux_in, y in zip(data[prefix + "_graphs_test"], data["aux_in_test"], data["y_test"]):
-            graph[utils.L.LABEL_0] = y
-            graph[utils.I.AUX_IN_0] = aux_in
-            graphs_test.append(graph)
-
-        self.model.train(graphs_train, graphs_test)
+        self.model.train(graphs_train)
 
     def predict(self, **data):
         prefix = 'clang' if self.__basename__ == 'deepgnn-ast' else 'llvm'
@@ -1254,6 +1457,7 @@ def main():
         parser_exp.add_argument('--dataset_amd')
 
         parser_exp.add_argument('--fold_mode')
+        parser_exp.add_argument('--split_mode')
         parser_exp.add_argument('--datasets', '--names-list', nargs='+', default=[])
 
         parser_exp.add_argument('--seed')
@@ -1438,7 +1642,12 @@ def main():
 
         print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 
-        report = evaluate(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd, seed)
+        if args.split_mode == '2':
+            evaluate_fn = evaluate
+        elif args.split_mode == '3':
+            evaluate_fn = evaluate_3split
+
+        report = evaluate_fn(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd, seed)
         print_and_save_report(args.report_write_dir, run_id, config, model, report)
 
     # Evaluate command

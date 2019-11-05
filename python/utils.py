@@ -442,6 +442,12 @@ def min_max_avg(l: list) -> dict:
         'avg': int(sum(l) / float(len(l)))
     }
 
+def chunks(l, n):
+    ret = []
+    for i in range(0, len(l), n):
+        ret.append(l[i:i+n])
+
+    return ret
 
 # Classes
 #########

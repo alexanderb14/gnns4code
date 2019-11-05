@@ -23,7 +23,8 @@ TC_CONFIGS = {
     },
     'DeepTuneGNNClang': {
         'slurm': {
-            'config': 'ml.slurm'
+            'config': 'ml.slurm',
+            'concurrency': 4,
         },
         'workstation': {
             'concurrency': 4,
@@ -216,7 +217,7 @@ def build_tc_experiment_infos(report_write_root_dir, num_iterations, methods):
 
 
 # DevMap experiment
-def build_devmap_experiment_cmd(method, fold_mode, report_write_dir, seed):
+def build_devmap_experiment_cmd(method, fold_mode, report_write_dir, seed, config=None):
     cmd = ['gnns4code/python/experiment/DevMapExperiment.py']
 
     experiment_arg = ['experiment']
@@ -229,6 +230,9 @@ def build_devmap_experiment_cmd(method, fold_mode, report_write_dir, seed):
             + ['--fold_mode', fold_mode] \
             + ['--report_write_dir', report_write_dir] \
             + ['--seed', str(seed)] \
+
+    if config:
+        args += ['--config', config]
 
     return cmd + args
 
