@@ -790,11 +790,11 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
         y_1hot = encode_1hot(y)
 
         # 10-fold cross-validation
-        if fold_mode == 'random_10fold':
+        if fold_mode == 'random':
             kfold_seed = 204
             kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=kfold_seed)
             split = kf.split(features, y)
-        elif fold_mode == 'benchmark_grouped_7fold':
+        elif fold_mode == 'grouped':
             benchmark_suites = [x.split('-')[0] for x in list(df['benchmark'])]
             num_benchmark_suites = len(set(benchmark_suites))
 

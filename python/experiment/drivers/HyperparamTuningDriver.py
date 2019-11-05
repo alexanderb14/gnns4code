@@ -85,7 +85,7 @@ def run_slurm_job(cmd):
     return job_id
 
 
-def run_n_times_on_slurm(task: str, method: str, config_str: str, num_iterations: int, fold_mode: str):
+def run_n_times_on_slurm(task: str, method: str, config_str: str, num_iterations: int, fold_mode: str, split_mode: str):
     # Run several instances of the experiment on slurm
     # Cleanup and prepare dirs
     pwd = execute_ssh_command('pwd')[0].replace('\n', '')
@@ -106,7 +106,7 @@ def run_n_times_on_slurm(task: str, method: str, config_str: str, num_iterations
         if task == 'tc':
             cmd = exp_utils.build_tc_experiment_cmd(method, run_artifact_dir, 0, config_str)
         elif task == 'devmap':
-            cmd = exp_utils.build_devmap_experiment_cmd(method, fold_mode, run_artifact_dir, 0, config_str)
+            cmd = exp_utils.build_devmap_experiment_cmd(method, fold_mode, split_mode, run_artifact_dir, 0, config_str)
 
         cmd = ' '.join(['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] +
                        ['\"'] +
@@ -199,7 +199,7 @@ def f_gnn_ast_tc(*data):
 
     config = {
         "run_id": 'foo',
-        'fold_mode': 'random_10fold',
+        'fold_mode': 'random',
 
         "graph_rnn_cell": "GRU",
 
@@ -269,14 +269,14 @@ def f_gnn_ast_tc(*data):
 
 
 def f_gnn_ast_devmap_random(*data):
-    f_gnn_ast_devmap('random_10fold', *data)
+    f_gnn_ast_devmap('random', '3', *data)
 
 
 def f_gnn_ast_devmap_grouped(*data):
-    f_gnn_ast_devmap('benchmark_grouped_7fold', *data)
+    f_gnn_ast_devmap('grouped', '3', *data)
 
 
-def f_gnn_ast_devmap(fold_mode, *data):
+def f_gnn_ast_devmap(fold_mode, split_mode, *data):
     # Build config
     num_timesteps = int(data[0][0])
     gnn_h_size = int(data[0][1])
@@ -297,7 +297,7 @@ def f_gnn_ast_devmap(fold_mode, *data):
 
     config = {
         "run_id": 'foo',
-        'fold_mode': 'random_10fold',
+        'fold_mode': 'random',
 
         "graph_rnn_cell": "GRU",
 
@@ -356,15 +356,16 @@ def f_gnn_ast_devmap(fold_mode, *data):
 
     results_df = run_n_times_on_slurm(task='devmap',
                                       fold_mode=fold_mode,
+                                      split_mode=split_mode,
                                       method='DeepTuneGNNClang',
                                       config_str=config_str,
-                                      num_iterations=2)
+                                      num_iterations=3)
 
     # Calculate metric
-    speedup = scipy.stats.gmean(list(results_df['Speedup']))
-    print(speedup)
+    accuracy = scipy.stats.mean(results_df['set' == 'Valid']['Correct?'])
+    print('Metric:', accuracy)
 
-    return speedup
+    return accuracy
 
 
 def main():

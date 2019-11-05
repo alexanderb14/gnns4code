@@ -217,7 +217,7 @@ def build_tc_experiment_infos(report_write_root_dir, num_iterations, methods):
 
 
 # DevMap experiment
-def build_devmap_experiment_cmd(method, fold_mode, report_write_dir, seed, config=None):
+def build_devmap_experiment_cmd(method, fold_mode, split_mode, report_write_dir, seed, config=None):
     cmd = ['gnns4code/python/experiment/DevMapExperiment.py']
 
     experiment_arg = ['experiment']
@@ -228,6 +228,7 @@ def build_devmap_experiment_cmd(method, fold_mode, report_write_dir, seed, confi
             + dataset_args \
             + ['--' + method] \
             + ['--fold_mode', fold_mode] \
+            + ['--split_mode', split_mode] \
             + ['--report_write_dir', report_write_dir] \
             + ['--seed', str(seed)] \
 
@@ -244,7 +245,7 @@ def build_devmap_experiment_infos(report_write_root_dir, num_iterations, methods
         methods = ['DeepTuneGNNClang', 'DeepTuneGNNClangASTEdges', 'DeepTuneGNNLLVM', 'DeepTuneGNNLLVMCFGEdges', 'DeepTuneGNNLLVMCFGDataflowEdges', 'DeepTuneGNNLLVMCFGDataflowCallEdges', 'DeepTuneLSTM', 'RandomMapping', 'StaticMapping', 'Grewe']
 
     for method in methods:
-        for fold_mode in ['random_10fold', 'benchmark_grouped_7fold']:
+        for fold_mode in ['random', 'grouped']:
             for seed in range(1, num_iterations + 1):
                 # Create report dir
                 report_write_dir = os.path.join(report_write_root_dir, 'devmap_%s_%s' % (method, fold_mode))
