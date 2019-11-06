@@ -211,6 +211,7 @@ class PredictionModel(object):
             'labels': [],
             'embeddings_in': [],
             'node_values': [],
+            'num_incoming_edges_dicts_per_type': []
         }
 
         if self.with_aux_in:
@@ -218,9 +219,6 @@ class PredictionModel(object):
 
         for graph_idx, graph in enumerate(graphs):
             num_nodes = graph_sizes[graph_idx]
-
-            if self.config['use_edge_bias'] == 1:
-                batch_data['num_incoming_edges_dicts_per_type'] = []
 
             # Aux in
             if self.with_aux_in:
@@ -238,15 +236,15 @@ class PredictionModel(object):
                     continue
                 batch_data['adjacency_lists'][idx].append(adj_list)
 
-            if self.config['use_edge_bias'] == 1:
-                # Graph model: Incoming edge numbers
-                num_incoming_edges_dicts_per_type = action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] if action else utils.graph_to_adjacency_lists([], self.config['tie_fwd_bkwd'], self.config['edge_type_filter'])[0]
-                num_incoming_edges_per_type = np.zeros((num_nodes, num_edge_types))
-                for (e_type, num_incoming_edges_per_type_dict) in num_incoming_edges_dicts_per_type.items():
-                    for (node_id, edge_count) in num_incoming_edges_per_type_dict.items():
-                        num_incoming_edges_per_type[node_id, e_type] = edge_count
-                batch_data['num_incoming_edges_dicts_per_type'].append(num_incoming_edges_per_type)
+            # Graph model: Incoming edge numbers
+            num_incoming_edges_dicts_per_type = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'], self.config['edge_type_filter'])[1]
+            num_incoming_edges_per_type = np.zeros((num_nodes, num_edge_types))
+            for (e_type, num_incoming_edges_per_type_dict) in num_incoming_edges_dicts_per_type.items():
+                for (node_id, edge_count) in num_incoming_edges_per_type_dict.items():
+                    num_incoming_edges_per_type[node_id, e_type] = edge_count
+            batch_data['num_incoming_edges_dicts_per_type'].append(num_incoming_edges_per_type)
 
+            # Graph model: Mappings
             graph_mappings_all = np.full(num_nodes, graph_idx)
             batch_data['embeddings_to_graph_mappings'].append(graph_mappings_all)
 
@@ -271,10 +269,9 @@ class PredictionModel(object):
             else:
                 feed_dict[adj_list] = feed_dict[adj_list][0]
 
-        if self.config['use_edge_bias'] == 1:
-            # Graph model: Incoming edge numbers
-            feed_dict[self.graph_layers[0].placeholders['num_incoming_edges_per_type']] \
-                = np.concatenate(batch_data['num_incoming_edges_dicts_per_type'], axis=0)
+        # Graph model: Incoming edge numbers
+        feed_dict[self.graph_layers[0].placeholders['num_incoming_edges_per_type']] \
+            = np.concatenate(batch_data['num_incoming_edges_dicts_per_type'], axis=0)
 
         # Is training
         feed_dict[self.cells[0].placeholders['is_training']] = is_training
@@ -396,7 +393,7 @@ class PredictionModel(object):
         """
         # Enrich graphs with adj list
         for graph in graphs_train:
-            graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'] == 1)[0]
+            graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'], self.config['edge_type_filter'])[0]
 
         # Extract graph sizes
         graph_sizes = []
@@ -432,8 +429,7 @@ class PredictionModel(object):
 
             lst = list(zip(graphs_train, graph_sizes))
             np.random.shuffle(lst)
-            batches = [lst[i * batch_size:(i + 1) * batch_size] for i in
-                       range((len(lst) + batch_size - 1) // batch_size)]
+            batches = utils.chunks(lst, batch_size)
 
             # Run batches
             training_losses = []
@@ -556,7 +552,7 @@ class PredictionModel(object):
     def predict(self, graphs):
         # Enrich graphs with adj list
         for graph in graphs:
-            graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'] == 1)[0]
+            graph[utils.AE.ADJ_LIST] = utils.graph_to_adjacency_lists(graph[utils.T.EDGES], self.config['tie_fwd_bkwd'], self.config['edge_type_filter'])[0]
 
         # Extract graph sizes
         graph_sizes = []

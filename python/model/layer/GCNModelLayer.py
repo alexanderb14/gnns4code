@@ -47,6 +47,9 @@ class GCNModelLayer(PropagationModelLayer):
         self.placeholders['adjacency_lists'] = [tf.placeholder(tf.int32, [None, 2], name='adjacency_e%s' % e)
                                                 for e in range(num_edge_types)]
 
+        self.placeholders['num_incoming_edges_per_type'] = tf.placeholder(tf.float32, [None, num_edge_types],
+                                                                          name='num_incoming_edges_per_type')
+
     def compute_embeddings(self, embeddings: tf.Tensor) -> tf.Tensor:
         """
         Uses the model layer to process embeddings to new embeddings. All embeddings are in one dimension.
@@ -79,6 +82,12 @@ class GCNModelLayer(PropagationModelLayer):
 
                 messages = self.state.weights['edge_type_to_message_transformation_layers'][edge_type_idx](
                     edge_source_states)                                             # [e, h]
+
+                # Normalize by number of incoming edges
+                # num_incoming_to_node_per_message = \
+                #     tf.nn.embedding_lookup(params=self.placeholders['num_incoming_edges_per_type'][edge_type_idx, :],
+                #                            ids=edge_targets)                        # Shape [E, H]
+                # messages = tf.expand_dims(1.0 / (num_incoming_to_node_per_message + utils.SMALL_NUMBER), axis=-1) * messages
 
                 messages_per_type.append(messages)
 

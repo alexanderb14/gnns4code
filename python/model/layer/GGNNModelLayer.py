@@ -52,9 +52,8 @@ class GGNNModelLayer(PropagationModelLayer):
         self.placeholders['adjacency_lists'] = [tf.placeholder(tf.int32, [None, 2], name='adjacency_e%s' % e)
                                                 for e in range(num_edge_types)]
 
-        if self.config['use_edge_bias'] == 1:
-            self.placeholders['num_incoming_edges_per_type'] = tf.placeholder(tf.float32, [None, num_edge_types],
-                                                                              name='num_incoming_edges_per_type')
+        self.placeholders['num_incoming_edges_per_type'] = tf.placeholder(tf.float32, [None, num_edge_types],
+                                                                          name='num_incoming_edges_per_type')
 
     def compute_embeddings(self, embeddings: tf.Tensor) -> tf.Tensor:
         """
