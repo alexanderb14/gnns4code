@@ -214,7 +214,7 @@ def f_gnn_ast_tc(*data):
         "run_id": 'foo',
         'fold_mode': 'random',
 
-        "graph_rnn_cell": "GRU",
+        "gnn_type": "GGNN",
 
         "num_timesteps": num_timesteps * 2,
         "hidden_size_orig": 46,
@@ -333,7 +333,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
         "run_id": 'foo',
         'fold_mode': 'random',
 
-        "graph_rnn_cell": "GRU",
+        "gnn_type": "GGNN",
 
         "num_timesteps": num_timesteps * 2,
         "hidden_size_orig": 92,
@@ -448,7 +448,7 @@ def f_gnn_llvm_tc(*data):
         "run_id": 'foo',
         'fold_mode': 'random',
 
-        "graph_rnn_cell": "GRU",
+        "gnn_type": "GGNN",
 
         "num_timesteps": num_timesteps * 2,
         "hidden_size_orig": 140,
@@ -566,7 +566,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
         "run_id": 'foo',
         'fold_mode': 'random',
 
-        "graph_rnn_cell": "GRU",
+        "gnn_type": "GGNN",
 
         "num_timesteps": num_timesteps * 2,
         "hidden_size_orig": 140,

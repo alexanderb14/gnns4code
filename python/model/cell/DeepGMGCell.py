@@ -64,7 +64,7 @@ class DeepGMGCellState(object):
                 elif action_meta['type'] == 'add_basic_block':
                     self.weights[function_name] = utils.MLP(h_size * m_size * 2, input_dimension, [], 'sigmoid', 'add_basic_block')
 
-                    elif action_meta['type'] == 'choose_number':
+                    if action_meta['type'] == 'choose_number':
                         self.weights[function_name] = utils.MLP(mlp_dim, 1, [], 'sigmoid', 'choose_number')
 
                     elif action_meta['type'] == 'choose_function':

@@ -8,8 +8,10 @@ from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
 
 # Static data
 CONFIG = {
+    'hidden_size_orig': 4,
+
     'num_timesteps': 4,
-    'graph_rnn_cell': 'GRU',  # GRU, CudnnCompatibleGRUCell, or RNN
+    'gnn_type': 'GCN',
     'gnn_h_size': 4,
 
     'gnn_m_size': 2,

@@ -25,20 +25,8 @@ class GGNNModelLayerState(object):
             self.weights['edge_biases'] = tf.Variable(np.zeros([num_edge_types, h_dim], dtype=np.float32),
                                                             name='gnn_edge_biases')
 
-        cell_type = self.config['graph_rnn_cell'].lower()
         activation_fun = tf.nn.tanh
-        if cell_type == 'gru':
-            # cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun,
-            #                               kernel_initializer=tf.glorot_uniform_initializer,
-            #                               bias_initializer=tf.glorot_uniform_initializer)
-            cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun)
-        elif cell_type == 'cudnncompatiblegrucell':
-            import tensorflow.contrib.cudnn_rnn as cudnn_rnn
-            cell = cudnn_rnn.CudnnCompatibleGRUCell(h_dim)
-        elif cell_type == 'rnn':
-            cell = tf.nn.rnn_cell.BasicRNNCell(h_dim, activation=activation_fun)
-        else:
-            raise Exception("Unknown RNN cell type '%s'." % cell_type)
+        cell = tf.nn.rnn_cell.GRUCell(h_dim, activation=activation_fun)
         self.weights['rnn_cells'] = cell
 
 class GGNNModelLayer(PropagationModelLayer):

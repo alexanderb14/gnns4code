@@ -1507,7 +1507,7 @@ def main():
                 "run_id": 'deepgnn-ast' + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
 
-                "graph_rnn_cell": "GRU",
+                "gnn_type": "GGNN",
 
                 "num_timesteps": 4,
                 "hidden_size_orig": 92,
@@ -1572,7 +1572,7 @@ def main():
                 "run_id": 'deepgnn-llvm' + '_' + str(run_id),
                 'fold_mode': args.fold_mode,
 
-                "graph_rnn_cell": "GRU",
+                "gnn_type": "GGNN",
 
                 "num_timesteps": 4,
                 "hidden_size_orig": 140,

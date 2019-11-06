@@ -452,12 +452,14 @@ def chunks(l, n):
 # Classes
 #########
 class MLP(object):
-    def __init__(self, in_size, out_size, hid_sizes, activation, func_name):
+    def __init__(self, in_size, out_size, hid_sizes, activation, func_name, with_bias=True):
         self.in_size = in_size
         self.out_size = out_size
         self.hid_sizes = hid_sizes
         self.activation = activation
         self.func_name = func_name
+        self.with_bias = with_bias
+
         self.params = self.make_network_params()
 
     def make_network_params(self) -> dict:
@@ -465,13 +467,12 @@ class MLP(object):
         weight_sizes = list(zip(dims[:-1], dims[1:]))
         weights = [tf.Variable(self.init_weights(s), name='%s_W_layer%i' % (self.func_name, i))
                    for (i, s) in enumerate(weight_sizes)]
-        biases = [tf.Variable(np.zeros(s[-1]).astype(np.float32), name='%s_b_layer%i' % (self.func_name, i))
-                  for (i, s) in enumerate(weight_sizes)]
+        network_params = {'weights': weights}
 
-        network_params = {
-            'weights': weights,
-            'biases': biases,
-        }
+        if self.with_bias:
+            biases = [tf.Variable(np.zeros(s[-1]).astype(np.float32), name='%s_b_layer%i' % (self.func_name, i))
+                      for (i, s) in enumerate(weight_sizes)]
+            network_params['biases'] = biases
 
         return network_params
 
@@ -480,8 +481,11 @@ class MLP(object):
 
     def __call__(self, inputs):
         acts = inputs
-        for W, b in zip(self.params['weights'], self.params['biases']):
-            hid = tf.matmul(acts, W) + b
+        for i, W in enumerate(self.params['weights']):
+            hid = tf.matmul(acts, W)
+            if self.with_bias:
+                hid += self.params['biases'][i]
+
             if self.activation == 'relu':
                 acts = tf.nn.relu(hid)
             elif self.activation == 'sigmoid':

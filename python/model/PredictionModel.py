@@ -17,6 +17,7 @@ import applications.clang_code.codegraph_models as clang_codegraph_models
 from model.cell.PredictionCell import PredictionCell, PredictionCellState
 from model.layer.EmbeddingLayer import EmbeddingLayer, EmbeddingLayerState
 from model.layer.GGNNModelLayer import GGNNModelLayer, GGNNModelLayerState
+from model.layer.GCNModelLayer import GCNModelLayer, GCNModelLayerState
 
 
 class PredictionModelState(object):
@@ -38,8 +39,12 @@ class PredictionModelState(object):
 
         with self.graph.as_default():
             self.embedding_layer_state = EmbeddingLayerState(config)
-            self.ggnn_layer_state = GGNNModelLayerState(config)
             self.prediction_cell_state = PredictionCellState(config)
+
+            if config['gnn_type'] == 'GGNN':
+                self.graph_layer_state = GGNNModelLayerState(config)
+            elif config['gnn_type'] == 'GCN':
+                self.graph_layer_state = GCNModelLayerState(config)
 
     def __get_weights(self):
         """
@@ -137,7 +142,7 @@ class PredictionModel(object):
         self.config = config
         self.state = state
 
-        self.ggnn_layers = []
+        self.graph_layers = []
         self.cells = []
 
         with self.state.graph.as_default():
@@ -259,7 +264,7 @@ class PredictionModel(object):
         feed_dict = {}
 
         # Graph model: Adj list
-        for idx, adj_list in enumerate(self.ggnn_layers[0].placeholders['adjacency_lists']):
+        for idx, adj_list in enumerate(self.graph_layers[0].placeholders['adjacency_lists']):
             feed_dict[adj_list] = np.array(batch_data['adjacency_lists'][idx])
             if len(feed_dict[adj_list]) == 0:
                 feed_dict[adj_list] = np.zeros((0, 2), dtype=np.int32)
@@ -268,7 +273,7 @@ class PredictionModel(object):
 
         if self.config['use_edge_bias'] == 1:
             # Graph model: Incoming edge numbers
-            feed_dict[self.ggnn_layers[0].placeholders['num_incoming_edges_per_type']] \
+            feed_dict[self.graph_layers[0].placeholders['num_incoming_edges_per_type']] \
                 = np.concatenate(batch_data['num_incoming_edges_dicts_per_type'], axis=0)
 
         # Is training
@@ -310,8 +315,12 @@ class PredictionModel(object):
         embeddings = embedding_layer.compute_embeddings(embeddings_reduced)
 
         # Create propagation layer
-        ggnn_layer = GGNNModelLayer(self.config, self.state.ggnn_layer_state)
-        embeddings = ggnn_layer.compute_embeddings(embeddings)
+        if self.config['gnn_type'] == 'GGNN':
+            graph_layer = GGNNModelLayer(self.config, self.state.graph_layer_state)
+        elif self.config['gnn_type'] == 'GCN':
+            graph_layer = GCNModelLayer(self.config, self.state.graph_layer_state)
+
+        embeddings = graph_layer.compute_embeddings(embeddings)
 
         if self.config['use_node_values'] == 1:
             embeddings = tf.concat([embeddings, node_values], axis=1)
@@ -321,7 +330,7 @@ class PredictionModel(object):
         prediction_cell.initial_embeddings = embeddings_reduced
         prediction_cell.compute_predictions(embeddings)
 
-        self.ggnn_layers.append(ggnn_layer)
+        self.graph_layers.append(graph_layer)
         self.cells.append(prediction_cell)
 
         if enable_training:

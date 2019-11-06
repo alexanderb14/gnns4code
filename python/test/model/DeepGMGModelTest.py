@@ -12,7 +12,7 @@ sys.path.append(SCRIPT_DIR + '/../..')
 
 # Static data
 CONFIG_DEFAULTGRAPH = {
-    'graph_rnn_cell': 'GRU',  # GRU, CudnnCompatibleGRUCell, or RNN
+    'gnn_type': 'GGNN',
 
     'num_timesteps': 2,
     'gnn_h_size': 4,

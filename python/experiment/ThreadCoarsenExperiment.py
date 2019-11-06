@@ -902,7 +902,7 @@ def main():
             config = json.loads(args.config) if args.config else {
                 "run_id": 'deepgnn-ast' + '_' + str(run_id),
 
-                "graph_rnn_cell": "GRU",
+                "gnn_type": "GGNN",
 
                 "num_timesteps": 4,
                 "hidden_size_orig": 46,
@@ -966,7 +966,7 @@ def main():
             config = json.loads(args.config) if args.config else {
                 "run_id": 'deepgnn-llvm' + '_' + str(run_id),
 
-                "graph_rnn_cell": "GRU",
+                "gnn_type": "GGNN",
 
                 "num_timesteps": 4,
                 "hidden_size_orig": 54,

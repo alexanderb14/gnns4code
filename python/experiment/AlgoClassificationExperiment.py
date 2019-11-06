@@ -444,7 +444,7 @@ def main():
         dataset = pd.read_csv(args.dataset)
 
         config = {
-            "graph_rnn_cell": "GRU",
+            "gnn_type": "GGNN",
 
             "num_timesteps": 4,
             "hidden_size_orig": 92,
