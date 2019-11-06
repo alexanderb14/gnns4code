@@ -1,5 +1,6 @@
 import argparse
 import json
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
@@ -12,6 +13,7 @@ import sys
 import time
 import uuid
 from io import StringIO
+from skopt.plots import plot_convergence, plot_evaluations, plot_objective
 
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -371,57 +373,96 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('command', help='Subcommand to run')
+    subparsers = parser.add_subparsers()
 
-    parser.add_argument('--experiment')
-    parser.add_argument('--fold_mode')
-    parser.add_argument('--method')
-    parser.add_argument('--checkpoint_file')
-    parser.add_argument('--result_file')
-    parser.add_argument('--num_iterations')
+    # Parse command
+    command_arg = parser.parse_args(sys.argv[1:2])
+    if not hasattr(command_arg, 'command'):
+        print('Unrecognized command')
+        parser.print_help()
+        exit(1)
 
-    args = parser.parse_args()
+    # Experiment command
+    if command_arg.command == 'experiment':
+        parser_exp = subparsers.add_parser('experiment')
 
-    #
-    fn_dims_and_default_params = None
-    fn_f = None
+        parser_exp.add_argument('--experiment')
+        parser_exp.add_argument('--fold_mode')
+        parser_exp.add_argument('--method')
+        parser_exp.add_argument('--checkpoint_file')
+        parser_exp.add_argument('--result_file')
+        parser_exp.add_argument('--num_iterations')
 
-    if args.experiment == 'tc':
-        fn_dims_and_default_params = get_gnn_ast_dimensions_and_default_params
-        fn_f = f_gnn_ast_tc
-    elif args.experiment == 'devmap':
-        fn_dims_and_default_params = get_gnn_ast_dimensions_and_default_params
-        if args.fold_mode == 'random':
-            fn_f = f_gnn_ast_devmap_random
-        elif args.fold_mode == 'grouped':
-            fn_f = f_gnn_ast_devmap_grouped
+        args = parser_exp.parse_args(sys.argv[2:])
 
-    dims, default_params = fn_dims_and_default_params()
-    num_iterations = int(args.num_iterations)
+        #
+        fn_dims_and_default_params = None
+        fn_f = None
 
-    checkpoint_saver = skopt.callbacks.CheckpointSaver(args.checkpoint_file, compress=0)
-    if os.path.isfile(args.checkpoint_file):
-        res = skopt.load(args.checkpoint_file)
+        if args.experiment == 'tc':
+            fn_dims_and_default_params = get_gnn_ast_dimensions_and_default_params
+            fn_f = f_gnn_ast_tc
+        elif args.experiment == 'devmap':
+            fn_dims_and_default_params = get_gnn_ast_dimensions_and_default_params
+            if args.fold_mode == 'random':
+                fn_f = f_gnn_ast_devmap_random
+            elif args.fold_mode == 'grouped':
+                fn_f = f_gnn_ast_devmap_grouped
 
-        gp_result = skopt.gp_minimize(func=fn_f,                    # the function to minimize
-                                      dimensions=dims,              # the bounds on each dimension of x
-                                      n_calls=num_iterations,       # the number of evaluations of f
-                                      callback=[checkpoint_saver],
-                                      x0=res.x_iters,               # already examined values for x
-                                      y0=res.func_vals,             # observed values for x0
-                                      verbose=True)
+        dims, default_params = fn_dims_and_default_params()
+        num_iterations = int(args.num_iterations)
 
-    else:
-        gp_result = skopt.gp_minimize(func=fn_f,                        # the function to minimize
-                                      dimensions=dims,                  # the bounds on each dimension of x
-                                      n_calls=num_iterations,           # the number of evaluations of f
-                                      callback=[checkpoint_saver],
-                                      x0=default_params,                # start values for x
-                                      verbose=True)
+        checkpoint_saver = skopt.callbacks.CheckpointSaver(args.checkpoint_file, compress=0)
+        if os.path.isfile(args.checkpoint_file):
+            res = skopt.load(args.checkpoint_file)
 
-    with open(args.result_file, 'w') as f:
-        pickle.dump(gp_result, f)
+            gp_result = skopt.gp_minimize(func=fn_f,                    # the function to minimize
+                                          dimensions=dims,              # the bounds on each dimension of x
+                                          n_calls=num_iterations,       # the number of evaluations of f
+                                          callback=[checkpoint_saver],
+                                          x0=res.x_iters,               # already examined values for x
+                                          y0=res.func_vals,             # observed values for x0
+                                          verbose=True)
 
-    print(gp_result.x, gp_result.fun)
+        else:
+            gp_result = skopt.gp_minimize(func=fn_f,                        # the function to minimize
+                                          dimensions=dims,                  # the bounds on each dimension of x
+                                          n_calls=num_iterations,           # the number of evaluations of f
+                                          callback=[checkpoint_saver],
+                                          x0=default_params,                # start values for x
+                                          verbose=True)
+
+        with open(args.result_file, 'w') as f:
+            pickle.dump(gp_result, f)
+
+        print(gp_result.x, gp_result.fun)
+
+    # Visualize command
+    if command_arg.command == 'visualize':
+        parser_vis = subparsers.add_parser('visualize')
+
+        parser_vis.add_argument('--result_file')
+
+        args = parser_vis.parse_args(sys.argv[2:])
+
+        res = skopt.load(args.result_file)
+
+        ax = plot_convergence(res)
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+        ax = plot_evaluations(res)
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+        ax = plot_objective(res)
+        plt.grid()
+        plt.legend()
+        plt.show()
+
 
 if __name__ == '__main__':
     main()
