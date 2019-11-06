@@ -1,5 +1,6 @@
 import argparse
 import json
+import numpy as np
 import os
 import pandas as pd
 import paramiko
@@ -91,7 +92,7 @@ def run_n_times_on_slurm(task: str, method: str, config_str: str, num_iterations
     pwd = execute_ssh_command('pwd')[0].replace('\n', '')
     reports_dir = os.path.join(pwd, REPORTS_DIR)
 
-    execute_ssh_command('mkdir -p ' + reports_dir)
+    execute_ssh_command('rm -rf ' + reports_dir + ' && mkdir -p ' + reports_dir)
     run_artifact_dirs = []
     cmds = []
 
@@ -134,7 +135,7 @@ def run_n_times_on_slurm(task: str, method: str, config_str: str, num_iterations
 
     # Periodically poll and wait for completion
     while len(triggered_jobs) != 0:
-        time.sleep(10)
+        time.sleep(60)
 
         stati = get_slurm_job_stati()
         print('Running:\t', stati['running'])
@@ -362,7 +363,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
                                       num_iterations=3)
 
     # Calculate metric
-    accuracy = scipy.stats.mean(results_df['set' == 'Valid']['Correct?'])
+    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
     print('Metric:', accuracy)
 
     return accuracy * (-1)
