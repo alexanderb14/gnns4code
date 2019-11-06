@@ -655,7 +655,6 @@ def main():
         parser_exp.add_argument('--experiment')
         parser_exp.add_argument('--fold_mode')
         parser_exp.add_argument('--method')
-        parser_exp.add_argument('--checkpoint_file')
         parser_exp.add_argument('--result_file')
         parser_exp.add_argument('--num_iterations')
 
@@ -690,9 +689,9 @@ def main():
         num_iterations = int(args.num_iterations)
 
         # Do optimization
-        checkpoint_saver = skopt.callbacks.CheckpointSaver(args.checkpoint_file, compress=0)
-        if os.path.isfile(args.checkpoint_file):
-            res = skopt.load(args.checkpoint_file)
+        checkpoint_saver = skopt.callbacks.CheckpointSaver(args.result_file, compress=0)
+        if os.path.isfile(args.result_file):
+            res = skopt.load(args.result_file)
 
             gp_result = skopt.gp_minimize(func=fn_f,                    # the function to minimize
                                           dimensions=dims,              # the bounds on each dimension of x
