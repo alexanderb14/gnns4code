@@ -166,17 +166,20 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
     return pd.concat(result_dfs)
 
 
-def get_gnn_ast_dimensions_and_default_params():
+# GNN AST
+# ##############
+# Thread Coarsening
+def get_gnn_ast_tc_dimensions_and_default_params():
     dims_and_default_params = [
         (skopt.space.Integer(low=1, high=4, name='num_timesteps'), 4),
-        (skopt.space.Integer(low=1, high=4, name='gnn_h_size'), 2),
+        (skopt.space.Integer(low=1, high=7, name='gnn_h_size'), 2),
         (skopt.space.Integer(low=1, high=4, name='gnn_m_size'), 2),
 
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_f_m_dims'), 2),
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
 
-        (skopt.space.Integer(low=0, high=4, name='embedding_layer_size'), 2),
+        (skopt.space.Integer(low=0, high=6, name='embedding_layer_size'), 2),
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
@@ -271,9 +274,33 @@ def f_gnn_ast_tc(*data):
 
     # Calculate metric
     speedup = scipy.stats.gmean(list(results_df['Speedup']))
-    print(speedup)
+    print('Metric:', speedup)
 
-    return speedup
+    return speedup * (-1)
+
+
+# Device Mapping
+def get_gnn_ast_devmap_dimensions_and_default_params():
+    dims_and_default_params = [
+        (skopt.space.Integer(low=1, high=4, name='num_timesteps'), 4),
+        (skopt.space.Integer(low=1, high=7, name='gnn_h_size'), 2),
+        (skopt.space.Integer(low=1, high=4, name='gnn_m_size'), 2),
+
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_f_m_dims'), 2),
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
+
+        (skopt.space.Integer(low=0, high=7, name='embedding_layer_size'), 2),
+        (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
+
+        (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
+        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
+        (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+
+        (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
+    ]
+
+    return split_dict(dims_and_default_params)
 
 
 def f_gnn_ast_devmap_random(*data):
@@ -373,6 +400,239 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
     return accuracy * (-1)
 
 
+# GNN LLVM
+# ##############
+# Thread Coarsening
+def get_gnn_llvm_tc_dimensions_and_default_params():
+    dims_and_default_params = [
+        (skopt.space.Integer(low=1, high=4, name='num_timesteps'), 4),
+        (skopt.space.Integer(low=1, high=4, name='gnn_h_size'), 2),
+        (skopt.space.Integer(low=1, high=4, name='gnn_m_size'), 2),
+
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_f_m_dims'), 2),
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
+
+        (skopt.space.Integer(low=0, high=4, name='embedding_layer_size'), 2),
+        (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
+
+        (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
+        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
+        (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+
+        (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
+    ]
+
+    return split_dict(dims_and_default_params)
+
+
+def f_gnn_llvm_tc(*data):
+    # Build config
+    num_timesteps = int(data[0][0])
+    gnn_h_size = int(data[0][1])
+    gnn_m_size = int(data[0][2])
+
+    prediction_cell_mlp_f_m_dims = int(data[0][3])
+    prediction_cell_mlp_g_m_dims = int(data[0][4])
+    prediction_cell_mlp_reduce_dims = int(data[0][5])
+
+    embedding_layer_size = int(data[0][6])
+    embedding_layer_dims = int(data[0][7])
+
+    learning_rate = float(data[0][8])
+    num_epochs = int(data[0][9])
+    L2_loss_factor = int(data[0][10])
+
+    tie_fwd_bkwd = int(data[0][11])
+
+    config = {
+        "run_id": 'foo',
+        'fold_mode': 'random',
+
+        "graph_rnn_cell": "GRU",
+
+        "num_timesteps": num_timesteps * 2,
+        "hidden_size_orig": 140,
+        "gnn_h_size": 2 ** gnn_h_size,
+        "gnn_m_size": gnn_m_size * 2,
+
+        "num_edge_types": 4,
+
+        "prediction_cell": {
+            "mlp_f_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
+            "mlp_f_m_activation": "relu",
+
+            "mlp_g_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
+            "mlp_g_m_activation": "sigmoid",
+
+            "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
+            "mlp_reduce_activation": "relu",
+
+            "mlp_reduce_after_aux_in_1_dims": [],
+            "mlp_reduce_after_aux_in_1_activation": "relu",
+            "mlp_reduce_after_aux_in_1_out_dim": 32,
+
+            "mlp_reduce_after_aux_in_2_dims": [],
+            "mlp_reduce_after_aux_in_2_activation": "sigmoid",
+            "mlp_reduce_after_aux_in_2_out_dim": 6,
+
+            "output_dim": 6,
+        },
+
+        "embedding_layer": {
+            "mapping_dims": [2 ** embedding_layer_size] * embedding_layer_dims
+        },
+
+        "learning_rate": learning_rate,
+        "clamp_gradient_norm": 1.0,
+        "L2_loss_factor": 0.05 * L2_loss_factor,
+
+        "batch_size": 16,
+        "num_epochs": 2 ** num_epochs * 100,
+        "out_dir": "/tmp",
+
+        "tie_fwd_bkwd": tie_fwd_bkwd,
+        "use_edge_bias": 0,
+        "use_edge_msg_avg_aggregation": 0,
+
+        "use_node_values": 0,
+        "save_best_model_interval": 1,
+        "with_aux_in": 0
+    }
+    utils.pretty_print_dict(config)
+
+    results_df = run_n_times_on_slurm(task='tc',
+                                      method='DeepTuneGNNClang',
+                                      config=config,
+                                      num_iterations=2)
+
+    # Calculate metric
+    speedup = scipy.stats.gmean(list(results_df['Speedup']))
+    print('Metric:', speedup)
+
+    return speedup * (-1)
+
+# Device Mapping
+def get_gnn_llvm_devmap_dimensions_and_default_params():
+    dims_and_default_params = [
+        (skopt.space.Integer(low=1, high=4, name='num_timesteps'), 4),
+        (skopt.space.Integer(low=1, high=7, name='gnn_h_size'), 2),
+        (skopt.space.Integer(low=1, high=4, name='gnn_m_size'), 2),
+
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_f_m_dims'), 2),
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
+        (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
+
+        (skopt.space.Integer(low=0, high=7, name='embedding_layer_size'), 2),
+        (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
+
+        (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
+        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
+        (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+
+        (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
+    ]
+
+    return split_dict(dims_and_default_params)
+
+
+def f_gnn_llvm_devmap_random(*data):
+    return f_gnn_llvm_devmap('random', '3', *data)
+
+
+def f_gnn_llvm_devmap_grouped(*data):
+    return f_gnn_llvm_devmap('grouped', '3', *data)
+
+
+def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
+    # Build config
+    num_timesteps = int(data[0][0])
+    gnn_h_size = int(data[0][1])
+    gnn_m_size = int(data[0][2])
+
+    prediction_cell_mlp_f_m_dims = int(data[0][3])
+    prediction_cell_mlp_g_m_dims = int(data[0][4])
+    prediction_cell_mlp_reduce_dims = int(data[0][5])
+
+    embedding_layer_size = int(data[0][6])
+    embedding_layer_dims = int(data[0][7])
+
+    learning_rate = float(data[0][8])
+    num_epochs = int(data[0][9])
+    L2_loss_factor = int(data[0][10])
+
+    tie_fwd_bkwd = int(data[0][11])
+
+    config = {
+        "run_id": 'foo',
+        'fold_mode': 'random',
+
+        "graph_rnn_cell": "GRU",
+
+        "num_timesteps": num_timesteps * 2,
+        "hidden_size_orig": 140,
+        "gnn_h_size": 2 ** gnn_h_size,
+        "gnn_m_size": gnn_m_size * 2,
+
+        "num_edge_types": 4,
+
+        "prediction_cell": {
+            "mlp_f_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
+            "mlp_f_m_activation": "sigmoid",
+
+            "mlp_g_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
+            "mlp_g_m_activation": "relu",
+
+            "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
+            "mlp_reduce_activation": "relu",
+
+            "mlp_reduce_after_aux_in_1_dims": [],
+            "mlp_reduce_after_aux_in_1_activation": "relu",
+            "mlp_reduce_after_aux_in_1_out_dim": 32,
+
+            "mlp_reduce_after_aux_in_2_dims": [],
+            "mlp_reduce_after_aux_in_2_activation": "sigmoid",
+            "mlp_reduce_after_aux_in_2_out_dim": 2,
+
+            "output_dim": 2,
+        },
+
+        "embedding_layer": {
+            "mapping_dims": [2 ** embedding_layer_size] * embedding_layer_dims
+        },
+
+        "learning_rate": learning_rate,
+        "clamp_gradient_norm": 1.0,
+        "L2_loss_factor": 0.05 * L2_loss_factor,
+
+        "batch_size": 64,
+        "num_epochs": 2 ** num_epochs * 100,
+        "out_dir": "/tmp",
+
+        "tie_fwd_bkwd": tie_fwd_bkwd,
+        "use_edge_bias": 0,
+        "use_edge_msg_avg_aggregation": 0,
+
+        "use_node_values": 0,
+        "save_best_model_interval": 1,
+        "with_aux_in": 1
+    }
+    utils.pretty_print_dict(config)
+
+    results_df = run_n_times_on_slurm(task='devmap',
+                                      fold_mode=fold_mode,
+                                      split_mode=split_mode,
+                                      method='DeepTuneGNNClang',
+                                      config=config,
+                                      num_iterations=3)
+
+    # Calculate metric
+    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
+    print('Metric:', accuracy)
+
+    return accuracy * (-1)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', help='Subcommand to run')
@@ -398,23 +658,35 @@ def main():
 
         args = parser_exp.parse_args(sys.argv[2:])
 
-        #
+        # Map arguments -> Functions
         fn_dims_and_default_params = None
         fn_f = None
 
-        if args.experiment == 'tc':
-            fn_dims_and_default_params = get_gnn_ast_dimensions_and_default_params
-            fn_f = f_gnn_ast_tc
-        elif args.experiment == 'devmap':
-            fn_dims_and_default_params = get_gnn_ast_dimensions_and_default_params
-            if args.fold_mode == 'random':
-                fn_f = f_gnn_ast_devmap_random
-            elif args.fold_mode == 'grouped':
-                fn_f = f_gnn_ast_devmap_grouped
+        if args.method == 'ast':
+            if args.experiment == 'tc':
+                fn_dims_and_default_params = get_gnn_ast_tc_dimensions_and_default_params
+                fn_f = f_gnn_ast_tc
+            elif args.experiment == 'devmap':
+                fn_dims_and_default_params = get_gnn_ast_devmap_dimensions_and_default_params
+                if args.fold_mode == 'random':
+                    fn_f = f_gnn_ast_devmap_random
+                elif args.fold_mode == 'grouped':
+                    fn_f = f_gnn_ast_devmap_grouped
+        if args.method == 'llvm':
+            if args.experiment == 'tc':
+                fn_dims_and_default_params = get_gnn_llvm_tc_dimensions_and_default_params
+                fn_f = f_gnn_llvm_tc
+            elif args.experiment == 'devmap':
+                fn_dims_and_default_params = get_gnn_llvm_devmap_dimensions_and_default_params
+                if args.fold_mode == 'random':
+                    fn_f = f_gnn_llvm_devmap_random
+                elif args.fold_mode == 'grouped':
+                    fn_f = f_gnn_llvm_devmap_grouped
 
         dims, default_params = fn_dims_and_default_params()
         num_iterations = int(args.num_iterations)
 
+        # Do optimization
         checkpoint_saver = skopt.callbacks.CheckpointSaver(args.checkpoint_file, compress=0)
         if os.path.isfile(args.checkpoint_file):
             res = skopt.load(args.checkpoint_file)
