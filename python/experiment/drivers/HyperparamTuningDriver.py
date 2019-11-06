@@ -158,7 +158,6 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
     result_dfs = []
     for i, run_artifact_dir in enumerate(run_artifact_dirs):
         result_csv = ''.join(execute_ssh_command('cat ' + run_artifact_dir + '/*_raw.txt'))
-        print(result_csv)
         result_df = pd.read_csv(StringIO(result_csv))
 
         result_dfs.append(result_df)
