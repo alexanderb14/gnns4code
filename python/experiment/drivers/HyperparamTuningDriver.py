@@ -661,7 +661,7 @@ def main():
         fn_dims_and_default_params = None
         fn_f = None
 
-        if args.method == 'ast':
+        if args.method == 'DeepTuneGNNClang':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_gnn_ast_tc_dimensions_and_default_params
                 fn_f = f_gnn_ast_tc
@@ -671,7 +671,7 @@ def main():
                     fn_f = f_gnn_ast_devmap_random
                 elif args.fold_mode == 'grouped':
                     fn_f = f_gnn_ast_devmap_grouped
-        if args.method == 'llvm':
+        if args.method == 'DeepTuneGNNLLVM':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_gnn_llvm_tc_dimensions_and_default_params
                 fn_f = f_gnn_llvm_tc
