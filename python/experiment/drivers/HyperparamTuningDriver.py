@@ -232,6 +232,7 @@ def f_gnn_ast_tc(*data):
 
             "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
             "mlp_reduce_activation": "relu",
+            "mlp_reduce_out_dim": 32,
 
             "mlp_reduce_after_aux_in_1_dims": [],
             "mlp_reduce_after_aux_in_1_activation": "relu",
@@ -351,6 +352,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
 
             "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
             "mlp_reduce_activation": "relu",
+            "mlp_reduce_out_dim": 32,
 
             "mlp_reduce_after_aux_in_1_dims": [],
             "mlp_reduce_after_aux_in_1_activation": "relu",
@@ -466,6 +468,7 @@ def f_gnn_llvm_tc(*data):
 
             "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
             "mlp_reduce_activation": "relu",
+            "mlp_reduce_out_dim": 32,
 
             "mlp_reduce_after_aux_in_1_dims": [],
             "mlp_reduce_after_aux_in_1_activation": "relu",
@@ -584,6 +587,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
 
             "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
             "mlp_reduce_activation": "relu",
+            "mlp_reduce_out_dim": 32,
 
             "mlp_reduce_after_aux_in_1_dims": [],
             "mlp_reduce_after_aux_in_1_activation": "relu",

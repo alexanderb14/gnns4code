@@ -38,7 +38,7 @@ class PredictionCellState(object):
                                                 'mlp_regression_gate')
 
         self.weights['mlp_reduce'] = utils.MLP(h_size * m_size,
-                                               h_size * m_size,
+                                               self.config['prediction_cell']['mlp_reduce_out_dim'],
                                                self.config['prediction_cell']['mlp_reduce_dims'],
                                                self.config['prediction_cell']['mlp_reduce_activation'],
                                                'mlp_reduce')
@@ -46,7 +46,7 @@ class PredictionCellState(object):
         offset = 0
         if config['with_aux_in'] == 1:
             offset = 2
-        self.weights['mlp_reduce_after_aux_in_1'] = utils.MLP(h_size * m_size + offset,
+        self.weights['mlp_reduce_after_aux_in_1'] = utils.MLP(self.config['prediction_cell']['mlp_reduce_out_dim'] + offset,
                                                               self.config['prediction_cell']['mlp_reduce_after_aux_in_1_out_dim'],
                                                               self.config['prediction_cell']['mlp_reduce_after_aux_in_1_dims'],
                                                               self.config['prediction_cell']['mlp_reduce_after_aux_in_1_activation'],

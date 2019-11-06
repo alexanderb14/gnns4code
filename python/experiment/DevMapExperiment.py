@@ -1525,6 +1525,7 @@ def main():
 
                     "mlp_reduce_dims": [64, 64],
                     "mlp_reduce_activation": "relu",
+                    "mlp_reduce_out_dim": 32,
 
                     "mlp_reduce_after_aux_in_1_dims": [32, 32, 32],
                     "mlp_reduce_after_aux_in_1_activation": "relu",
@@ -1592,6 +1593,7 @@ def main():
 
                     "mlp_reduce_dims": [64, 64],
                     "mlp_reduce_activation": "relu",
+                    "mlp_reduce_out_dim": 32,
 
                     "mlp_reduce_after_aux_in_1_dims": [64, 32],
                     "mlp_reduce_after_aux_in_1_activation": "relu",
