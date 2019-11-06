@@ -88,7 +88,7 @@ def run_slurm_job(cmd):
     return job_id
 
 
-def run_n_times_on_slurm(task: str, method: str, config_str: str, num_iterations: int, fold_mode: str, split_mode: str):
+def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: int, fold_mode: str, split_mode: str):
     # Run several instances of the experiment on slurm
     # Cleanup and prepare dirs
     pwd = execute_ssh_command('pwd')[0].replace('\n', '')
@@ -98,14 +98,22 @@ def run_n_times_on_slurm(task: str, method: str, config_str: str, num_iterations
     run_artifact_dirs = []
     cmds = []
 
-    # Build commands and prepare dirs
+    # Prepare dirs and build config
     for i in range(0, num_iterations):
+        # Prepare dirs
         run_id = str(uuid.uuid4())
         run_artifact_dir = os.path.join(reports_dir, run_id)
         run_artifact_dirs.append(run_artifact_dir)
 
         execute_ssh_command('mkdir ' + run_artifact_dir)
 
+        # Set seed
+        config['seed'] = i + 1
+
+        # Build config
+        config_str = json.dumps(config).replace('"', '\\"').replace(' ', '')
+
+        # Build commands
         if task == 'tc':
             cmd = exp_utils.build_tc_experiment_cmd(method, run_artifact_dir, 0, config_str)
         elif task == 'devmap':
@@ -252,16 +260,13 @@ def f_gnn_ast_tc(*data):
 
         "use_node_values": 0,
         "save_best_model_interval": 1,
-        "with_aux_in": 0,
-
-        "seed": 1
+        "with_aux_in": 0
     }
-    config_str = json.dumps(config).replace('"', '\\"').replace(' ', '')
     utils.pretty_print_dict(config)
 
     results_df = run_n_times_on_slurm(task='tc',
                                       method='DeepTuneGNNClang',
-                                      config_str=config_str,
+                                      config=config,
                                       num_iterations=2)
 
     # Calculate metric
@@ -350,18 +355,15 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
 
         "use_node_values": 0,
         "save_best_model_interval": 1,
-        "with_aux_in": 1,
-
-        "seed": 1
+        "with_aux_in": 1
     }
-    config_str = json.dumps(config).replace('"', '\\"').replace(' ', '')
     utils.pretty_print_dict(config)
 
     results_df = run_n_times_on_slurm(task='devmap',
                                       fold_mode=fold_mode,
                                       split_mode=split_mode,
                                       method='DeepTuneGNNClang',
-                                      config_str=config_str,
+                                      config=config,
                                       num_iterations=3)
 
     # Calculate metric
