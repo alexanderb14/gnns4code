@@ -263,7 +263,9 @@ def f_gnn_ast_tc(*data):
 
         "use_node_values": 0,
         "save_best_model_interval": 1,
-        "with_aux_in": 0
+        "with_aux_in": 0,
+
+        "edge_type_filter": []
     }
     utils.pretty_print_dict(config)
 
@@ -383,7 +385,9 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
 
         "use_node_values": 0,
         "save_best_model_interval": 1,
-        "with_aux_in": 1
+        "with_aux_in": 1,
+
+        "edge_type_filter": []
     }
     utils.pretty_print_dict(config)
 
@@ -499,7 +503,9 @@ def f_gnn_llvm_tc(*data):
 
         "use_node_values": 0,
         "save_best_model_interval": 1,
-        "with_aux_in": 0
+        "with_aux_in": 0,
+
+        "edge_type_filter": []
     }
     utils.pretty_print_dict(config)
 
@@ -618,7 +624,9 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
 
         "use_node_values": 0,
         "save_best_model_interval": 1,
-        "with_aux_in": 1
+        "with_aux_in": 1,
+
+        "edge_type_filter": []
     }
     utils.pretty_print_dict(config)
 

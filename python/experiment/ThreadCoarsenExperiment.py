@@ -954,6 +954,8 @@ def main():
                 "save_best_model_interval": 1,
                 "with_aux_in": 0,
 
+                "edge_type_filter": [],
+
                 "seed": seed
             }
 
@@ -1018,6 +1020,8 @@ def main():
                 "use_node_values": 0,
                 "save_best_model_interval": 1,
                 "with_aux_in": 0,
+
+                "edge_type_filter": [],
 
                 "seed": seed
             }
