@@ -221,7 +221,7 @@ def build_devmap_experiment_cmd(method, fold_mode, split_mode, report_write_dir,
     cmd = ['gnns4code/python/experiment/DevMapExperiment.py']
 
     experiment_arg = ['experiment']
-    dataset_args = ['--dataset_nvidia gnns4code/data/dev_mapping_task/prediction_task.csv',
+    dataset_args = ['--dataset_nvidia gnns4code/data/dev_mapping_task/prediction_task_nvidia.csv',
                     '--dataset_amd gnns4code/data/dev_mapping_task/prediction_task_amd.csv']
 
     args = experiment_arg \
