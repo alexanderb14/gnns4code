@@ -115,9 +115,6 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str, i
 
         stdout, stderr, result = process_source_file(filename, additional_args=additional_args)
 
-        with open(out_filename, 'wb') as f:
-            f.write(stdout)
-
         # In case of an error
         if result != 0:
             report_filename = os.path.join(
@@ -125,10 +122,13 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str, i
                 filename.replace('/', '_') + '.txt')
 
             # write error report file containing source, stdout, stderr
-            utils.write_error_report_file(filename, report_filename, [stdout], [stderr], result, cmd)
+            utils.write_error_report_file(filename, report_filename, [stdout], [stderr], result, '')
 
             shutil.copyfile(filename, os.path.join(bad_code_dir, os.path.basename(filename)))
         else:
+            with open(out_filename, 'wb') as f:
+                f.write(stdout)
+
             shutil.copyfile(filename, os.path.join(good_code_dir, os.path.basename(filename)))
 
         return result
