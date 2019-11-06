@@ -458,13 +458,13 @@ def f_gnn_llvm_tc(*data):
         "num_edge_types": 4,
 
         "prediction_cell": {
-            "mlp_f_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
+            "mlp_f_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
             "mlp_f_m_activation": "relu",
 
-            "mlp_g_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
+            "mlp_g_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
             "mlp_g_m_activation": "sigmoid",
 
-            "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
+            "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
             "mlp_reduce_activation": "relu",
 
             "mlp_reduce_after_aux_in_1_dims": [],
@@ -576,13 +576,13 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
         "num_edge_types": 4,
 
         "prediction_cell": {
-            "mlp_f_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
+            "mlp_f_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
             "mlp_f_m_activation": "sigmoid",
 
-            "mlp_g_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
+            "mlp_g_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
             "mlp_g_m_activation": "relu",
 
-            "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
+            "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
             "mlp_reduce_activation": "relu",
 
             "mlp_reduce_after_aux_in_1_dims": [],
