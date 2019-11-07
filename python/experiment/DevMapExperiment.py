@@ -985,6 +985,9 @@ class DeepTune(HeterogemeousMappingModel):
     __name__ = "DeepTune"
     __basename__ = "deeptune"
 
+    def __init__(self, config):
+        self.config = config
+
     def init(self, seed: int):
         np.random.seed(seed)
 
@@ -992,17 +995,30 @@ class DeepTune(HeterogemeousMappingModel):
         from keras.layers.merge import Concatenate
         from keras.layers.normalization import BatchNormalization
         from keras.models import Model
+        from keras.regularizers import l2
+
+        # Parse from config
+        h_size = self.config['h_size']
+        num_extra_lstm_layers = self.config['num_extra_lstm_layers']
+        l2_factor = self.config['L2_loss_factor']
 
         srcs = '\n'.join(self.dataset['src'].values)
         self.atomizer = GreedyAtomizer.from_text(srcs)
 
         # Language model. Takes as inputs source code sequences.
+        # Embedding model
         code_in = Input(shape=(1024,), dtype="int32", name="code_in")
         x = Embedding(input_dim=self.atomizer.vocab_size + 1, input_length=1024,
-                      output_dim=64, name="embedding")(code_in)
-        x = LSTM(64, implementation=1, return_sequences=True, name="lstm_1")(x)
-        x = LSTM(64, implementation=1, name="lstm_2")(x)
-        langmodel_out = Dense(2, activation="sigmoid")(x)
+                      output_dim=h_size, name="embedding",
+                      embeddings_regularizer=l2(l2_factor), activity_regularizer=l2(l2_factor))(code_in)
+        # Language model
+        x = LSTM(h_size, implementation=1, return_sequences=True, name="lstm_1",
+                 kernel_regularizer=l2(l2_factor), recurrent_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
+        for i in range(0, num_extra_lstm_layers):
+            x = LSTM(h_size, implementation=1, name="lstm_%i" % (i + 2),
+                     kernel_regularizer=l2(l2_factor), recurrent_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
+        langmodel_out = Dense(2, activation="sigmoid",
+                              kernel_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
 
         # Auxiliary inputs. wgsize and dsize.
         auxiliary_inputs = Input(shape=(2,))
@@ -1011,8 +1027,10 @@ class DeepTune(HeterogemeousMappingModel):
         #   outputs 1-hot encoded device mapping
         x = Concatenate()([auxiliary_inputs, x])
         x = BatchNormalization()(x)
-        x = Dense(32, activation="relu")(x)
-        out = Dense(2, activation="sigmoid")(x)
+        x = Dense(32, activation="relu",
+                  kernel_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
+        out = Dense(2, activation="sigmoid",
+                    kernel_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
 
         self.model = Model(inputs=[auxiliary_inputs, code_in], outputs=[out, langmodel_out])
         self.model.compile(
@@ -1497,10 +1515,13 @@ def main():
 
         if args.DeepTuneLSTM:
             config = json.loads(args.config) if args.config else {
-                'fold_mode': args.fold_mode
+                'fold_mode': args.fold_mode,
+                'h_size': 64,
+                'num_extra_lstm_layers': 1,
+                'L2_loss_factor': 0
             }
 
-            model = DeepTune()
+            model = DeepTune(config)
 
         if args.DeepTuneGNNClang or args.DeepTuneGNNClangASTEdges:
             config = json.loads(args.config) if args.config else {
