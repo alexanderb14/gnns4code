@@ -24,8 +24,8 @@ import experiment.drivers.exp_utils as exp_utils
 import utils as utils
 
 
-
 REPORTS_DIR = 'tmp'
+NUM_EXP_ITERATIONS = 3
 
 
 def split_dict(d: dict):
@@ -203,7 +203,7 @@ def f_lstm_tc(*data):
                                       split_mode=split_mode,
                                       method='DeepTuneLSTM',
                                       config=config,
-                                      num_iterations=3)
+                                      num_iterations=NUM_EXP_ITERATIONS)
 
     # Calculate metric
     accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
@@ -253,7 +253,7 @@ def f_lstm_devmap(fold_mode, split_mode, *data):
     results_df = run_n_times_on_slurm(task='tc',
                                       method='DeepTuneLSTM',
                                       config=config,
-                                      num_iterations=3)
+                                      num_iterations=NUM_EXP_ITERATIONS)
 
     # Calculate metric
     speedup = scipy.stats.gmean(list(results_df['Speedup']))
@@ -369,7 +369,7 @@ def f_gnn_ast_tc(*data):
     results_df = run_n_times_on_slurm(task='tc',
                                       method='DeepTuneGNNClang',
                                       config=config,
-                                      num_iterations=3)
+                                      num_iterations=NUM_EXP_ITERATIONS)
 
     # Calculate metric
     speedup = scipy.stats.gmean(list(results_df['Speedup']))
@@ -493,7 +493,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
                                       split_mode=split_mode,
                                       method='DeepTuneGNNClang',
                                       config=config,
-                                      num_iterations=3)
+                                      num_iterations=NUM_EXP_ITERATIONS)
 
     # Calculate metric
     accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
@@ -609,7 +609,7 @@ def f_gnn_llvm_tc(*data):
     results_df = run_n_times_on_slurm(task='tc',
                                       method='DeepTuneGNNClang',
                                       config=config,
-                                      num_iterations=3)
+                                      num_iterations=NUM_EXP_ITERATIONS)
 
     # Calculate metric
     speedup = scipy.stats.gmean(list(results_df['Speedup']))
@@ -732,7 +732,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
                                       split_mode=split_mode,
                                       method='DeepTuneGNNClang',
                                       config=config,
-                                      num_iterations=3)
+                                      num_iterations=NUM_EXP_ITERATIONS)
 
     # Calculate metric
     accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
