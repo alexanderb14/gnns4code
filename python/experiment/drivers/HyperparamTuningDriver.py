@@ -25,7 +25,7 @@ import utils as utils
 
 
 
-REPORTS_DIR = 'tmp/hyperparam_reports'
+REPORTS_DIR = 'tmp'
 
 
 def split_dict(d: dict):
@@ -92,7 +92,7 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
     # Run several instances of the experiment on slurm
     # Cleanup and prepare dirs
     pwd = execute_ssh_command('pwd')[0].replace('\n', '')
-    reports_dir = os.path.join(pwd, REPORTS_DIR)
+    reports_dir = os.path.join(pwd, REPORTS_DIR, method + '_' + str(uuid.uuid4()))
 
     execute_ssh_command('rm -rf ' + reports_dir + ' && mkdir -p ' + reports_dir)
     run_artifact_dirs = []
