@@ -694,10 +694,16 @@ class DeepTune(ThreadCoarseningModel):
     __name__ = "DeepTune"
     __basename__ = "deeptune"
 
+    def __init__(self, config):
+        self.config = config
+
     def init(self, seed: int = None):
+        np.random.seed(seed)
+
         from keras.layers import Input, Dropout, Embedding, merge, LSTM, Dense
         from keras.layers.normalization import BatchNormalization
         from keras.models import Model, Sequential, load_model
+        from keras.regularizers import l2
         #
         # from keras.backend.tensorflow_backend import set_session
         # import tensorflow as tf
@@ -707,7 +713,10 @@ class DeepTune(ThreadCoarseningModel):
         # sess = tf.Session(config=config)
         # set_session(sess)  # set this TensorFlow session as the default session for Keras
 
-        np.random.seed(seed)
+        # Parse from config
+        h_size = self.config['h_size']
+        num_extra_lstm_layers = self.config['num_extra_lstm_layers']
+        l2_factor = self.config['L2_loss_factor']
 
         # Vocabulary has a padding character
         vocab_size = self.atomizer.vocab_size + 1
@@ -715,21 +724,32 @@ class DeepTune(ThreadCoarseningModel):
         # Language model. Takes as inputs source code sequences.
         seq_inputs = Input(shape=(1024,), dtype="int32")
         x = Embedding(input_dim=vocab_size, input_length=1024,
-                      output_dim=64, name="embedding")(seq_inputs)
-        x = LSTM(64, return_sequences=True, implementation=1, name="lstm_1")(x)
-        x = LSTM(64, implementation=1, name="lstm_2")(x)
+                      output_dim=h_size, name="embedding",
+                      embeddings_regularizer=l2(l2_factor), activity_regularizer=l2(l2_factor))(seq_inputs)
+        x = LSTM(h_size, return_sequences=True, implementation=1, name="lstm_1",
+                 kernel_regularizer=l2(l2_factor), recurrent_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
+        for i in range(0, num_extra_lstm_layers):
+            x = LSTM(h_size, implementation=1, name="lstm_%i" % (i + 2),
+                     kernel_regularizer=l2(l2_factor), recurrent_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
 
         # Heuristic model. Takes as inputs the language model,
         #   outputs 1-of-6 thread coarsening factor
         x = BatchNormalization()(x)
-        x = Dense(32, activation="relu")(x)
-        outputs = Dense(6, activation="sigmoid")(x)
+        x = Dense(32, activation="relu",
+                  kernel_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
+        outputs = Dense(6, activation="sigmoid",
+                        kernel_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
 
         self.model = Model(inputs=seq_inputs, outputs=outputs)
         self.model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=['accuracy'])
 
     def train(self, **data) -> None:
-        self.model.fit(data['sequences'], data['y_1hot'], epochs=50, batch_size=64, verbose=data['verbose'], shuffle=True)
+        # Parse from config
+        num_epochs = self.config['num_epochs']
+        batch_size = self.config['batch_size']
+
+        self.model.fit(data['sequences'], data['y_1hot'],
+                       epochs=num_epochs, batch_size=batch_size, verbose=data['verbose'], shuffle=True)
 
     def predict(self, **data) -> np.array:
         # directly predict optimal thread coarsening factor from source sequences:
@@ -893,7 +913,16 @@ def main():
             model.atomizer = GreedyAtomizer.from_text(srcs)
 
         if args.DeepTuneLSTM:
-            model = DeepTune()
+            config = json.loads(args.config) if args.config else {
+                "fold_mode": args.fold_mode,
+                "h_size": 64,
+                "num_extra_lstm_layers": 1,
+                "L2_loss_factor": 0,
+                "batch_size": 64,
+                "num_epochs": 50
+            }
+
+            model = DeepTune(config)
 
             srcs = '\n'.join(df_devmap_amd['src'].values)
             model.atomizer = GreedyAtomizer.from_text(srcs)

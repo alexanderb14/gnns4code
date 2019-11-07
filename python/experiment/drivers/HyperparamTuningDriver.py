@@ -167,6 +167,51 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
 
 # LSTM
 # ##############
+# Thread Coarsening
+def get_lstm_tc_dimensions_and_default_params():
+    dims_and_default_params = [
+        (skopt.space.Integer(low=4, high=9, name='h_size'), 6),
+        (skopt.space.Integer(low=0, high=6, name='num_extra_lstm_layers'), 1),
+        (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+        (skopt.space.Integer(low=0, high=6, name='num_epochs'), 0),
+    ]
+
+    return split_dict(dims_and_default_params)
+
+
+def f_lstm_tc(*data):
+    # Build config
+    h_size = int(data[0][0])
+    num_extra_lstm_layers = int(data[0][1])
+    L2_loss_factor = int(data[0][2])
+    num_epochs = int(data[0][3])
+
+    config = {
+        "h_size": 2 ** h_size,
+        "num_extra_lstm_layers": num_extra_lstm_layers,
+
+        "L2_loss_factor": 0.05 * L2_loss_factor,
+
+        "batch_size": 64,
+        "num_epochs": 2 ** num_epochs * 50,
+        "out_dir": "/tmp",
+    }
+    utils.pretty_print_dict(config)
+
+    results_df = run_n_times_on_slurm(task='devmap',
+                                      fold_mode=fold_mode,
+                                      split_mode=split_mode,
+                                      method='DeepTuneLSTM',
+                                      config=config,
+                                      num_iterations=3)
+
+    # Calculate metric
+    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
+    print('Metric:', accuracy)
+
+    return accuracy * (-1)
+
+
 # Device Mapping
 def get_lstm_devmap_dimensions_and_default_params():
     dims_and_default_params = [
@@ -205,18 +250,16 @@ def f_lstm_devmap(fold_mode, split_mode, *data):
     }
     utils.pretty_print_dict(config)
 
-    results_df = run_n_times_on_slurm(task='devmap',
-                                      fold_mode=fold_mode,
-                                      split_mode=split_mode,
+    results_df = run_n_times_on_slurm(task='tc',
                                       method='DeepTuneLSTM',
                                       config=config,
                                       num_iterations=3)
 
     # Calculate metric
-    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
-    print('Metric:', accuracy)
+    speedup = scipy.stats.gmean(list(results_df['Speedup']))
+    print('Metric:', speedup)
 
-    return accuracy * (-1)
+    return speedup * (-1)
 
 
 # GNN AST
@@ -326,7 +369,7 @@ def f_gnn_ast_tc(*data):
     results_df = run_n_times_on_slurm(task='tc',
                                       method='DeepTuneGNNClang',
                                       config=config,
-                                      num_iterations=2)
+                                      num_iterations=3)
 
     # Calculate metric
     speedup = scipy.stats.gmean(list(results_df['Speedup']))
@@ -566,7 +609,7 @@ def f_gnn_llvm_tc(*data):
     results_df = run_n_times_on_slurm(task='tc',
                                       method='DeepTuneGNNClang',
                                       config=config,
-                                      num_iterations=2)
+                                      num_iterations=3)
 
     # Calculate metric
     speedup = scipy.stats.gmean(list(results_df['Speedup']))
