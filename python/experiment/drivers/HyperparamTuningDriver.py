@@ -250,7 +250,9 @@ def f_lstm_devmap(fold_mode, split_mode, *data):
     }
     utils.pretty_print_dict(config)
 
-    results_df = run_n_times_on_slurm(task='tc',
+    results_df = run_n_times_on_slurm(task='devmap',
+                                      fold_mode=fold_mode,
+                                      split_mode=split_mode,
                                       method='DeepTuneLSTM',
                                       config=config,
                                       num_iterations=NUM_EXP_ITERATIONS)
