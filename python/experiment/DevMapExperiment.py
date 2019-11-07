@@ -1050,9 +1050,10 @@ class DeepTune(HeterogemeousMappingModel):
     def train(self, **data):
         # Parse from config
         num_epochs = self.config['num_epochs']
+        batch_size = self.config['batch_size']
 
         self.model.fit([data["aux_in_train"], data["sequences"]], [data["y_1hot"], data["y_1hot"]],
-                       epochs=num_epochs, batch_size=64, verbose=data["verbose"], shuffle=True)
+                       epochs=num_epochs, batch_size=batch_size, verbose=data["verbose"], shuffle=True)
 
     def predict(self, **data):
         p = np.array(self.model.predict(
@@ -1522,6 +1523,7 @@ def main():
                 "h_size": 64,
                 "num_extra_lstm_layers": 1,
                 "L2_loss_factor": 0,
+                "batch_size": 64,
                 "num_epochs": 50
             }
 

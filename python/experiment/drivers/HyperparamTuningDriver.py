@@ -165,6 +165,60 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
     return pd.concat(result_dfs)
 
 
+# LSTM
+# ##############
+# Device Mapping
+def get_lstm_devmap_dimensions_and_default_params():
+    dims_and_default_params = [
+        (skopt.space.Integer(low=4, high=9, name='h_size'), 6),
+        (skopt.space.Integer(low=0, high=6, name='num_extra_lstm_layers'), 1),
+        (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+        (skopt.space.Integer(low=0, high=6, name='num_epochs'), 0),
+    ]
+
+    return split_dict(dims_and_default_params)
+
+def f_lstm_devmap_random(*data):
+    return f_lstm_devmap('random', '3', *data)
+
+
+def f_lstm_devmap_grouped(*data):
+    return f_gnn_ast_devmap('grouped', '3', *data)
+
+
+def f_lstm_devmap(fold_mode, split_mode, *data):
+    # Build config
+    h_size = int(data[0][0])
+    num_extra_lstm_layers = int(data[0][1])
+    L2_loss_factor = int(data[0][2])
+    num_epochs = int(data[0][3])
+
+    config = {
+        "h_size": 2 ** h_size,
+        "num_extra_lstm_layers": num_extra_lstm_layers,
+
+        "L2_loss_factor": 0.05 * L2_loss_factor,
+
+        "batch_size": 64,
+        "num_epochs": 2 ** num_epochs * 50,
+        "out_dir": "/tmp",
+    }
+    utils.pretty_print_dict(config)
+
+    results_df = run_n_times_on_slurm(task='devmap',
+                                      fold_mode=fold_mode,
+                                      split_mode=split_mode,
+                                      method='DeepTuneLSTM',
+                                      config=config,
+                                      num_iterations=3)
+
+    # Calculate metric
+    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
+    print('Metric:', accuracy)
+
+    return accuracy * (-1)
+
+
 # GNN AST
 # ##############
 # Thread Coarsening
@@ -182,8 +236,8 @@ def get_gnn_ast_tc_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
-        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
 
         (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
     ]
@@ -296,8 +350,8 @@ def get_gnn_ast_devmap_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
-        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
 
         (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
     ]
@@ -422,8 +476,8 @@ def get_gnn_llvm_tc_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
-        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
 
         (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
     ]
@@ -535,8 +589,8 @@ def get_gnn_llvm_devmap_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
-        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 1),
 
         (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
     ]
