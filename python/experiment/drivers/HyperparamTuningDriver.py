@@ -607,7 +607,7 @@ def f_gnn_llvm_tc(*data):
     utils.pretty_print_dict(config)
 
     results_df = run_n_times_on_slurm(task='tc',
-                                      method='DeepTuneGNNClang',
+                                      method='DeepTuneGNNLLVM',
                                       config=config,
                                       num_iterations=NUM_EXP_ITERATIONS)
 
@@ -730,7 +730,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
     results_df = run_n_times_on_slurm(task='devmap',
                                       fold_mode=fold_mode,
                                       split_mode=split_mode,
-                                      method='DeepTuneGNNClang',
+                                      method='DeepTuneGNNLLVM',
                                       config=config,
                                       num_iterations=NUM_EXP_ITERATIONS)
 
@@ -769,6 +769,16 @@ def main():
         fn_dims_and_default_params = None
         fn_f = None
 
+        if args.method == 'DeepTuneLSTM':
+            if args.experiment == 'tc':
+                fn_dims_and_default_params = get_lstm_tc_dimensions_and_default_params
+                fn_f = f_lstm_tc
+            elif args.experiment == 'devmap':
+                fn_dims_and_default_params = get_lstm_devmap_dimensions_and_default_params
+                if args.fold_mode == 'random':
+                    fn_f = f_lstm_devmap_random
+                elif args.fold_mode == 'grouped':
+                    fn_f = f_lstm_devmap_grouped
         if args.method == 'DeepTuneGNNClang':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_gnn_ast_tc_dimensions_and_default_params
