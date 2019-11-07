@@ -187,6 +187,8 @@ def f_lstm_tc(*data):
     num_epochs = int(data[0][3])
 
     config = {
+        'fold_mode': 'random',
+
         "h_size": 2 ** h_size,
         "num_extra_lstm_layers": num_extra_lstm_layers,
 
@@ -239,6 +241,8 @@ def f_lstm_devmap(fold_mode, split_mode, *data):
     num_epochs = int(data[0][3])
 
     config = {
+        "fold_mode": fold_mode,
+
         "h_size": 2 ** h_size,
         "num_extra_lstm_layers": num_extra_lstm_layers,
 
@@ -433,7 +437,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
 
     config = {
         "run_id": 'foo',
-        'fold_mode': 'random',
+        'fold_mode': fold_mode,
 
         "gnn_type": "GGNN",
 
@@ -672,7 +676,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
 
     config = {
         "run_id": 'foo',
-        'fold_mode': 'random',
+        'fold_mode': fold_mode,
 
         "gnn_type": "GGNN",
 
