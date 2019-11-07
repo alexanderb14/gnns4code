@@ -1048,8 +1048,11 @@ class DeepTune(HeterogemeousMappingModel):
         self.model = load_model(inpath)
 
     def train(self, **data):
+        # Parse from config
+        num_epochs = self.config['num_epochs']
+
         self.model.fit([data["aux_in_train"], data["sequences"]], [data["y_1hot"], data["y_1hot"]],
-                       epochs=50, batch_size=64, verbose=data["verbose"], shuffle=True)
+                       epochs=num_epochs, batch_size=64, verbose=data["verbose"], shuffle=True)
 
     def predict(self, **data):
         p = np.array(self.model.predict(
@@ -1515,10 +1518,11 @@ def main():
 
         if args.DeepTuneLSTM:
             config = json.loads(args.config) if args.config else {
-                'fold_mode': args.fold_mode,
-                'h_size': 64,
-                'num_extra_lstm_layers': 1,
-                'L2_loss_factor': 0
+                "fold_mode": args.fold_mode,
+                "h_size": 64,
+                "num_extra_lstm_layers": 1,
+                "L2_loss_factor": 0,
+                "num_epochs": 50
             }
 
             model = DeepTune(config)
