@@ -1015,7 +1015,10 @@ class DeepTune(HeterogemeousMappingModel):
         x = LSTM(h_size, implementation=1, return_sequences=True, name="lstm_1",
                  kernel_regularizer=l2(l2_factor), recurrent_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
         for i in range(0, num_extra_lstm_layers):
-            x = LSTM(h_size, implementation=1, name="lstm_%i" % (i + 2),
+            return_sequences=True
+            if i == num_extra_lstm_layers - 1:
+                return_sequences = False
+            x = LSTM(h_size, implementation=1, return_sequences=return_sequences, name="lstm_%i" % (i + 2),
                      kernel_regularizer=l2(l2_factor), recurrent_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
         langmodel_out = Dense(2, activation="sigmoid",
                               kernel_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)

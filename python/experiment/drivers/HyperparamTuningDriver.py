@@ -262,10 +262,10 @@ def f_lstm_devmap(fold_mode, split_mode, *data):
                                       num_iterations=NUM_EXP_ITERATIONS)
 
     # Calculate metric
-    speedup = scipy.stats.gmean(list(results_df['Speedup']))
-    print('Metric:', speedup)
+    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
+    print('Metric:', accuracy)
 
-    return speedup * (-1)
+    return accuracy * (-1)
 
 
 # GNN AST
