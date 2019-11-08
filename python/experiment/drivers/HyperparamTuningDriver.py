@@ -308,8 +308,8 @@ def f_gnn_ast_tc(*data):
     embedding_layer_dims = int(data[0][7])
 
     learning_rate = float(data[0][8])
-    num_epochs = int(data[0][9])
-    L2_loss_factor = int(data[0][10])
+    L2_loss_factor = int(data[0][9])
+    num_epochs = int(data[0][10])
 
     tie_fwd_bkwd = int(data[0][11])
 
@@ -430,8 +430,8 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
     embedding_layer_dims = int(data[0][7])
 
     learning_rate = float(data[0][8])
-    num_epochs = int(data[0][9])
-    L2_loss_factor = int(data[0][10])
+    L2_loss_factor = int(data[0][9])
+    num_epochs = int(data[0][10])
 
     tie_fwd_bkwd = int(data[0][11])
 
@@ -548,8 +548,8 @@ def f_gnn_llvm_tc(*data):
     embedding_layer_dims = int(data[0][7])
 
     learning_rate = float(data[0][8])
-    num_epochs = int(data[0][9])
-    L2_loss_factor = int(data[0][10])
+    L2_loss_factor = int(data[0][9])
+    num_epochs = int(data[0][10])
 
     tie_fwd_bkwd = int(data[0][11])
 
@@ -669,8 +669,8 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
     embedding_layer_dims = int(data[0][7])
 
     learning_rate = float(data[0][8])
-    num_epochs = int(data[0][9])
-    L2_loss_factor = int(data[0][10])
+    L2_loss_factor = int(data[0][9])
+    num_epochs = int(data[0][10])
 
     tie_fwd_bkwd = int(data[0][11])
 
