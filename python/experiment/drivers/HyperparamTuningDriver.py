@@ -400,7 +400,7 @@ def get_gnn_ast_devmap_dimensions_and_default_params():
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
-        (skopt.space.Integer(low=0, high=4, name='num_epochs'), 1),
+        (skopt.space.Integer(low=0, high=4, name='num_epochs'), 3),
 
         (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
     ]
@@ -639,7 +639,7 @@ def get_gnn_llvm_devmap_dimensions_and_default_params():
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
-        (skopt.space.Integer(low=0, high=4, name='num_epochs'), 1),
+        (skopt.space.Integer(low=0, high=4, name='num_epochs'), 3),
 
         (skopt.space.Integer(low=0, high=1, name='tie_fwd_bkwd'), 0),
     ]
