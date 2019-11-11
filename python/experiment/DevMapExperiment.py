@@ -704,7 +704,7 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
                 )
 
     df_valid = pd.DataFrame(
-        data_valid, index=range(1, len(data_valid) + 1), columns=[
+        data_valid, columns=[
             "Model",
             "Platform",
             "Benchmark",
@@ -721,7 +721,7 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
     df_valid['set'] = 'valid'
 
     df_test = pd.DataFrame(
-        data_test, index=range(1, len(data_valid) + 1), columns=[
+        data_test, columns=[
             "Model",
             "Platform",
             "Benchmark",
@@ -737,7 +737,7 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
         ])
     df_test['set'] = 'test'
 
-    return pd.concat([df_valid, df_test])
+    return pd.concat([df_valid, df_test], ignore_index=True)
 
 
 def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd, seed) -> pd.DataFrame:
@@ -1557,7 +1557,7 @@ def main():
                     "mlp_reduce_activation": "relu",
                     "mlp_reduce_out_dim": 32,
 
-                    "mlp_reduce_after_aux_in_1_dims": [32, 32, 32],
+                    "mlp_reduce_after_aux_in_1_dims": [],
                     "mlp_reduce_after_aux_in_1_activation": "relu",
                     "mlp_reduce_after_aux_in_1_out_dim": 32,
 
@@ -1575,7 +1575,7 @@ def main():
 
                 "learning_rate": 0.0005,
                 "clamp_gradient_norm": 1.0,
-                "L2_loss_factor": 0.1,
+                "L2_loss_factor": 0,
 
                 "batch_size": 64,
                 "num_epochs": 1500,
