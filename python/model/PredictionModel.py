@@ -533,7 +533,7 @@ class PredictionModel(object):
 
             else:
                 # Logging
-                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, loss: %.8f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss))
+                print('epoch: %i, instances/sec: %.2f, epoch_time: %.2fs, loss: %.8f, train_accuracy: %.4f' % (epoch, epoch_instances_per_sec, epoch_time, training_loss, training_accuracy))
 
                 if training_loss < best_epoch_loss:
                     best_epoch_loss = training_loss
