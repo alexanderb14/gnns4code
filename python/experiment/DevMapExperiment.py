@@ -5,9 +5,11 @@ import numpy as np
 import pandas as pd
 import pickle
 import sys
+import time
 from collections import Counter, defaultdict
 from pandas.io.json import json_normalize
-import time
+from progressbar import ProgressBar
+from sklearn.model_selection import StratifiedKFold, GroupKFold
 from typing import List
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -535,6 +537,65 @@ class HeterogemeousMappingModel(object):
         pass
 
 
+def get_stratified_kfold_train_valid_test_split(y, k, kfold_seed = 204):
+    """
+    Implements stratified k-fold cross validation.
+    Training set will be k-2 folds. Two other folds will be held out.
+    This functionality is not implemented in sklearn: Here, only holding out one fold is supported.
+    Implementing it with two nesting stratified k-folds has one limitation: The training sets of two
+    held-out folds will differ due to rounding/flooring. Therefore, we cannot reduce the amount of
+    training runs by 2 in this case.
+    """
+    kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=kfold_seed)
+    split = kf.split(np.zeros(len(y)) , y)
+
+    # Get k stratified folds
+    folds = []
+    for j, (big_split_index, small_split_index) in enumerate(split):
+        folds.append(small_split_index)
+
+    # Test: Are all folds disjunct?
+    for f1_idx in range(0, len(folds)):
+        for f2_idx in range(f1_idx + 1, len(folds)):
+            f1 = set(folds[f1_idx])
+            f2 = set(folds[f2_idx])
+            assert len(f1.intersection(f2)) == 0
+
+    # Build train, valid, test sets.
+    train_valid_test_split = {}
+    for valid_idx_idx in range(0, k):
+        for test_idx_idx in range(0, k):
+            if test_idx_idx == valid_idx_idx:
+                continue
+
+            train_idx_idx = [x for x in range(0, k) if x not in [valid_idx_idx, test_idx_idx]]
+            train_idx = np.concatenate([folds[x] for x in train_idx_idx])
+
+            valid_idx = folds[valid_idx_idx]
+            test_idx = folds[test_idx_idx]
+
+            train_valid_test_split[hash(tuple(train_idx))] = {
+                'train_idx': train_idx,
+                'other_idxs': [valid_idx, test_idx]
+            }
+
+            # Test: Are train, valid, test sets disjunct?
+            tvt_idxs = [train_idx, valid_idx, test_idx]
+            for idx_1 in range(0, len(tvt_idxs)):
+                for idx_2 in range(idx_1 + 1, len(tvt_idxs)):
+                    tvt_1 = set(tvt_idxs[idx_1])
+                    tvt_2 = set(tvt_idxs[idx_2])
+                    assert len(tvt_1.intersection(tvt_2)) == 0
+
+    # print(len(train_valid_test_split))
+    # for configuration in train_valid_test_split.values():
+    #     print(hash(tuple(configuration['train_idx'])),
+    #           hash(tuple(configuration['other_idxs'][0])),
+    #           hash(tuple(configuration['other_idxs'][1])))
+
+    return train_valid_test_split.values()
+
+
 def predict(**data):
     idx = data['idx']
 
@@ -606,7 +667,6 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
     pd.Dataframe
         Evaluation results.
     """
-    from sklearn.model_selection import StratifiedKFold, GroupKFold
     from progressbar import ProgressBar
 
     if len(datasets) == 0:
@@ -639,13 +699,15 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
         y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
         y_1hot = encode_1hot(y)
 
-        # 5-fold cross-validation
+        # Cross-validation
         if fold_mode == 'random':
-            kfold_seed = 204
-            kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=kfold_seed)
-            split = kf.split(features, y)
+            train_valid_test_split = get_stratified_kfold_train_valid_test_split(y, 10)
 
-        for j, (train_index, remaining_index) in enumerate(split):
+
+        for j, configuration in enumerate(train_valid_test_split):
+            train_idx = configuration['train_idx']
+            other_idxs = configuration['other_idxs']
+            
             # train model
             model.init(seed=seed)
 
@@ -654,26 +716,24 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
 
             train_time_start = time.time()
             model.train(df=df,
-                        features=features[train_index],
-                        aux_in_train=aux_in[train_index],
-                        clang_graphs_train=clang_graphs[train_index],
-                        llvm_graphs_train=llvm_graphs[train_index],
-                        sequences=sequences[train_index] if sequences is not None else None,
-                        y_train=y[train_index],
-                        y_1hot=y_1hot[train_index],
+                        features=features[train_idx],
+                        aux_in_train=aux_in[train_idx],
+                        clang_graphs_train=clang_graphs[train_idx],
+                        llvm_graphs_train=llvm_graphs[train_idx],
+                        sequences=sequences[train_idx] if sequences is not None else None,
+                        y_train=y[train_idx],
+                        y_1hot=y_1hot[train_idx],
                         verbose=True)
             train_time_end = time.time()
             train_time = train_time_end - train_time_start
 
-            # validate and test model
-            kfold_seed = 204
-            kf = StratifiedKFold(n_splits=2, shuffle=True, random_state=kfold_seed)
-            remaining_split = kf.split(features[remaining_index], y[remaining_index])
+            for i in range(0, 2):
+                valid_idx = other_idxs[i % 2]
+                test_idx = other_idxs[(i+1) % 2]
 
-            for j_remaining, (valid_index, test_index) in enumerate(remaining_split):
-                # validate
+                # Validate
                 data_valid += predict(
-                    idx=valid_index,
+                    idx=valid_idx,
                     model=model,
                     features=features,
                     aux_in=aux_in,
@@ -689,7 +749,7 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
 
                 # Test
                 data_test += predict(
-                    idx=test_index,
+                    idx=test_idx,
                     model=model,
                     features=features,
                     aux_in=aux_in,
@@ -757,9 +817,6 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
     pd.Dataframe
         Evaluation results.
     """
-    from sklearn.model_selection import StratifiedKFold, GroupKFold
-    from progressbar import ProgressBar
-
     if len(datasets) == 0:
         datasets = ["nvidia", "amd"]
 
@@ -804,31 +861,31 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             kf = GroupKFold(n_splits=num_benchmark_suites)
             split = kf.split(features, y, groups)
 
-        for j, (train_index, test_index) in enumerate(split):
+        for j, (train_idx, test_idx) in enumerate(split):
             # train and cache a model
             model.init(seed=seed)
 
             if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
                 sequences = encode_srcs(model.atomizer, df["src"].values)
 
-            clang_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_index]]
-            clang_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_index]]
-            llvm_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_index]]
-            llvm_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_index]]
+            clang_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_idx]]
+            clang_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_idx]]
+            llvm_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_idx]]
+            llvm_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_idx]]
 
             train_time_start = time.time()
             model.train(df=df,
-                        features=features[train_index],
-                        aux_in_train=aux_in[train_index],
-                        aux_in_test=aux_in[test_index],
+                        features=features[train_idx],
+                        aux_in_train=aux_in[train_idx],
+                        aux_in_test=aux_in[test_idx],
                         clang_graphs_train=clang_graphs_train,
                         clang_graphs_test=clang_graphs_test,
                         llvm_graphs_train=llvm_graphs_train,
                         llvm_graphs_test=llvm_graphs_test,
-                        sequences=sequences[train_index] if sequences is not None else None,
-                        y_train=y[train_index],
-                        y_test=y[test_index],
-                        y_1hot=y_1hot[train_index],
+                        sequences=sequences[train_idx] if sequences is not None else None,
+                        y_train=y[train_idx],
+                        y_test=y[test_idx],
+                        y_1hot=y_1hot[train_idx],
                         verbose=True)
             train_time_end = time.time()
             train_time = train_time_end - train_time_start
@@ -836,27 +893,27 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             # test model
             inference_time_start = time.time()
             p = model.predict(
-                features=features[test_index],
-                aux_in_test=aux_in[test_index],
+                features=features[test_idx],
+                aux_in_test=aux_in[test_idx],
                 clang_graphs_test=clang_graphs_test,
                 llvm_graphs_test=llvm_graphs_test,
-                sequences=sequences[test_index] if sequences is not None else None,
-                y_test=y[test_index],
+                sequences=sequences[test_idx] if sequences is not None else None,
+                y_test=y[test_idx],
                 verbose=False)
             inference_time_end = time.time()
             inference_time = inference_time_end - inference_time_start
 
             # benchmarks
-            benchmarks = df['benchmark'].values[test_index]
+            benchmarks = df['benchmark'].values[test_idx]
             # oracle device mappings
-            o = y[test_index]
+            o = y[test_idx]
             # whether predictions were correct or not
             correct = p == o
             # runtimes of baseline mapping (CPU on AMD, GPU on NVIDIA)
             zero_r_dev = "runtime_cpu" if platform == "amd" else "runtime_gpu"
-            zer_r_runtimes = df[zero_r_dev][test_index]
+            zer_r_runtimes = df[zero_r_dev][test_idx]
             # speedups of predictions
-            runtimes = df[['runtime_cpu', 'runtime_gpu']].values[test_index]
+            runtimes = df[['runtime_cpu', 'runtime_gpu']].values[test_idx]
             p_runtimes = [r[p_] for p_, r in zip(p, runtimes)]
             p_speedup = zer_r_runtimes / p_runtimes
 
