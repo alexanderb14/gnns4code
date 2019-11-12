@@ -431,7 +431,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
 
     learning_rate = float(data[0][8])
     L2_loss_factor = int(data[0][9])
-    num_epochs = int(data[0][10])
+    num_epochs = int(data[0][4])
 
     tie_fwd_bkwd = int(data[0][11])
 
@@ -670,7 +670,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
 
     learning_rate = float(data[0][8])
     L2_loss_factor = int(data[0][9])
-    num_epochs = int(data[0][10])
+    num_epochs = int(data[0][4])
 
     tie_fwd_bkwd = int(data[0][11])
 
