@@ -253,7 +253,7 @@ def build_devmap_experiment_infos(report_write_root_dir, num_iterations, methods
                     os.makedirs(report_write_dir)
 
                 # Build command
-                cmd = build_devmap_experiment_cmd(method, fold_mode, report_write_dir, seed)
+                cmd = build_devmap_experiment_cmd(method, fold_mode, "2", report_write_dir, seed)
 
                 cmds.append({
                     'cmd': cmd,

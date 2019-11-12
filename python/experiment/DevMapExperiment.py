@@ -667,8 +667,6 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
     pd.Dataframe
         Evaluation results.
     """
-    from progressbar import ProgressBar
-
     if len(datasets) == 0:
         datasets = ["nvidia", "amd"]
 
@@ -868,20 +866,15 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
                 sequences = encode_srcs(model.atomizer, df["src"].values)
 
-            clang_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[train_idx]]
-            clang_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in clang_graphs[test_idx]]
-            llvm_graphs_train = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[train_idx]]
-            llvm_graphs_test = [json.loads(g, object_hook=utils.json_keys_to_int) for g in llvm_graphs[test_idx]]
-
             train_time_start = time.time()
             model.train(df=df,
                         features=features[train_idx],
                         aux_in_train=aux_in[train_idx],
                         aux_in_test=aux_in[test_idx],
-                        clang_graphs_train=clang_graphs_train,
-                        clang_graphs_test=clang_graphs_test,
-                        llvm_graphs_train=llvm_graphs_train,
-                        llvm_graphs_test=llvm_graphs_test,
+                        clang_graphs_train=clang_graphs[train_idx],
+                        clang_graphs_test=clang_graphs[test_idx],
+                        llvm_graphs_train=llvm_graphs[train_idx],
+                        llvm_graphs_test=llvm_graphs[test_idx],
                         sequences=sequences[train_idx] if sequences is not None else None,
                         y_train=y[train_idx],
                         y_test=y[test_idx],
@@ -895,8 +888,8 @@ def evaluate(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvid
             p = model.predict(
                 features=features[test_idx],
                 aux_in_test=aux_in[test_idx],
-                clang_graphs_test=clang_graphs_test,
-                llvm_graphs_test=llvm_graphs_test,
+                clang_graphs_test=clang_graphs[test_idx],
+                llvm_graphs_test=llvm_graphs[test_idx],
                 sequences=sequences[test_idx] if sequences is not None else None,
                 y_test=y[test_idx],
                 verbose=False)
