@@ -4,6 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 import pickle
+import scipy.special
 import sys
 import time
 from collections import Counter, defaultdict
@@ -670,11 +671,13 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
     if len(datasets) == 0:
         datasets = ["nvidia", "amd"]
 
+    kfold_k = 5
+
+    progressbar = [0, ProgressBar(max_value=int(scipy.special.binom(kfold_k, kfold_k - 2) * len(datasets)))]
+
     data_valid = []
     data_test = []
     for i, platform in enumerate(datasets):
-        progressbar = [0, ProgressBar(max_value=10)]
-
         platform_name = platform2str(platform)
 
         # load runtime data
@@ -699,7 +702,7 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
 
         # Cross-validation
         if fold_mode == 'random':
-            train_valid_test_split = get_stratified_kfold_train_valid_test_split(y, 10)
+            train_valid_test_split = get_stratified_kfold_train_valid_test_split(y, kfold_k)
 
 
         for j, configuration in enumerate(train_valid_test_split):
@@ -760,6 +763,9 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
                     fold_idx=j,
                     train_time=train_time
                 )
+
+            progressbar[0] += 1
+            progressbar[1].update(progressbar[0])
 
     df_valid = pd.DataFrame(
         data_valid, columns=[
