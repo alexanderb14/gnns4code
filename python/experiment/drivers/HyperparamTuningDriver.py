@@ -281,7 +281,6 @@ def get_gnn_ast_tc_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
 
-        (skopt.space.Integer(low=0, high=6, name='embedding_layer_size'), 2),
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
@@ -304,14 +303,13 @@ def f_gnn_ast_tc(*data):
     prediction_cell_mlp_g_m_dims = int(data[0][4])
     prediction_cell_mlp_reduce_dims = int(data[0][5])
 
-    embedding_layer_size = int(data[0][6])
-    embedding_layer_dims = int(data[0][7])
+    embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][8])
-    L2_loss_factor = int(data[0][9])
-    num_epochs = int(data[0][10])
+    learning_rate = float(data[0][7])
+    L2_loss_factor = int(data[0][8])
+    num_epochs = int(data[0][9])
 
-    tie_fwd_bkwd = int(data[0][11])
+    tie_fwd_bkwd = int(data[0][10])
 
     config = {
         "run_id": 'foo',
@@ -349,7 +347,7 @@ def f_gnn_ast_tc(*data):
         },
 
         "embedding_layer": {
-            "mapping_dims": [2 ** embedding_layer_size] * embedding_layer_dims
+            "mapping_dims": [46] * embedding_layer_dims
         },
 
         "learning_rate": learning_rate,
@@ -395,7 +393,6 @@ def get_gnn_ast_devmap_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
 
-        (skopt.space.Integer(low=0, high=7, name='embedding_layer_size'), 2),
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
@@ -426,14 +423,13 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
     prediction_cell_mlp_g_m_dims = int(data[0][4])
     prediction_cell_mlp_reduce_dims = int(data[0][5])
 
-    embedding_layer_size = int(data[0][6])
-    embedding_layer_dims = int(data[0][7])
+    embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][8])
-    L2_loss_factor = int(data[0][9])
-    num_epochs = int(data[0][4])
+    learning_rate = float(data[0][7])
+    L2_loss_factor = int(data[0][8])
+    num_epochs = int(data[0][9])
 
-    tie_fwd_bkwd = int(data[0][11])
+    tie_fwd_bkwd = int(data[0][10])
 
     config = {
         "run_id": 'foo',
@@ -471,7 +467,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
         },
 
         "embedding_layer": {
-            "mapping_dims": [2 ** embedding_layer_size] * embedding_layer_dims
+            "mapping_dims": [92] * embedding_layer_dims
         },
 
         "learning_rate": learning_rate,
@@ -521,7 +517,6 @@ def get_gnn_llvm_tc_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
 
-        (skopt.space.Integer(low=0, high=4, name='embedding_layer_size'), 2),
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
@@ -544,14 +539,13 @@ def f_gnn_llvm_tc(*data):
     prediction_cell_mlp_g_m_dims = int(data[0][4])
     prediction_cell_mlp_reduce_dims = int(data[0][5])
 
-    embedding_layer_size = int(data[0][6])
-    embedding_layer_dims = int(data[0][7])
+    embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][8])
-    L2_loss_factor = int(data[0][9])
-    num_epochs = int(data[0][10])
+    learning_rate = float(data[0][7])
+    L2_loss_factor = int(data[0][8])
+    num_epochs = int(data[0][9])
 
-    tie_fwd_bkwd = int(data[0][11])
+    tie_fwd_bkwd = int(data[0][10])
 
     config = {
         "run_id": 'foo',
@@ -589,7 +583,7 @@ def f_gnn_llvm_tc(*data):
         },
 
         "embedding_layer": {
-            "mapping_dims": [2 ** embedding_layer_size] * embedding_layer_dims
+            "mapping_dims": [140] * embedding_layer_dims
         },
 
         "learning_rate": learning_rate,
@@ -634,7 +628,6 @@ def get_gnn_llvm_devmap_dimensions_and_default_params():
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_g_m_dims'), 2),
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_reduce_dims'), 2),
 
-        (skopt.space.Integer(low=0, high=7, name='embedding_layer_size'), 2),
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
         (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
@@ -665,14 +658,13 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
     prediction_cell_mlp_g_m_dims = int(data[0][4])
     prediction_cell_mlp_reduce_dims = int(data[0][5])
 
-    embedding_layer_size = int(data[0][6])
-    embedding_layer_dims = int(data[0][7])
+    embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][8])
-    L2_loss_factor = int(data[0][9])
-    num_epochs = int(data[0][4])
+    learning_rate = float(data[0][7])
+    L2_loss_factor = int(data[0][8])
+    num_epochs = int(data[0][9])
 
-    tie_fwd_bkwd = int(data[0][11])
+    tie_fwd_bkwd = int(data[0][10])
 
     config = {
         "run_id": 'foo',
@@ -710,7 +702,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
         },
 
         "embedding_layer": {
-            "mapping_dims": [2 ** embedding_layer_size] * embedding_layer_dims
+            "mapping_dims": [140] * embedding_layer_dims
         },
 
         "learning_rate": learning_rate,
