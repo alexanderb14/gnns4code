@@ -283,7 +283,7 @@ def get_gnn_ast_tc_dimensions_and_default_params():
 
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
-        (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
+        (skopt.space.Integer(low=0, high=4, name='learning_rate'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
         (skopt.space.Integer(low=0, high=4, name='num_epochs'), 1),
 
@@ -305,7 +305,7 @@ def f_gnn_ast_tc(*data):
 
     embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][7])
+    learning_rate = int(data[0][7])
     L2_loss_factor = int(data[0][8])
     num_epochs = int(data[0][9])
 
@@ -350,7 +350,7 @@ def f_gnn_ast_tc(*data):
             "mapping_dims": [46] * embedding_layer_dims
         },
 
-        "learning_rate": learning_rate,
+        "learning_rate": 0.00001 * learning_rate,
         "clamp_gradient_norm": 1.0,
         "L2_loss_factor": 0.05 * L2_loss_factor,
 
@@ -395,7 +395,7 @@ def get_gnn_ast_devmap_dimensions_and_default_params():
 
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
-        (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
+        (skopt.space.Integer(low=0, high=4, name='learning_rate'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
         (skopt.space.Integer(low=0, high=4, name='num_epochs'), 3),
 
@@ -425,7 +425,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
 
     embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][7])
+    learning_rate = int(data[0][7])
     L2_loss_factor = int(data[0][8])
     num_epochs = int(data[0][9])
 
@@ -470,7 +470,7 @@ def f_gnn_ast_devmap(fold_mode, split_mode, *data):
             "mapping_dims": [92] * embedding_layer_dims
         },
 
-        "learning_rate": learning_rate,
+        "learning_rate": 0.00001 * learning_rate,
         "clamp_gradient_norm": 1.0,
         "L2_loss_factor": 0.05 * L2_loss_factor,
 
@@ -519,7 +519,7 @@ def get_gnn_llvm_tc_dimensions_and_default_params():
 
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
-        (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
+        (skopt.space.Integer(low=0, high=4, name='learning_rate'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
         (skopt.space.Integer(low=0, high=4, name='num_epochs'), 1),
 
@@ -541,7 +541,7 @@ def f_gnn_llvm_tc(*data):
 
     embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][7])
+    learning_rate = int(data[0][7])
     L2_loss_factor = int(data[0][8])
     num_epochs = int(data[0][9])
 
@@ -586,7 +586,7 @@ def f_gnn_llvm_tc(*data):
             "mapping_dims": [140] * embedding_layer_dims
         },
 
-        "learning_rate": learning_rate,
+        "learning_rate": 0.00001 * learning_rate,
         "clamp_gradient_norm": 1.0,
         "L2_loss_factor": 0.05 * L2_loss_factor,
 
@@ -630,7 +630,7 @@ def get_gnn_llvm_devmap_dimensions_and_default_params():
 
         (skopt.space.Integer(low=0, high=4, name='embedding_layer_dims'), 2),
 
-        (skopt.space.Real(low=0.0001, high=0.001, name='learning_rate'), 0.0001),
+        (skopt.space.Integer(low=0, high=4, name='learning_rate'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
         (skopt.space.Integer(low=0, high=4, name='num_epochs'), 3),
 
@@ -660,7 +660,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
 
     embedding_layer_dims = int(data[0][6])
 
-    learning_rate = float(data[0][7])
+    learning_rate = int(data[0][7])
     L2_loss_factor = int(data[0][8])
     num_epochs = int(data[0][9])
 
@@ -705,7 +705,7 @@ def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
             "mapping_dims": [140] * embedding_layer_dims
         },
 
-        "learning_rate": learning_rate,
+        "learning_rate": 0.00001 * learning_rate,
         "clamp_gradient_norm": 1.0,
         "L2_loss_factor": 0.05 * L2_loss_factor,
 
