@@ -217,10 +217,10 @@ def f_lstm_tc(*data):
 # Device Mapping
 def get_lstm_devmap_dimensions_and_default_params():
     dims_and_default_params = [
-        (skopt.space.Integer(low=4, high=9, name='h_size'), 6),
+        (skopt.space.Integer(low=4, high=7, name='h_size'), 6),
         (skopt.space.Integer(low=0, high=6, name='num_extra_lstm_layers'), 1),
         (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
-        (skopt.space.Integer(low=0, high=5, name='num_epochs'), 0),
+        (skopt.space.Integer(low=0, high=3, name='num_epochs'), 0),
     ]
 
     return split_dict(dims_and_default_params)
@@ -386,7 +386,7 @@ def f_gnn_ast_tc(*data):
 def get_gnn_ast_devmap_dimensions_and_default_params():
     dims_and_default_params = [
         (skopt.space.Integer(low=1, high=4, name='num_timesteps'), 4),
-        (skopt.space.Integer(low=1, high=9, name='gnn_h_size'), 7),
+        (skopt.space.Integer(low=1, high=7, name='gnn_h_size'), 7),
         (skopt.space.Integer(low=1, high=4, name='gnn_m_size'), 2),
 
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_f_m_dims'), 2),
@@ -621,7 +621,7 @@ def f_gnn_llvm_tc(*data):
 def get_gnn_llvm_devmap_dimensions_and_default_params():
     dims_and_default_params = [
         (skopt.space.Integer(low=1, high=4, name='num_timesteps'), 4),
-        (skopt.space.Integer(low=1, high=9, name='gnn_h_size'), 7),
+        (skopt.space.Integer(low=1, high=7, name='gnn_h_size'), 7),
         (skopt.space.Integer(low=1, high=4, name='gnn_m_size'), 2),
 
         (skopt.space.Integer(low=0, high=4, name='prediction_cell_mlp_f_m_dims'), 2),
