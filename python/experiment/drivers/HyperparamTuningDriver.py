@@ -12,6 +12,7 @@ import skopt
 import sys
 import time
 import uuid
+from datetime import datetime, timedelta
 from io import StringIO
 from skopt.plots import plot_convergence, plot_evaluations, plot_objective
 
@@ -53,7 +54,9 @@ def execute_ssh_command(cmd):
 
 
 def get_slurm_job_stati():
-    lines = execute_ssh_command('sacct -o JobID,State')
+    num_days = 2
+    start_date = datetime.strftime(datetime.now() - timedelta(num_days), '%m/%d')
+    lines = execute_ssh_command('sacct -o JobID,State -S ' + start_date)
 
     completed_jobs = set()
     failed_jobs = set()
