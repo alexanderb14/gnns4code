@@ -827,7 +827,7 @@ def main():
             x = opt.ask(n_points=num_parallel_per_iteration)
             if i == 0:
                 x.append(default_params)
-            y = Parallel(n_jobs=num_parallel_per_iteration)(delayed(fn_f)(v) for v in x)
+            y = Parallel(n_jobs=len((x)))(delayed(fn_f)(v) for v in x)
             res = opt.tell(x, y)
 
             print('Iteration: %i, Minimum: %f' % (i, min(opt.yi)))
