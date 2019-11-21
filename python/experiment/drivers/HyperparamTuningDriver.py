@@ -160,7 +160,6 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
         # Remove jobs from pending set on completion
         pending_jobs = pending_jobs - stati['completed']
 
-        print('Running:\t', stati['running'], file=sys.stderr)
         print('Pending:\t', pending_jobs, file=sys.stderr)
 
     # When completed, aggregate all result csvs to metric and report
