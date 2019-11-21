@@ -767,6 +767,7 @@ def main():
         parser_exp.add_argument('--method')
         parser_exp.add_argument('--result_file')
         parser_exp.add_argument('--num_iterations')
+        parser_exp.add_argument('--num_parallel_per_iteration')
 
         args = parser_exp.parse_args(sys.argv[2:])
 
@@ -807,7 +808,7 @@ def main():
 
         dims, default_params = fn_dims_and_default_params()
         num_iterations = int(args.num_iterations)
-        num_parallel = int(args.num_parallel)
+        num_parallel_per_iteration = int(args.num_parallel_per_iteration)
 
         # Do optimization
         opt = None
@@ -823,10 +824,10 @@ def main():
             dimensions=dims
         )
         for i in range(0, int(num_iterations)):
-            x = opt.ask(n_points=num_parallel)
+            x = opt.ask(n_points=num_parallel_per_iteration)
             if i == 0:
                 x.append(default_params)
-            y = Parallel(n_jobs=num_parallel)(delayed(fn_f)(v) for v in x)
+            y = Parallel(n_jobs=num_parallel_per_iteration)(delayed(fn_f)(v) for v in x)
             res = opt.tell(x, y)
 
             print('Iteration: %i, Minimum: %f' % (i, min(opt.yi)))
