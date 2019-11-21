@@ -814,7 +814,7 @@ def main():
         opt = None
         if os.path.isfile(args.result_file):
             with open(args.result_file, 'rb') as f:
-                opt = pickle.load(f)
+                opt = pickle.load(f)['optimizer']
         else:
             opt = skopt.optimizer.Optimizer(
                 dimensions=dims
@@ -833,7 +833,10 @@ def main():
             print('Iteration: %i, Minimum: %f' % (i, min(opt.yi)))
 
             with open(args.result_file, 'wb') as f:
-                pickle.dump(res, f)
+                pickle.dump({
+                    'optimizer': opt,
+                    'result': res
+                }, f)
 
     # Visualize command
     if command_arg.command == 'visualize':
