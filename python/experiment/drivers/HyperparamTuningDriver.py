@@ -133,7 +133,7 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
     # num_concurrency = exp_utils.TC_CONFIGS['DeepTuneGNNClang']['slurm']['concurrency']
     # chunks = utils.chunks(cmds, num_concurrency)
     #
-    # triggered_jobs = set()
+    # pending_jobs = set()
     # for cmds in chunks:
     #     complete_cmd = ''
     #     for cmd in cmds:
@@ -141,24 +141,24 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
     #     complete_cmd += 'wait'
     #
     #     job_id = run_slurm_job(complete_cmd)
-    #     triggered_jobs.add(job_id)
-    triggered_jobs = set()
+    #     pending_jobs.add(job_id)
+    pending_jobs = set()
     for cmd in cmds:
         job_id = run_slurm_job(cmd)
-        triggered_jobs.add(job_id)
+        pending_jobs.add(job_id)
 
     # Periodically poll and wait for completion
-    while len(triggered_jobs) != 0:
+    while len(pending_jobs) != 0:
         time.sleep(60)
 
         # Get job stati from slurm
         stati = get_slurm_job_stati()
 
         # Remove jobs from pending set on completion
-        triggered_jobs = triggered_jobs - stati['completed']
+        pending_jobs = pending_jobs - stati['completed']
 
         print('Running:\t', stati['running'], file=sys.stderr)
-        print('Awaiting:\t', triggered_jobs, file=sys.stderr)
+        print('Pending:\t', pending_jobs, file=sys.stderr)
 
     # When completed, aggregate all result csvs to metric and report
     # Get and aggregate results
