@@ -30,10 +30,7 @@ REPORTS_DIR = 'tmp'
 NUM_EXP_ITERATIONS = 1
 
 
-ssh_client = paramiko.SSHClient()
-ssh_client.load_system_host_keys()
-ssh_client.set_missing_host_key_policy(paramiko.WarningPolicy)
-ssh_client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'])
+ssh_client = None
 
 
 def split_dict(d: dict):
@@ -47,6 +44,13 @@ def split_dict(d: dict):
 
 
 def execute_ssh_command(cmd):
+    global ssh_client
+    if not ssh_client:
+        ssh_client = paramiko.SSHClient()
+        ssh_client.load_system_host_keys()
+        ssh_client.set_missing_host_key_policy(paramiko.WarningPolicy)
+        ssh_client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'])
+
     stdin, stdout, stderr = ssh_client.exec_command(cmd)
     ret = stdout.readlines()
 
@@ -837,6 +841,7 @@ def main():
                     'result': res
                 }, f)
 
+        global ssh_client
         ssh_client.close()
 
     # Visualize command
