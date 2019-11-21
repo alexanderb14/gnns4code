@@ -29,7 +29,7 @@ import utils as utils
 REPORTS_DIR = 'tmp'
 NUM_EXP_ITERATIONS = 1
 
-client = None
+ssh_client = None
 
 
 def split_dict(d: dict):
@@ -43,13 +43,13 @@ def split_dict(d: dict):
 
 
 def execute_ssh_command(cmd):
-    if not client:
-        client = paramiko.SSHClient()
-        client.load_system_host_keys()
-        client.set_missing_host_key_policy(paramiko.WarningPolicy)
-        client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'])
+    if ssh_client is None:
+        ssh_client = paramiko.SSHClient()
+        ssh_client.load_system_host_keys()
+        ssh_client.set_missing_host_key_policy(paramiko.WarningPolicy)
+        ssh_client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'])
 
-    stdin, stdout, stderr = client.exec_command(cmd)
+    stdin, stdout, stderr = ssh_client.exec_command(cmd)
     ret = stdout.readlines()
 
     return ret
@@ -839,7 +839,7 @@ def main():
                     'result': res
                 }, f)
 
-        client.close()
+        ssh_client.close()
 
     # Visualize command
     if command_arg.command == 'visualize':
