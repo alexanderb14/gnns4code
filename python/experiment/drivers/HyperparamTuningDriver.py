@@ -29,6 +29,8 @@ import utils as utils
 REPORTS_DIR = 'tmp'
 NUM_EXP_ITERATIONS = 1
 
+client = None
+
 
 def split_dict(d: dict):
     dims = []
@@ -41,15 +43,14 @@ def split_dict(d: dict):
 
 
 def execute_ssh_command(cmd):
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-    client.set_missing_host_key_policy(paramiko.WarningPolicy)
-    client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'])
+    if not client:
+        client = paramiko.SSHClient()
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(paramiko.WarningPolicy)
+        client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'])
 
     stdin, stdout, stderr = client.exec_command(cmd)
     ret = stdout.readlines()
-
-    client.close()
 
     return ret
 
@@ -838,6 +839,8 @@ def main():
                     'result': res
                 }, f)
 
+        client.close()
+
     # Visualize command
     if command_arg.command == 'visualize':
         parser_vis = subparsers.add_parser('visualize')
@@ -846,7 +849,7 @@ def main():
 
         args = parser_vis.parse_args(sys.argv[2:])
 
-        res = skopt.load(args.result_file)
+        res = skopt.load(args.result_file)['result']
 
         ax = plot_convergence(res)
         plt.grid()
