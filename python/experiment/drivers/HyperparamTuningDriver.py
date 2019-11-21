@@ -14,6 +14,7 @@ import time
 import uuid
 from datetime import datetime, timedelta
 from io import StringIO
+from sklearn.externals.joblib import Parallel,delayed
 from skopt.plots import plot_convergence, plot_evaluations, plot_objective
 
 
@@ -26,7 +27,7 @@ import utils as utils
 
 
 REPORTS_DIR = 'tmp'
-NUM_EXP_ITERATIONS = 3
+NUM_EXP_ITERATIONS = 1
 
 
 def split_dict(d: dict):
@@ -150,11 +151,14 @@ def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: i
     while len(triggered_jobs) != 0:
         time.sleep(60)
 
+        # Get job stati from slurm
         stati = get_slurm_job_stati()
-        print('Running:\t', stati['running'])
 
+        # Remove jobs from pending set on completion
         triggered_jobs = triggered_jobs - stati['completed']
-        print('Awaiting:\t', triggered_jobs)
+
+        print('Running:\t', stati['running'], file=sys.stderr)
+        print('Awaiting:\t', triggered_jobs, file=sys.stderr)
 
     # When completed, aggregate all result csvs to metric and report
     # Get and aggregate results
@@ -803,32 +807,32 @@ def main():
 
         dims, default_params = fn_dims_and_default_params()
         num_iterations = int(args.num_iterations)
+        num_parallel = int(args.num_parallel)
 
         # Do optimization
-        checkpoint_saver = skopt.callbacks.CheckpointSaver(args.result_file, compress=0)
+        opt = None
         if os.path.isfile(args.result_file):
-            res = skopt.load(args.result_file)
-
-            gp_result = skopt.gp_minimize(func=fn_f,                    # the function to minimize
-                                          dimensions=dims,              # the bounds on each dimension of x
-                                          n_calls=num_iterations,       # the number of evaluations of f
-                                          callback=[checkpoint_saver],
-                                          x0=res.x_iters,               # already examined values for x
-                                          y0=res.func_vals,             # observed values for x0
-                                          verbose=True)
-
+            with open(args.result_file, 'rb') as f:
+                opt = pickle.load(f)
         else:
-            gp_result = skopt.gp_minimize(func=fn_f,                        # the function to minimize
-                                          dimensions=dims,                  # the bounds on each dimension of x
-                                          n_calls=num_iterations,           # the number of evaluations of f
-                                          callback=[checkpoint_saver],
-                                          x0=default_params,                # start values for x
-                                          verbose=True)
+            opt = skopt.optimizer.Optimizer(
+                dimensions=dims
+            )
 
-        with open(args.result_file, 'w') as f:
-            pickle.dump(gp_result, f)
+        opt = skopt.optimizer.Optimizer(
+            dimensions=dims
+        )
+        for i in range(0, int(num_iterations)):
+            x = opt.ask(n_points=num_parallel)
+            if i == 0:
+                x.append(default_params)
+            y = Parallel(n_jobs=num_parallel)(delayed(fn_f)(v) for v in x)
+            res = opt.tell(x, y)
 
-        print(gp_result.x, gp_result.fun)
+            print('Iteration: %i, Minimum: %f' % (i, min(opt.yi)))
+
+            with open(args.result_file, 'wb') as f:
+                pickle.dump(res, f)
 
     # Visualize command
     if command_arg.command == 'visualize':
