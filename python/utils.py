@@ -6,6 +6,7 @@ import pandas as pd
 import shutil
 import tensorflow as tf
 from collections import defaultdict
+from datetime import datetime
 from typing import Tuple, Dict
 
 
@@ -58,6 +59,9 @@ class I:
 
 # Functions
 ###########
+def log_with_time(logline):
+    print(datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '\t' + logline)
+
 def action_pretty_print(action, id=0):
     # Action name
     action_name = ''

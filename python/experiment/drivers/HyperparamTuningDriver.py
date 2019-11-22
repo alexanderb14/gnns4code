@@ -14,14 +14,12 @@ import time
 import uuid
 from datetime import datetime, timedelta
 from io import StringIO
-from sklearn.externals.joblib import Parallel,delayed
 from skopt.plots import plot_convergence, plot_evaluations, plot_objective
 
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
 
-import DevMapExperiment as DevMapExperiment
 import drivers.exp_utils as exp_utils
 import utils as utils
 
@@ -95,85 +93,6 @@ def run_slurm_job(cmd):
     return job_id
 
 
-def run_n_times_on_slurm(task: str, method: str, config: dict, num_iterations: int, fold_mode: str, split_mode: str):
-    # Run several instances of the experiment on slurm
-    # Cleanup and prepare dirs
-    pwd = execute_ssh_command('pwd')[0].replace('\n', '')
-    reports_dir = os.path.join(pwd, REPORTS_DIR, method + '_' + str(uuid.uuid4()))
-
-    execute_ssh_command('rm -rf ' + reports_dir + ' && mkdir -p ' + reports_dir)
-    run_artifact_dirs = []
-    cmds = []
-
-    # Prepare dirs and build config
-    for i in range(0, num_iterations):
-        # Prepare dirs
-        run_id = str(uuid.uuid4())
-        run_artifact_dir = os.path.join(reports_dir, run_id)
-        run_artifact_dirs.append(run_artifact_dir)
-
-        execute_ssh_command('mkdir ' + run_artifact_dir)
-
-        # Set seed
-        config['seed'] = i + 1
-
-        # Build config
-        config_str = json.dumps(config).replace('"', '\\"').replace(' ', '')
-
-        # Build commands
-        if task == 'tc':
-            cmd = exp_utils.build_tc_experiment_cmd(method, run_artifact_dir, 0, config_str)
-        elif task == 'devmap':
-            cmd = exp_utils.build_devmap_experiment_cmd(method, fold_mode, split_mode, run_artifact_dir, 0, config_str)
-
-        cmd = ' '.join(['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] +
-                       ['\"'] +
-                       ['python'] + cmd +
-                       ['\"'])
-        cmds.append(cmd)
-
-    # Run cmds on slurm. Run multiple cmds in one job if possible
-    # num_concurrency = exp_utils.TC_CONFIGS['DeepTuneGNNClang']['slurm']['concurrency']
-    # chunks = utils.chunks(cmds, num_concurrency)
-    #
-    # pending_jobs = set()
-    # for cmds in chunks:
-    #     complete_cmd = ''
-    #     for cmd in cmds:
-    #         complete_cmd += cmd + ' & '
-    #     complete_cmd += 'wait'
-    #
-    #     job_id = run_slurm_job(complete_cmd)
-    #     pending_jobs.add(job_id)
-    pending_jobs = set()
-    for cmd in cmds:
-        job_id = run_slurm_job(cmd)
-        pending_jobs.add(job_id)
-
-    # Periodically poll and wait for completion
-    while len(pending_jobs) != 0:
-        time.sleep(60)
-
-        # Get job stati from slurm
-        stati = get_slurm_job_stati()
-
-        # Remove jobs from pending set on completion
-        pending_jobs = pending_jobs - stati['completed']
-
-        print('Pending:\t', pending_jobs, file=sys.stderr)
-
-    # When completed, aggregate all result csvs to metric and report
-    # Get and aggregate results
-    result_dfs = []
-    for i, run_artifact_dir in enumerate(run_artifact_dirs):
-        result_csv = ''.join(execute_ssh_command('cat ' + run_artifact_dir + '/*_raw.txt'))
-        result_df = pd.read_csv(StringIO(result_csv))
-
-        result_dfs.append(result_df)
-
-    return pd.concat(result_dfs)
-
-
 def trigger_slurm_jobs(task: str, method: str, config: dict, num_iterations: int, fold_mode: str, split_mode: str):
     # Run several instances of the experiment on slurm
     # Cleanup and prepare dirs
@@ -230,7 +149,7 @@ def wait_for_slurm_jobs(pending_jobs, check_interval_in_seconds):
         # Remove jobs from pending set on completion
         pending_jobs = pending_jobs - stati['completed']
 
-        print('Pending:\t', pending_jobs, file=sys.stderr)
+        utils.log_with_time('Pending: %s' % pending_jobs)
 
 
 def aggregate_results_of_slurm_jobs(run_artifact_dirs):
@@ -258,39 +177,47 @@ def get_lstm_tc_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-def f_lstm_tc(*data):
-    # Build config
-    h_size = int(data[0][0])
-    num_extra_lstm_layers = int(data[0][1])
-    L2_loss_factor = int(data[0][2])
-    num_epochs = int(data[0][3])
+class f_lstm_tc(object):
+    def trigger(self, *data):
+        # Build config
+        h_size = int(data[0][0])
+        num_extra_lstm_layers = int(data[0][1])
+        L2_loss_factor = int(data[0][2])
+        num_epochs = int(data[0][3])
 
-    config = {
-        'fold_mode': 'random',
+        config = {
+            'fold_mode': 'random',
 
-        "h_size": 2 ** h_size,
-        "num_extra_lstm_layers": num_extra_lstm_layers,
+            "h_size": 2 ** h_size,
+            "num_extra_lstm_layers": num_extra_lstm_layers,
 
-        "L2_loss_factor": 0.05 * L2_loss_factor,
+            "L2_loss_factor": 0.05 * L2_loss_factor,
 
-        "batch_size": 64,
-        "num_epochs": 2 ** num_epochs * 50,
-        "out_dir": "/tmp",
-    }
-    utils.pretty_print_dict(config)
+            "batch_size": 64,
+            "num_epochs": 2 ** num_epochs * 50,
+            "out_dir": "/tmp",
+        }
+        utils.pretty_print_dict(config)
 
-    results_df = run_n_times_on_slurm(task='devmap',
-                                      fold_mode=fold_mode,
-                                      split_mode=split_mode,
-                                      method='DeepTuneLSTM',
-                                      config=config,
-                                      num_iterations=NUM_EXP_ITERATIONS)
+        job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
+                                          fold_mode=fold_mode,
+                                          split_mode=split_mode,
+                                          method='DeepTuneLSTM',
+                                          config=config,
+                                          num_iterations=NUM_EXP_ITERATIONS)
 
-    # Calculate metric
-    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
-    print('Metric:', accuracy)
+        self.run_artifact_dirs = run_artifact_dirs
 
-    return accuracy * (-1)
+        return job_ids
+
+    def get_result(self):
+        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
+
+        # Calculate metric
+        accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
+        print('Metric:', accuracy)
+
+        return accuracy * (-1)
 
 
 # Device Mapping
@@ -304,47 +231,61 @@ def get_lstm_devmap_dimensions_and_default_params():
 
     return split_dict(dims_and_default_params)
 
-def f_lstm_devmap_random(*data):
-    return f_lstm_devmap('random', '3', *data)
+
+class f_lstm_devmap(object):
+    def __init__(self, fold_mode):
+        self.fold_mode = fold_mode
+
+    def trigger(self, *data):
+        # Build config
+        h_size = int(data[0][0])
+        num_extra_lstm_layers = int(data[0][1])
+        L2_loss_factor = int(data[0][2])
+        num_epochs = int(data[0][3])
+
+        config = {
+            "fold_mode": self.fold_mode,
+
+            "h_size": 2 ** h_size,
+            "num_extra_lstm_layers": num_extra_lstm_layers,
+
+            "L2_loss_factor": 0.05 * L2_loss_factor,
+
+            "batch_size": 64,
+            "num_epochs": 2 ** num_epochs * 50,
+            "out_dir": "/tmp",
+        }
+        utils.pretty_print_dict(config)
+
+        job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
+                                          fold_mode=self.fold_mode,
+                                          split_mode='3',
+                                          method='DeepTuneLSTM',
+                                          config=config,
+                                          num_iterations=NUM_EXP_ITERATIONS)
+
+        self.run_artifact_dirs = run_artifact_dirs
+
+        return job_ids
+
+    def get_result(self):
+        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
+
+        # Calculate metric
+        accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
+        print('Metric:', accuracy)
+
+        return accuracy * (-1)
 
 
-def f_lstm_devmap_grouped(*data):
-    return f_gnn_ast_devmap('grouped', '3', *data)
+class f_lstm_devmap_random(f_lstm_devmap):
+    def __init__(self):
+        f_lstm_devmap.__init__(self, 'random')
 
 
-def f_lstm_devmap(fold_mode, split_mode, *data):
-    # Build config
-    h_size = int(data[0][0])
-    num_extra_lstm_layers = int(data[0][1])
-    L2_loss_factor = int(data[0][2])
-    num_epochs = int(data[0][3])
-
-    config = {
-        "fold_mode": fold_mode,
-
-        "h_size": 2 ** h_size,
-        "num_extra_lstm_layers": num_extra_lstm_layers,
-
-        "L2_loss_factor": 0.05 * L2_loss_factor,
-
-        "batch_size": 64,
-        "num_epochs": 2 ** num_epochs * 50,
-        "out_dir": "/tmp",
-    }
-    utils.pretty_print_dict(config)
-
-    results_df = run_n_times_on_slurm(task='devmap',
-                                      fold_mode=fold_mode,
-                                      split_mode=split_mode,
-                                      method='DeepTuneLSTM',
-                                      config=config,
-                                      num_iterations=NUM_EXP_ITERATIONS)
-
-    # Calculate metric
-    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
-    print('Metric:', accuracy)
-
-    return accuracy * (-1)
+class f_lstm_devmap_grouped(f_lstm_devmap):
+    def __init__(self):
+        f_lstm_devmap.__init__(self, 'grouped')
 
 
 # GNN AST
@@ -372,93 +313,102 @@ def get_gnn_ast_tc_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-def f_gnn_ast_tc(*data):
-    # Build config
-    num_timesteps = int(data[0][0])
-    gnn_h_size = int(data[0][1])
-    gnn_m_size = int(data[0][2])
+class f_gnn_ast_tc(object):
+    def trigger(self, *data):
+        # Build config
+        num_timesteps = int(data[0][0])
+        gnn_h_size = int(data[0][1])
+        gnn_m_size = int(data[0][2])
 
-    prediction_cell_mlp_f_m_dims = int(data[0][3])
-    prediction_cell_mlp_g_m_dims = int(data[0][4])
-    prediction_cell_mlp_reduce_dims = int(data[0][5])
+        prediction_cell_mlp_f_m_dims = int(data[0][3])
+        prediction_cell_mlp_g_m_dims = int(data[0][4])
+        prediction_cell_mlp_reduce_dims = int(data[0][5])
 
-    embedding_layer_dims = int(data[0][6])
+        embedding_layer_dims = int(data[0][6])
 
-    learning_rate = int(data[0][7])
-    L2_loss_factor = int(data[0][8])
-    num_epochs = int(data[0][9])
+        learning_rate = int(data[0][7])
+        L2_loss_factor = int(data[0][8])
+        num_epochs = int(data[0][9])
 
-    tie_fwd_bkwd = int(data[0][10])
+        tie_fwd_bkwd = int(data[0][10])
 
-    config = {
-        "run_id": 'foo',
-        'fold_mode': 'random',
+        config = {
+            "run_id": 'foo',
+            'fold_mode': 'random',
 
-        "gnn_type": "GGNN",
+            "gnn_type": "GGNN",
 
-        "num_timesteps": num_timesteps * 2,
-        "hidden_size_orig": 46,
-        "gnn_h_size": 2 ** gnn_h_size,
-        "gnn_m_size": gnn_m_size * 2,
+            "num_timesteps": num_timesteps * 2,
+            "hidden_size_orig": 46,
+            "gnn_h_size": 2 ** gnn_h_size,
+            "gnn_m_size": gnn_m_size * 2,
 
-        "num_edge_types": 2,
+            "num_edge_types": 2,
 
-        "prediction_cell": {
-            "mlp_f_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
-            "mlp_f_m_activation": "relu",
+            "prediction_cell": {
+                "mlp_f_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
+                "mlp_f_m_activation": "relu",
 
-            "mlp_g_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
-            "mlp_g_m_activation": "sigmoid",
+                "mlp_g_m_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
+                "mlp_g_m_activation": "sigmoid",
 
-            "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
-            "mlp_reduce_activation": "relu",
-            "mlp_reduce_out_dim": 32,
+                "mlp_reduce_dims": [gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
+                "mlp_reduce_activation": "relu",
+                "mlp_reduce_out_dim": 32,
 
-            "mlp_reduce_after_aux_in_1_dims": [],
-            "mlp_reduce_after_aux_in_1_activation": "relu",
-            "mlp_reduce_after_aux_in_1_out_dim": 32,
+                "mlp_reduce_after_aux_in_1_dims": [],
+                "mlp_reduce_after_aux_in_1_activation": "relu",
+                "mlp_reduce_after_aux_in_1_out_dim": 32,
 
-            "mlp_reduce_after_aux_in_2_dims": [],
-            "mlp_reduce_after_aux_in_2_activation": "sigmoid",
-            "mlp_reduce_after_aux_in_2_out_dim": 6,
+                "mlp_reduce_after_aux_in_2_dims": [],
+                "mlp_reduce_after_aux_in_2_activation": "sigmoid",
+                "mlp_reduce_after_aux_in_2_out_dim": 6,
 
-            "output_dim": 6,
-        },
+                "output_dim": 6,
+            },
 
-        "embedding_layer": {
-            "mapping_dims": [46] * embedding_layer_dims
-        },
+            "embedding_layer": {
+                "mapping_dims": [46] * embedding_layer_dims
+            },
 
-        "learning_rate": 0.00001 * learning_rate,
-        "clamp_gradient_norm": 1.0,
-        "L2_loss_factor": 0.05 * L2_loss_factor,
+            "learning_rate": 0.00001 * learning_rate,
+            "clamp_gradient_norm": 1.0,
+            "L2_loss_factor": 0.05 * L2_loss_factor,
 
-        "batch_size": 16,
-        "num_epochs": 2 ** num_epochs * 100,
-        "out_dir": "/tmp",
+            "batch_size": 16,
+            "num_epochs": 2 ** num_epochs * 100,
+            "out_dir": "/tmp",
 
-        "tie_fwd_bkwd": tie_fwd_bkwd,
-        "use_edge_bias": 0,
-        "use_edge_msg_avg_aggregation": 0,
+            "tie_fwd_bkwd": tie_fwd_bkwd,
+            "use_edge_bias": 0,
+            "use_edge_msg_avg_aggregation": 0,
 
-        "use_node_values": 0,
-        "save_best_model_interval": 1,
-        "with_aux_in": 0,
+            "use_node_values": 0,
+            "save_best_model_interval": 1,
+            "with_aux_in": 0,
 
-        "edge_type_filter": []
-    }
-    utils.pretty_print_dict(config)
+            "edge_type_filter": []
+        }
+        utils.pretty_print_dict(config)
 
-    results_df = run_n_times_on_slurm(task='tc',
-                                      method='DeepTuneGNNClang',
-                                      config=config,
-                                      num_iterations=NUM_EXP_ITERATIONS)
+        job_ids, run_artifact_dirs = trigger_slurm_jobs(task='tc',
+                                          method='DeepTuneGNNClang',
+                                          config=config,
+                                          num_iterations=NUM_EXP_ITERATIONS)
 
-    # Calculate metric
-    speedup = scipy.stats.gmean(list(results_df['Speedup']))
-    print('Metric:', speedup)
+        self.run_artifact_dirs = run_artifact_dirs
 
-    return speedup * (-1)
+        return job_ids
+
+
+    def get_result(self):
+        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
+
+        # Calculate metric
+        speedup = scipy.stats.gmean(list(results_df['Speedup']))
+        print('Metric:', speedup)
+
+        return speedup * (-1)
 
 
 # Device Mapping
@@ -575,7 +525,6 @@ class f_gnn_ast_devmap(object):
 
         return job_ids
 
-
     def get_result(self):
         results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
 
@@ -621,93 +570,101 @@ def get_gnn_llvm_tc_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-def f_gnn_llvm_tc(*data):
-    # Build config
-    num_timesteps = int(data[0][0])
-    gnn_h_size = int(data[0][1])
-    gnn_m_size = int(data[0][2])
+class f_gnn_llvm_tc(object):
+    def trigger(self, *data):
+        # Build config
+        num_timesteps = int(data[0][0])
+        gnn_h_size = int(data[0][1])
+        gnn_m_size = int(data[0][2])
 
-    prediction_cell_mlp_f_m_dims = int(data[0][3])
-    prediction_cell_mlp_g_m_dims = int(data[0][4])
-    prediction_cell_mlp_reduce_dims = int(data[0][5])
+        prediction_cell_mlp_f_m_dims = int(data[0][3])
+        prediction_cell_mlp_g_m_dims = int(data[0][4])
+        prediction_cell_mlp_reduce_dims = int(data[0][5])
 
-    embedding_layer_dims = int(data[0][6])
+        embedding_layer_dims = int(data[0][6])
 
-    learning_rate = int(data[0][7])
-    L2_loss_factor = int(data[0][8])
-    num_epochs = int(data[0][9])
+        learning_rate = int(data[0][7])
+        L2_loss_factor = int(data[0][8])
+        num_epochs = int(data[0][9])
 
-    tie_fwd_bkwd = int(data[0][10])
+        tie_fwd_bkwd = int(data[0][10])
 
-    config = {
-        "run_id": 'foo',
-        'fold_mode': 'random',
+        config = {
+            "run_id": 'foo',
+            'fold_mode': 'random',
 
-        "gnn_type": "GGNN",
+            "gnn_type": "GGNN",
 
-        "num_timesteps": num_timesteps * 2,
-        "hidden_size_orig": 140,
-        "gnn_h_size": 2 ** gnn_h_size,
-        "gnn_m_size": gnn_m_size * 2,
+            "num_timesteps": num_timesteps * 2,
+            "hidden_size_orig": 140,
+            "gnn_h_size": 2 ** gnn_h_size,
+            "gnn_m_size": gnn_m_size * 2,
 
-        "num_edge_types": 4,
+            "num_edge_types": 4,
 
-        "prediction_cell": {
-            "mlp_f_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
-            "mlp_f_m_activation": "relu",
+            "prediction_cell": {
+                "mlp_f_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
+                "mlp_f_m_activation": "relu",
 
-            "mlp_g_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
-            "mlp_g_m_activation": "sigmoid",
+                "mlp_g_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
+                "mlp_g_m_activation": "sigmoid",
 
-            "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
-            "mlp_reduce_activation": "relu",
-            "mlp_reduce_out_dim": 32,
+                "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
+                "mlp_reduce_activation": "relu",
+                "mlp_reduce_out_dim": 32,
 
-            "mlp_reduce_after_aux_in_1_dims": [],
-            "mlp_reduce_after_aux_in_1_activation": "relu",
-            "mlp_reduce_after_aux_in_1_out_dim": 32,
+                "mlp_reduce_after_aux_in_1_dims": [],
+                "mlp_reduce_after_aux_in_1_activation": "relu",
+                "mlp_reduce_after_aux_in_1_out_dim": 32,
 
-            "mlp_reduce_after_aux_in_2_dims": [],
-            "mlp_reduce_after_aux_in_2_activation": "sigmoid",
-            "mlp_reduce_after_aux_in_2_out_dim": 6,
+                "mlp_reduce_after_aux_in_2_dims": [],
+                "mlp_reduce_after_aux_in_2_activation": "sigmoid",
+                "mlp_reduce_after_aux_in_2_out_dim": 6,
 
-            "output_dim": 6,
-        },
+                "output_dim": 6,
+            },
 
-        "embedding_layer": {
-            "mapping_dims": [140] * embedding_layer_dims
-        },
+            "embedding_layer": {
+                "mapping_dims": [140] * embedding_layer_dims
+            },
 
-        "learning_rate": 0.00001 * learning_rate,
-        "clamp_gradient_norm": 1.0,
-        "L2_loss_factor": 0.05 * L2_loss_factor,
+            "learning_rate": 0.00001 * learning_rate,
+            "clamp_gradient_norm": 1.0,
+            "L2_loss_factor": 0.05 * L2_loss_factor,
 
-        "batch_size": 16,
-        "num_epochs": 2 ** num_epochs * 100,
-        "out_dir": "/tmp",
+            "batch_size": 16,
+            "num_epochs": 2 ** num_epochs * 100,
+            "out_dir": "/tmp",
 
-        "tie_fwd_bkwd": tie_fwd_bkwd,
-        "use_edge_bias": 0,
-        "use_edge_msg_avg_aggregation": 0,
+            "tie_fwd_bkwd": tie_fwd_bkwd,
+            "use_edge_bias": 0,
+            "use_edge_msg_avg_aggregation": 0,
 
-        "use_node_values": 0,
-        "save_best_model_interval": 1,
-        "with_aux_in": 0,
+            "use_node_values": 0,
+            "save_best_model_interval": 1,
+            "with_aux_in": 0,
 
-        "edge_type_filter": []
-    }
-    utils.pretty_print_dict(config)
+            "edge_type_filter": []
+        }
+        utils.pretty_print_dict(config)
 
-    results_df = run_n_times_on_slurm(task='tc',
-                                      method='DeepTuneGNNLLVM',
-                                      config=config,
-                                      num_iterations=NUM_EXP_ITERATIONS)
+        job_ids, run_artifact_dirs = trigger_slurm_jobs(task='tc',
+                                          method='DeepTuneGNNLLVM',
+                                          config=config,
+                                          num_iterations=NUM_EXP_ITERATIONS)
 
-    # Calculate metric
-    speedup = scipy.stats.gmean(list(results_df['Speedup']))
-    print('Metric:', speedup)
+        self.run_artifact_dirs = run_artifact_dirs
 
-    return speedup * (-1)
+        return job_ids
+
+    def get_result(self):
+        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
+
+        # Calculate metric
+        speedup = scipy.stats.gmean(list(results_df['Speedup']))
+        print('Metric:', speedup)
+
+        return speedup * (-1)
 
 # Device Mapping
 def get_gnn_llvm_devmap_dimensions_and_default_params():
@@ -732,103 +689,116 @@ def get_gnn_llvm_devmap_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-def f_gnn_llvm_devmap_random(*data):
-    return f_gnn_llvm_devmap('random', '3', *data)
+class f_gnn_llvm_devmap(object):
+    def __init__(self, fold_mode):
+        self.fold_mode = fold_mode
+
+    def trigger(self, *data):
+        # Build config
+        num_timesteps = int(data[0][0])
+        gnn_h_size = int(data[0][1])
+        gnn_m_size = int(data[0][2])
+
+        prediction_cell_mlp_f_m_dims = int(data[0][3])
+        prediction_cell_mlp_g_m_dims = int(data[0][4])
+        prediction_cell_mlp_reduce_dims = int(data[0][5])
+
+        embedding_layer_dims = int(data[0][6])
+
+        learning_rate = int(data[0][7])
+        L2_loss_factor = int(data[0][8])
+        num_epochs = int(data[0][9])
+
+        tie_fwd_bkwd = int(data[0][10])
+
+        config = {
+            "run_id": 'foo',
+            'fold_mode': self.fold_mode,
+
+            "gnn_type": "GGNN",
+
+            "num_timesteps": num_timesteps * 2,
+            "hidden_size_orig": 140,
+            "gnn_h_size": 2 ** gnn_h_size,
+            "gnn_m_size": gnn_m_size * 2,
+
+            "num_edge_types": 4,
+
+            "prediction_cell": {
+                "mlp_f_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
+                "mlp_f_m_activation": "sigmoid",
+
+                "mlp_g_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
+                "mlp_g_m_activation": "relu",
+
+                "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
+                "mlp_reduce_activation": "relu",
+                "mlp_reduce_out_dim": 32,
+
+                "mlp_reduce_after_aux_in_1_dims": [],
+                "mlp_reduce_after_aux_in_1_activation": "relu",
+                "mlp_reduce_after_aux_in_1_out_dim": 32,
+
+                "mlp_reduce_after_aux_in_2_dims": [],
+                "mlp_reduce_after_aux_in_2_activation": "sigmoid",
+                "mlp_reduce_after_aux_in_2_out_dim": 2,
+
+                "output_dim": 2,
+            },
+
+            "embedding_layer": {
+                "mapping_dims": [140] * embedding_layer_dims
+            },
+
+            "learning_rate": 0.00001 * learning_rate,
+            "clamp_gradient_norm": 1.0,
+            "L2_loss_factor": 0.05 * L2_loss_factor,
+
+            "batch_size": 64,
+            "num_epochs": 2 ** num_epochs * 100,
+            "out_dir": "/tmp",
+
+            "tie_fwd_bkwd": tie_fwd_bkwd,
+            "use_edge_bias": 0,
+            "use_edge_msg_avg_aggregation": 0,
+
+            "use_node_values": 0,
+            "save_best_model_interval": 1,
+            "with_aux_in": 1,
+
+            "edge_type_filter": []
+        }
+        utils.pretty_print_dict(config)
+
+        job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
+                                          fold_mode=self.fold_mode,
+                                          split_mode='3',
+                                          method='DeepTuneGNNLLVM',
+                                          config=config,
+                                          num_iterations=NUM_EXP_ITERATIONS)
+
+        self.run_artifact_dirs = run_artifact_dirs
+
+        return job_ids
+
+    def get_result(self):
+        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
+
+        # Calculate metric
+        accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
+        print('Metric:', accuracy)
+
+        return accuracy * (-1)
 
 
-def f_gnn_llvm_devmap_grouped(*data):
-    return f_gnn_llvm_devmap('grouped', '3', *data)
+class f_gnn_llvm_devmap_random(f_gnn_llvm_devmap):
+    def __init__(self):
+        f_gnn_llvm_devmap.__init__(self, 'random')
 
 
-def f_gnn_llvm_devmap(fold_mode, split_mode, *data):
-    # Build config
-    num_timesteps = int(data[0][0])
-    gnn_h_size = int(data[0][1])
-    gnn_m_size = int(data[0][2])
-
-    prediction_cell_mlp_f_m_dims = int(data[0][3])
-    prediction_cell_mlp_g_m_dims = int(data[0][4])
-    prediction_cell_mlp_reduce_dims = int(data[0][5])
-
-    embedding_layer_dims = int(data[0][6])
-
-    learning_rate = int(data[0][7])
-    L2_loss_factor = int(data[0][8])
-    num_epochs = int(data[0][9])
-
-    tie_fwd_bkwd = int(data[0][10])
-
-    config = {
-        "run_id": 'foo',
-        'fold_mode': fold_mode,
-
-        "gnn_type": "GGNN",
-
-        "num_timesteps": num_timesteps * 2,
-        "hidden_size_orig": 140,
-        "gnn_h_size": 2 ** gnn_h_size,
-        "gnn_m_size": gnn_m_size * 2,
-
-        "num_edge_types": 4,
-
-        "prediction_cell": {
-            "mlp_f_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_f_m_dims,
-            "mlp_f_m_activation": "sigmoid",
-
-            "mlp_g_m_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_g_m_dims,
-            "mlp_g_m_activation": "relu",
-
-            "mlp_reduce_dims": [2 ** gnn_h_size * gnn_m_size * 2] * prediction_cell_mlp_reduce_dims,
-            "mlp_reduce_activation": "relu",
-            "mlp_reduce_out_dim": 32,
-
-            "mlp_reduce_after_aux_in_1_dims": [],
-            "mlp_reduce_after_aux_in_1_activation": "relu",
-            "mlp_reduce_after_aux_in_1_out_dim": 32,
-
-            "mlp_reduce_after_aux_in_2_dims": [],
-            "mlp_reduce_after_aux_in_2_activation": "sigmoid",
-            "mlp_reduce_after_aux_in_2_out_dim": 2,
-
-            "output_dim": 2,
-        },
-
-        "embedding_layer": {
-            "mapping_dims": [140] * embedding_layer_dims
-        },
-
-        "learning_rate": 0.00001 * learning_rate,
-        "clamp_gradient_norm": 1.0,
-        "L2_loss_factor": 0.05 * L2_loss_factor,
-
-        "batch_size": 64,
-        "num_epochs": 2 ** num_epochs * 100,
-        "out_dir": "/tmp",
-
-        "tie_fwd_bkwd": tie_fwd_bkwd,
-        "use_edge_bias": 0,
-        "use_edge_msg_avg_aggregation": 0,
-
-        "use_node_values": 0,
-        "save_best_model_interval": 1,
-        "with_aux_in": 1,
-
-        "edge_type_filter": []
-    }
-    utils.pretty_print_dict(config)
-
-    results_df = run_n_times_on_slurm(task='devmap',
-                                      fold_mode=fold_mode,
-                                      split_mode=split_mode,
-                                      method='DeepTuneGNNLLVM',
-                                      config=config,
-                                      num_iterations=NUM_EXP_ITERATIONS)
-
-    # Calculate metric
-    accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
-    print('Metric:', accuracy)
-
-    return accuracy * (-1)
+class f_gnn_llvm_devmap_grouped(f_gnn_llvm_devmap):
+    def __init__(self):
+        f_gnn_llvm_devmap.__init__(self, 'grouped')
 
 
 def main():
