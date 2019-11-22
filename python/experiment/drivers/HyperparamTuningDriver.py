@@ -18,9 +18,9 @@ from skopt.plots import plot_convergence, plot_evaluations, plot_objective
 
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(SCRIPT_DIR + '/..')
+sys.path.append(SCRIPT_DIR + '/../..')
 
-import drivers.exp_utils as exp_utils
+import experiment.drivers.exp_utils as exp_utils
 import utils as utils
 
 
