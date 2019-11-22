@@ -924,7 +924,7 @@ def main():
                 job_ids = job_ids.union(job.trigger(v))
 
             # 2.2. Wait for completion
-            wait_for_slurm_jobs(job_ids, 5)
+            wait_for_slurm_jobs(job_ids, 30)
 
             # 2.3 Get and aggregate results
             y = [job.get_result() for job in jobs]
