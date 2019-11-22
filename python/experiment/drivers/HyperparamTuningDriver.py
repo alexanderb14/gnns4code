@@ -550,7 +550,7 @@ class f_gnn_ast_devmap(object):
             "L2_loss_factor": 0.05 * L2_loss_factor,
 
             "batch_size": 64,
-            "num_epochs": 2, # 2 ** num_epochs * 100,
+            "num_epochs": 2 ** num_epochs * 100,
             "out_dir": "/tmp",
 
             "tie_fwd_bkwd": tie_fwd_bkwd,
