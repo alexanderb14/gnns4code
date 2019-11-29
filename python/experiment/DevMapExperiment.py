@@ -542,15 +542,11 @@ def get_stratified_kfold_train_valid_test_split(y, k, kfold_seed = 204):
     """
     Implements stratified k-fold cross validation.
     Training set will be k-2 folds. Two other folds will be held out.
-    This functionality is not implemented in sklearn: Here, only holding out one fold is supported.
-    Implementing it with two nesting stratified k-folds has one limitation: The training sets of two
-    held-out folds will differ due to rounding/flooring. Therefore, we cannot reduce the amount of
-    training runs by 2 in this case.
     """
+    # Get k stratified folds
     kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=kfold_seed)
     split = kf.split(np.zeros(len(y)) , y)
 
-    # Get k stratified folds
     folds = []
     for j, (big_split_index, small_split_index) in enumerate(split):
         folds.append(small_split_index)
@@ -563,7 +559,7 @@ def get_stratified_kfold_train_valid_test_split(y, k, kfold_seed = 204):
             assert len(f1.intersection(f2)) == 0
 
     # Build train, valid, test sets.
-    train_valid_test_split = {}
+    train_valid_test_split = []
     for valid_idx_idx in range(0, k):
         for test_idx_idx in range(0, k):
             if test_idx_idx == valid_idx_idx:
@@ -575,10 +571,11 @@ def get_stratified_kfold_train_valid_test_split(y, k, kfold_seed = 204):
             valid_idx = folds[valid_idx_idx]
             test_idx = folds[test_idx_idx]
 
-            train_valid_test_split[hash(tuple(train_idx))] = {
+            train_valid_test_split.append({
                 'train_idx': train_idx,
-                'other_idxs': [valid_idx, test_idx]
-            }
+                'valid_idx': valid_idx,
+                'test_idx': test_idx
+            })
 
             # Test: Are train, valid, test sets disjunct?
             tvt_idxs = [train_idx, valid_idx, test_idx]
@@ -588,13 +585,13 @@ def get_stratified_kfold_train_valid_test_split(y, k, kfold_seed = 204):
                     tvt_2 = set(tvt_idxs[idx_2])
                     assert len(tvt_1.intersection(tvt_2)) == 0
 
-    # print(len(train_valid_test_split))
-    # for configuration in train_valid_test_split.values():
-    #     print(hash(tuple(configuration['train_idx'])),
-    #           hash(tuple(configuration['other_idxs'][0])),
-    #           hash(tuple(configuration['other_idxs'][1])))
+    print(len(train_valid_test_split))
+    for configuration in train_valid_test_split:
+        print(hash(tuple(configuration['train_idx'])),
+              hash(tuple(configuration['valid_idx'])),
+              hash(tuple(configuration['test_idx'])))
 
-    return train_valid_test_split.values()
+    return train_valid_test_split
 
 
 def predict(**data):
@@ -649,6 +646,116 @@ def predict(**data):
         })
 
     return results
+
+
+def evaluate_fold(model: HeterogemeousMappingModel, dataset, train_idx, valid_idx, test_idx, fold_idx, dataset_nvidia, dataset_amd, seed) -> pd.DataFrame:
+    # load runtime data
+    # #############################
+    if dataset == "nvidia":
+        model.dataset = dataset_nvidia
+    elif dataset == "amd":
+        model.dataset = dataset_amd
+    df = model.dataset
+
+    sequences = None  # defer sequence encoding until needed (it's expensive)
+
+    # values used for training & predictions
+    features = grewe_features(df)
+    aux_in = auxiliary_inputs(df)
+    clang_graphs = get_clang_graphs(df)
+    llvm_graphs = get_llvm_graphs(df)
+
+    # optimal mappings
+    y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
+    y_1hot = encode_1hot(y)
+
+    # train model
+    # #############################
+    model.init(seed=seed)
+
+    if model.__class__.__name__ == 'DeepTune' and sequences is None:  # encode source codes if needed
+        sequences = encode_srcs(model.atomizer, df["src"].values)
+
+    train_time_start = time.time()
+    model.train(df=df,
+                features=features[train_idx],
+                aux_in_train=aux_in[train_idx],
+                clang_graphs_train=clang_graphs[train_idx],
+                llvm_graphs_train=llvm_graphs[train_idx],
+                sequences=sequences[train_idx] if sequences is not None else None,
+                y_train=y[train_idx],
+                y_1hot=y_1hot[train_idx],
+                verbose=True)
+    train_time_end = time.time()
+    train_time = train_time_end - train_time_start
+
+    # Validate
+    data_valid = predict(
+        idx=valid_idx,
+        model=model,
+        features=features,
+        aux_in=aux_in,
+        platform=dataset,
+        clang_graphs=clang_graphs,
+        llvm_graphs=llvm_graphs,
+        sequences=sequences,
+        y=y,
+        df=df,
+        fold_idx=fold_idx,
+        train_time=train_time
+    )
+
+    df_valid = pd.DataFrame(
+        data_valid, columns=[
+            "Model",
+            "Platform",
+            "Benchmark",
+            "Benchmark Suite",
+            "Oracle Mapping",
+            "Predicted Mapping",
+            "Correct?",
+            "Speedup",
+            "Fold",
+            "num_trainable_parameters",
+            "train_time",
+            "inference_time"
+        ])
+    df_valid['set'] = 'valid'
+
+    # Test
+    data_test = predict(
+        idx=test_idx,
+        model=model,
+        features=features,
+        aux_in=aux_in,
+        platform=dataset,
+        clang_graphs=clang_graphs,
+        llvm_graphs=llvm_graphs,
+        sequences=sequences,
+        y=y,
+        df=df,
+        fold_idx=fold_idx,
+        train_time=train_time
+    )
+
+    df_test = pd.DataFrame(
+        data_test, columns=[
+            "Model",
+            "Platform",
+            "Benchmark",
+            "Benchmark Suite",
+            "Oracle Mapping",
+            "Predicted Mapping",
+            "Correct?",
+            "Speedup",
+            "Fold",
+            "num_trainable_parameters",
+            "train_time",
+            "inference_time"
+        ])
+    df_test['set'] = 'test'
+
+    return pd.concat([df_valid, df_test], ignore_index=True)
 
 
 def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, dataset_nvidia, dataset_amd, seed) -> pd.DataFrame:
@@ -706,9 +813,12 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
 
 
         for j, configuration in enumerate(train_valid_test_split):
-            train_idx = configuration['train_idx']
-            other_idxs = configuration['other_idxs']
-            
+            print(str(list(configuration['train_idx'])).replace(' ', ''))
+            print(str(list(configuration['valid_idx'])).replace(' ', ''))
+            print(str(list(configuration['test_idx'])).replace(' ', ''))
+
+            train_idx = configuration['configuration']
+
             # train model
             model.init(seed=seed)
 
@@ -728,41 +838,40 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
             train_time_end = time.time()
             train_time = train_time_end - train_time_start
 
-            for i in range(0, 2):
-                valid_idx = other_idxs[i % 2]
-                test_idx = other_idxs[(i+1) % 2]
+            valid_idx = configuration['valid_idx']
+            test_idx = configuration['test_idx']
 
-                # Validate
-                data_valid += predict(
-                    idx=valid_idx,
-                    model=model,
-                    features=features,
-                    aux_in=aux_in,
-                    platform=platform,
-                    clang_graphs=clang_graphs,
-                    llvm_graphs=llvm_graphs,
-                    sequences=sequences,
-                    y=y,
-                    df=df,
-                    fold_idx=j,
-                    train_time=train_time
-                )
+            # Validate
+            data_valid += predict(
+                idx=valid_idx,
+                model=model,
+                features=features,
+                aux_in=aux_in,
+                platform=platform,
+                clang_graphs=clang_graphs,
+                llvm_graphs=llvm_graphs,
+                sequences=sequences,
+                y=y,
+                df=df,
+                fold_idx=j,
+                train_time=train_time
+            )
 
-                # Test
-                data_test += predict(
-                    idx=test_idx,
-                    model=model,
-                    features=features,
-                    aux_in=aux_in,
-                    platform=platform,
-                    clang_graphs=clang_graphs,
-                    llvm_graphs=llvm_graphs,
-                    sequences=sequences,
-                    y=y,
-                    df=df,
-                    fold_idx=j,
-                    train_time=train_time
-                )
+            # Test
+            data_test += predict(
+                idx=test_idx,
+                model=model,
+                features=features,
+                aux_in=aux_in,
+                platform=platform,
+                clang_graphs=clang_graphs,
+                llvm_graphs=llvm_graphs,
+                sequences=sequences,
+                y=y,
+                df=df,
+                fold_idx=j,
+                train_time=train_time
+            )
 
             progressbar[0] += 1
             progressbar[1].update(progressbar[0])
@@ -1519,9 +1628,9 @@ def main():
 
 
     # Experiment command
-    if command_arg.command == 'experiment':
+    if command_arg.command == 'experiment' or command_arg.command == 'experiment_fold':
         # Parse args
-        parser_exp = subparsers.add_parser('train')
+        parser_exp = subparsers.add_parser('experiment')
 
         parser_exp.add_argument('--RandomMapping', action='store_true')
         parser_exp.add_argument('--StaticMapping', action='store_true')
@@ -1537,13 +1646,20 @@ def main():
         parser_exp.add_argument('--dataset_nvidia')
         parser_exp.add_argument('--dataset_amd')
 
-        parser_exp.add_argument('--fold_mode')
-        parser_exp.add_argument('--split_mode')
-        parser_exp.add_argument('--datasets', '--names-list', nargs='+', default=[])
-
         parser_exp.add_argument('--seed')
         parser_exp.add_argument('--report_write_dir')
         parser_exp.add_argument('--config')
+
+        if command_arg.command == 'experiment':
+            parser_exp.add_argument('--fold_mode')
+            parser_exp.add_argument('--split_mode')
+            parser_exp.add_argument('--datasets', '--names-list', nargs='+', default=[])
+        elif command_arg.command == 'experiment_fold':
+            parser_exp.add_argument('--train_idx')
+            parser_exp.add_argument('--valid_idx')
+            parser_exp.add_argument('--test_idx')
+            parser_exp.add_argument('--fold_idx')
+            parser_exp.add_argument('--dataset')
 
         args = parser_exp.parse_args(sys.argv[2:])
 
@@ -1556,29 +1672,16 @@ def main():
         seed = int(args.seed)
 
         if args.RandomMapping:
-            config = json.loads(args.config) if args.config else {
-                'fold_mode': args.fold_mode
-            }
-
             model = RandomMapping()
 
         if args.StaticMapping:
-            config = json.loads(args.config) if args.config else {
-                'fold_mode': args.fold_mode
-            }
-
             model = StaticMapping()
 
         if args.Grewe:
-            config = json.loads(args.config) if args.config else {
-                'fold_mode': args.fold_mode
-            }
-
             model = Grewe()
 
         if args.DeepTuneLSTM:
             config = json.loads(args.config) if args.config else {
-                "fold_mode": args.fold_mode,
                 "h_size": 64,
                 "num_extra_lstm_layers": 1,
                 "L2_loss_factor": 0,
@@ -1591,7 +1694,6 @@ def main():
         if args.DeepTuneGNNClang or args.DeepTuneGNNClangASTEdges:
             config = json.loads(args.config) if args.config else {
                 "run_id": 'deepgnn-ast' + '_' + str(run_id),
-                'fold_mode': args.fold_mode,
 
                 "gnn_type": "GGNN",
 
@@ -1659,7 +1761,6 @@ def main():
         if args.DeepTuneGNNLLVM or args.DeepTuneGNNLLVMCFGEdges or args.DeepTuneGNNLLVMCFGDataflowEdges or args.DeepTuneGNNLLVMCFGDataflowCallEdges:
             config = json.loads(args.config) if args.config else {
                 "run_id": 'deepgnn-llvm' + '_' + str(run_id),
-                'fold_mode': args.fold_mode,
 
                 "gnn_type": "GGNN",
 
@@ -1732,15 +1833,32 @@ def main():
 
             model = DeepGNNLLVM(config)
 
-        print("Evaluating %s ..." % model.__name__, file=sys.stderr)
+        if command_arg.command == 'experiment':
+            print("Evaluating %s ..." % model.__name__, file=sys.stderr)
 
-        if args.split_mode == '2':
-            evaluate_fn = evaluate
-        elif args.split_mode == '3':
-            evaluate_fn = evaluate_3split
+            if args.split_mode == '2':
+                evaluate_fn = evaluate
+            elif args.split_mode == '3':
+                evaluate_fn = evaluate_3split
 
-        report = evaluate_fn(model, config['fold_mode'], args.datasets, dataset_nvidia, dataset_amd, seed)
-        print_and_save_report(args.report_write_dir, run_id, config, model, report)
+            report = evaluate_fn(model, args.fold_mode, args.datasets, dataset_nvidia, dataset_amd, seed)
+            print_and_save_report(args.report_write_dir, run_id, config, model, report)
+
+        elif command_arg.command == 'experiment_fold':
+            print("Evaluating fold.", file=sys.stderr)
+            print("train_idx: %s" % str(args.train_idx), file=sys.stderr)
+            print("valid_idx: %s" % str(args.valid_idx), file=sys.stderr)
+            print("test_idx: %s" % str(args.test_idx), file=sys.stderr)
+
+            train_idx = json.loads(args.train_idx)
+            valid_idx = json.loads(args.valid_idx)
+            test_idx = json.loads(args.test_idx)
+            fold_idx = int(args.fold_idx)
+
+            report = evaluate_fold(model, args.dataset, train_idx, valid_idx, test_idx, fold_idx,
+                                   dataset_nvidia, dataset_amd, seed)
+            print_and_save_report(args.report_write_dir, run_id, config, model, report)
+
 
     # Evaluate command
     if command_arg.command == 'evaluate':

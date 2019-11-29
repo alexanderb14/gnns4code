@@ -9,6 +9,7 @@ import pickle
 import re
 import scipy
 import skopt
+import socket
 import sys
 import time
 import uuid
@@ -20,6 +21,7 @@ from skopt.plots import plot_convergence, plot_evaluations, plot_objective
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/../..')
 
+import experiment.DevMapExperiment as DevMapExperiment
 import experiment.drivers.exp_utils as exp_utils
 import utils as utils
 
@@ -47,7 +49,7 @@ def execute_ssh_command(cmd):
         ssh_client = paramiko.SSHClient()
         ssh_client.load_system_host_keys()
         ssh_client.set_missing_host_key_policy(paramiko.WarningPolicy)
-        ssh_client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'])
+        ssh_client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'], timeout=10)
 
     stdin, stdout, stderr = ssh_client.exec_command(cmd)
     ret = stdout.readlines()
@@ -144,7 +146,10 @@ def wait_for_slurm_jobs(pending_jobs, check_interval_in_seconds):
         time.sleep(check_interval_in_seconds)
 
         # Get job stati from slurm
-        stati = get_slurm_job_stati()
+        try:
+            stati = get_slurm_job_stati()
+        except socket.timeout:
+            continue
 
         # Remove jobs from pending set on completion
         pending_jobs = pending_jobs - stati['completed']
@@ -526,13 +531,7 @@ class f_gnn_ast_devmap(object):
         return job_ids
 
     def get_result(self):
-        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
-
-        # Calculate metric
-        accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
-        print('Metric:', accuracy)
-
-        return accuracy * (-1)
+        return aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
 
 
 class f_gnn_ast_devmap_random(f_gnn_ast_devmap):
@@ -822,7 +821,6 @@ def main():
         parser_exp.add_argument('--method')
         parser_exp.add_argument('--result_file')
         parser_exp.add_argument('--num_iterations')
-        parser_exp.add_argument('--num_parallel_per_iteration')
 
         args = parser_exp.parse_args(sys.argv[2:])
 
@@ -861,54 +859,79 @@ def main():
                 elif args.fold_mode == 'grouped':
                     fn_f = f_gnn_llvm_devmap_grouped
 
-        dims, default_params = fn_dims_and_default_params()
-        num_iterations = int(args.num_iterations)
-        num_parallel_per_iteration = int(args.num_parallel_per_iteration)
+        # Split into folds
+        kfold_k = 3
+        df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_nvidia.csv'))
+        y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
+        train_valid_test_split = DevMapExperiment.get_stratified_kfold_train_valid_test_split(y, kfold_k)
+        num_splits = len(train_valid_test_split)
 
         # Do optimization
-        opt = None
+        # ###############################
+        dims, default_params = fn_dims_and_default_params()
+        num_iterations = int(args.num_iterations)
+        num_parallel_per_iteration = 1
+
+        # Create / Load optimizers
+        data = None
         if os.path.isfile(args.result_file):
             with open(args.result_file, 'rb') as f:
-                opt = pickle.load(f)['optimizer']
+                data = pickle.load(f)
         else:
-            opt = skopt.optimizer.Optimizer(
-                dimensions=dims
-            )
+            data = {
+                'iteration': 0,
+                'folds': []
+            }
+            for split_idx in range(num_splits):
+                data['folds'].append({
+                    'opt': skopt.optimizer.Optimizer(dimensions=dims)
+                })
 
-        opt = skopt.optimizer.Optimizer(
-            dimensions=dims
-        )
-        for i in range(0, int(num_iterations)):
-            # 1. Get params from optimizer
-            x = opt.ask(n_points=num_parallel_per_iteration)
-            if i == 0:
-                x.append(default_params)
-
-            # 2.1. Trigger jobs
+        iteration = data['iteration']
+        for iteration in range(iteration, num_iterations)
+            # Get params and trigger jobs
             job_ids = set()
-            jobs = []
-            for v in x:
-                job = fn_f()
-                jobs.append(job)
+            for split_idx in range(num_splits):
+                opt = data['folds'][split_idx]['opt']
 
-                job_ids = job_ids.union(job.trigger(v))
+                # Get params from optimizer
+                x = opt.ask(n_points=num_parallel_per_iteration)
+                if iteration == 0:
+                    x.append(default_params)
+                data['folds'][split_idx]['x'] = x
 
-            # 2.2. Wait for completion
+                # Trigger jobs
+                data['folds'][split_idx]['jobs'] = []
+                for v in x:
+                    job = fn_f()
+                    data['folds'][split_idx]['jobs'].append(job)
+
+                    job_ids = job_ids.union(job.trigger(v))
+
+            # Wait for jobs to complete
             wait_for_slurm_jobs(job_ids, 30)
 
-            # 2.3 Get and aggregate results
-            y = [job.get_result() for job in jobs]
+            # Get and aggregate results
+            for split_idx in range(num_splits):
+                opt = data['folds'][split_idx]['opt']
 
-            # 3. Report back to optimizer
-            res = opt.tell(x, y)
+                y = [job.get_result() for job in data['folds'][split_idx]['jobs']]
+                x = data['folds'][split_idx]['x']
 
-            # 4. Show on stdout and store on disk
-            print('Iteration: %i, Minimum: %f' % (i, min(opt.yi)))
+                # Report to optimizer
+                res = opt.tell(x, y)
+
+                data['folds'][split_idx]['res'] = res
+
+            # Show on stdout and store on disk
+            for split_idx in range(num_splits):
+                opt = data['folds'][split_idx]['optimizer']
+                iteration = data['iteration']
+
+                print('Split: %i, Iteration: %i, Minimum: %f' % (split_idx, iteration, min(opt.yi)))
+
             with open(args.result_file, 'wb') as f:
-                pickle.dump({
-                    'optimizer': opt,
-                    'result': res
-                }, f)
+                pickle.dump(data, f)
 
         global ssh_client
         ssh_client.close()
