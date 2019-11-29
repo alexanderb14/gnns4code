@@ -922,7 +922,7 @@ def main():
                     # Report to optimizer
                     x = data['folds'][fold_idx]['x']
                     df_fold = job.get_result()
-                    y = fn_aggregation(df_fold, 'valid')
+                    y = [fn_aggregation(df_fold, 'valid')]
 
                     opt = data['folds'][fold_idx]['opt']
                     res = opt.tell(x, y)
