@@ -683,8 +683,12 @@ def get_gnn_llvm_devmap_dimensions_and_default_params():
 
 
 class f_gnn_llvm_devmap(object):
-    def __init__(self, fold_mode):
-        self.fold_mode = fold_mode
+    def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        self.train_idx = train_idx
+        self.valid_idx = valid_idx
+        self.test_idx = test_idx
+        self.fold_idx = fold_idx
+        self.dataset = dataset
 
     def trigger(self, *data):
         # Build config
@@ -706,7 +710,6 @@ class f_gnn_llvm_devmap(object):
 
         config = {
             "run_id": 'foo',
-            'fold_mode': self.fold_mode,
 
             "gnn_type": "GGNN",
 
@@ -748,7 +751,7 @@ class f_gnn_llvm_devmap(object):
             "L2_loss_factor": 0.05 * L2_loss_factor,
 
             "batch_size": 64,
-            "num_epochs": 2 ** num_epochs * 100,
+            "num_epochs": 2, #2 ** num_epochs * 100,
             "out_dir": "/tmp",
 
             "tie_fwd_bkwd": tie_fwd_bkwd,
@@ -764,34 +767,20 @@ class f_gnn_llvm_devmap(object):
         # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
-                                          fold_mode=self.fold_mode,
-                                          split_mode='3',
-                                          method='DeepTuneGNNLLVM',
-                                          config=config,
-                                          num_iterations=NUM_EXP_ITERATIONS)
-
+                                                        method='DeepTuneGNNLLVM',
+                                                        config=config,
+                                                        num_iterations=NUM_EXP_ITERATIONS,
+                                                        train_idx=self.train_idx,
+                                                        valid_idx=self.valid_idx,
+                                                        test_idx=self.test_idx,
+                                                        fold_idx=self.fold_idx,
+                                                        dataset=self.dataset)
         self.run_artifact_dirs = run_artifact_dirs
 
         return job_ids
 
     def get_result(self):
-        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
-
-        # Calculate metric
-        accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
-        print('Metric:', accuracy)
-
-        return accuracy * (-1)
-
-
-class f_gnn_llvm_devmap_random(f_gnn_llvm_devmap):
-    def __init__(self):
-        f_gnn_llvm_devmap.__init__(self, 'random')
-
-
-class f_gnn_llvm_devmap_grouped(f_gnn_llvm_devmap):
-    def __init__(self):
-        f_gnn_llvm_devmap.__init__(self, 'grouped')
+        return aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
 
 
 # Aggregation functions
@@ -853,10 +842,7 @@ def main():
                 fn_evaluation = f_gnn_llvm_tc
             elif args.experiment == 'devmap':
                 fn_dims_and_default_params = get_gnn_llvm_devmap_dimensions_and_default_params
-                if args.fold_mode == 'random':
-                    fn_evaluation = f_gnn_llvm_devmap_random
-                elif args.fold_mode == 'grouped':
-                    fn_evaluation = f_gnn_llvm_devmap_grouped
+                fn_evaluation = f_gnn_llvm_devmap
 
         if args.experiment == 'devmap':
             fn_aggregation = aggregate_arithmetic_mean
