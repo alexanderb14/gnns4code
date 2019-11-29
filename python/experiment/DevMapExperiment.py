@@ -817,7 +817,7 @@ def evaluate_3split(model: HeterogemeousMappingModel, fold_mode, datasets, datas
             print(str(list(configuration['valid_idx'])).replace(' ', ''))
             print(str(list(configuration['test_idx'])).replace(' ', ''))
 
-            train_idx = configuration['configuration']
+            train_idx = configuration['train_idx']
 
             # train model
             model.init(seed=seed)

@@ -888,7 +888,7 @@ def main():
                 })
 
         iteration = data['iteration']
-        for iteration in range(iteration, num_iterations)
+        for iteration in range(iteration, num_iterations):
             # Get params and trigger jobs
             job_ids = set()
             for split_idx in range(num_splits):
