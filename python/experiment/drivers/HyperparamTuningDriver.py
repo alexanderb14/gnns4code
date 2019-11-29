@@ -861,95 +861,103 @@ def main():
         if args.experiment == 'devmap':
             fn_aggregation = aggregate_arithmetic_mean
 
-        # Split into folds
-        kfold_k = 3
-        df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_nvidia.csv'))
-        y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
-        train_valid_test_split = DevMapExperiment.get_stratified_kfold_train_valid_test_split(y, kfold_k)
-        num_splits = len(train_valid_test_split)
+        for dataset in ['amd', 'nvidia']:
+            result_file_dataset_specific = args.result_file + '_' + dataset + '.pckl'
 
-        # Do optimization
-        # ###############################
-        dims, default_params = fn_dims_and_default_params()
-        num_iterations = int(args.num_iterations)
-        num_parallel_per_iteration = 1
+            # Split into folds
+            # ###############################
+            kfold_k = 3
+            if dataset == 'amd':
+                df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_amd.csv'))
+            elif dataset == 'nvidia':
+                df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_nvidia.csv'))
 
-        # Create / Load optimizers
-        data = None
-        if os.path.isfile(args.result_file):
-            with open(args.result_file, 'rb') as f:
-                data = pickle.load(f)
-        else:
-            data = {
-                'iteration': 0,
-                'folds': []
-            }
-            for split_idx in range(num_splits):
-                data['folds'].append({
-                    'opt': skopt.optimizer.Optimizer(dimensions=dims),
-                    'iterations': []
-                })
+            y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
+            train_valid_test_split = DevMapExperiment.get_stratified_kfold_train_valid_test_split(y, kfold_k)
+            num_splits = len(train_valid_test_split)
 
-        iteration = data['iteration']
-        for iteration in range(iteration, num_iterations):
-            # Get params and trigger jobs
-            job_ids = set()
-            for split_idx in range(num_splits):
-                opt = data['folds'][split_idx]['opt']
+            # Do optimization
+            # ###############################
+            dims, default_params = fn_dims_and_default_params()
+            num_iterations = int(args.num_iterations)
+            num_parallel_per_iteration = 1
 
-                # Get params from optimizer
-                x = opt.ask(n_points=num_parallel_per_iteration)
-                data['folds'][split_idx]['x'] = x
+            # Create / Load optimizers
+            if os.path.isfile(result_file_dataset_specific):
+                with open(result_file_dataset_specific, 'rb') as f:
+                    data = pickle.load(f)
+            else:
+                data = {
+                    'iteration': 0,
+                    'dataset': dataset,
+                    'folds': []
+                }
+                for split_idx in range(num_splits):
+                    data['folds'].append({
+                        'opt': skopt.optimizer.Optimizer(dimensions=dims),
+                        'iterations': []
+                    })
 
-                # Trigger jobs
-                data['folds'][split_idx]['jobs'] = []
-                for v in x:
-                    split = train_valid_test_split[split_idx]
+            iteration = data['iteration']
+            for iteration in range(iteration, num_iterations):
+                # Get params and trigger jobs
+                job_ids = set()
+                for split_idx in range(num_splits):
+                    opt = data['folds'][split_idx]['opt']
 
-                    job = fn_evaluation(split['train_idx'], split['valid_idx'], split['test_idx'], split_idx, 'nvidia')
-                    data['folds'][split_idx]['jobs'].append(job)
+                    # Get params from optimizer
+                    x = opt.ask(n_points=num_parallel_per_iteration)
+                    data['folds'][split_idx]['x'] = x
 
-                    job_ids = job_ids.union(job.trigger(v))
+                    # Trigger jobs
+                    data['folds'][split_idx]['jobs'] = []
+                    for v in x:
+                        split = train_valid_test_split[split_idx]
 
-            # Wait for jobs to complete
-            wait_for_slurm_jobs(job_ids, 30)
+                        job = fn_evaluation(split['train_idx'], split['valid_idx'], split['test_idx'], split_idx, dataset)
+                        data['folds'][split_idx]['jobs'].append(job)
 
-            # Get and aggregate results
-            for split_idx in range(num_splits):
-                opt = data['folds'][split_idx]['opt']
+                        job_ids = job_ids.union(job.trigger(v))
 
-                x = data['folds'][split_idx]['x']
+                # Wait for jobs to complete
+                wait_for_slurm_jobs(job_ids, 30)
 
-                df_fold = [job.get_result() for job in data['folds'][split_idx]['jobs']]
-                df_fold = pd.concat(df_fold)
-                y_valid = fn_aggregation(df_fold, 'valid')
+                # Get and aggregate results
+                for split_idx in range(num_splits):
+                    opt = data['folds'][split_idx]['opt']
 
-                # Report to optimizer
-                res = opt.tell(x, y_valid)
+                    x = data['folds'][split_idx]['x']
 
-                data['folds'][split_idx]['iterations'].append({
-                    'df_fold': df_fold,
-                    'y_valid': fn_aggregation(df_fold, 'valid'),
-                    'y_test': fn_aggregation(df_fold, 'test')
-                })
+                    df_fold = [job.get_result() for job in data['folds'][split_idx]['jobs']]
+                    df_fold = pd.concat(df_fold)
+                    y_valid = fn_aggregation(df_fold, 'valid')
 
-                data['folds'][split_idx]['res'] = res
+                    # Report to optimizer
+                    res = opt.tell(x, y_valid)
 
-            # Show metric on stdout
-            df_all_folds = pd.concat([data['folds'][split_idx]['iterations'][-1]['df_fold'] for split_idx in range(num_splits)])
-            print('Validation accuracy: %f' % fn_aggregation(df_all_folds, 'valid'))
-            print('Test accuracy: %f' % fn_aggregation(df_all_folds, 'test'))
+                    data['folds'][split_idx]['iterations'].append({
+                        'df_fold': df_fold,
+                        'y_valid': fn_aggregation(df_fold, 'valid'),
+                        'y_test': fn_aggregation(df_fold, 'test')
+                    })
 
-            # Show on stdout and store on disk
-            for split_idx in range(num_splits):
-                opt = data['folds'][split_idx]['opt']
-                iteration = data['iteration']
-                x = data['folds'][split_idx]['x']
+                    data['folds'][split_idx]['res'] = res
 
-                print('Iteration: %i, Split: %i, Params: %s, Minimum: %f' % (iteration, split_idx, str(x), min(opt.yi)))
+                # Show metric on stdout
+                df_all_folds = pd.concat([data['folds'][split_idx]['iterations'][-1]['df_fold'] for split_idx in range(num_splits)])
+                print('Validation accuracy: %f' % fn_aggregation(df_all_folds, 'valid'))
+                print('Test accuracy: %f' % fn_aggregation(df_all_folds, 'test'))
 
-            with open(args.result_file, 'wb') as f:
-                pickle.dump(data, f)
+                # Show on stdout and store on disk
+                for split_idx in range(num_splits):
+                    opt = data['folds'][split_idx]['opt']
+                    x = data['folds'][split_idx]['x']
+                    print('Iteration: %i, Split: %i, Params: %s, Minimum: %f' % (iteration, split_idx, str(x), min(opt.yi)))
+
+                data['iteration'] = iteration
+
+                with open(result_file_dataset_specific, 'wb') as f:
+                    pickle.dump(data, f)
 
         global ssh_client
         ssh_client.close()

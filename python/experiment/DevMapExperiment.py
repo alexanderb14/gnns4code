@@ -1337,27 +1337,11 @@ def build_run_id(report_write_dir):
 
 
 def print_and_save_report(report_write_dir, run_id, config, model, report):
-    # Print report
-    report_summary = parse_report_to_summary(report)
-    print(report_summary)
-
-    report_json = report_to_json(report)
-
     # Write to files
     # Config
     filename = model.__basename__ + '_' + str(run_id) + '_config.txt'
     with open(os.path.join(report_write_dir, filename), 'w') as f:
         f.write(json.dumps(config))
-
-    # Summary
-    filename = model.__basename__ + '_' + str(run_id) + '_summary.txt'
-    with open(os.path.join(report_write_dir, filename), 'w') as f:
-        f.write(report_summary)
-
-    # Summary as JSON
-    filename = model.__basename__ + '_' + str(run_id) + '_summary.json'
-    with open(os.path.join(report_write_dir, filename), 'w') as f:
-        f.write(json.dumps(report_json))
 
     # Raw
     filename = model.__basename__ + '_' + str(run_id) + '_raw.txt'
