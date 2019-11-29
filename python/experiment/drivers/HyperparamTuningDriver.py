@@ -95,7 +95,7 @@ def run_slurm_job(cmd):
     return job_id
 
 
-def trigger_slurm_jobs(task: str, method: str, config: dict, num_iterations: int, train_idx, valid_idx, test_idx, fold_idx, dataset):
+def trigger_slurm_jobs(task: str, method: str, config: dict, train_idx, valid_idx, test_idx, fold_idx, dataset):
     # Run several instances of the experiment on slurm
     # Cleanup and prepare dirs
     pwd = execute_ssh_command('pwd')[0].replace('\n', '')
@@ -103,41 +103,34 @@ def trigger_slurm_jobs(task: str, method: str, config: dict, num_iterations: int
 
     execute_ssh_command('rm -rf ' + reports_dir + ' && mkdir -p ' + reports_dir)
     run_artifact_dirs = []
-    cmds = []
 
-    # Prepare dirs and build config
-    for i in range(0, num_iterations):
-        # Prepare dirs
-        run_id = str(uuid.uuid4())
-        run_artifact_dir = os.path.join(reports_dir, run_id)
-        run_artifact_dirs.append(run_artifact_dir)
+    # Prepare dirs
+    run_id = str(uuid.uuid4())
+    run_artifact_dir = os.path.join(reports_dir, run_id)
+    run_artifact_dirs.append(run_artifact_dir)
 
-        execute_ssh_command('mkdir ' + run_artifact_dir)
+    execute_ssh_command('mkdir ' + run_artifact_dir)
 
-        # Set seed
-        config['seed'] = i + 1
+    # Set seed
+    config['seed'] = 1
 
-        # Build config
-        config_str = json.dumps(config).replace('"', '\\"').replace(' ', '')
+    # Build config
+    config_str = json.dumps(config).replace('"', '\\"').replace(' ', '')
 
-        # Build commands
-        if task == 'tc':
-            cmd = exp_utils.build_tc_experiment_cmd(method, run_artifact_dir, 0, config_str)
-        elif task == 'devmap':
-            cmd = exp_utils.build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fold_idx, dataset, run_artifact_dir, 0, config_str)
+    # Build commands
+    if task == 'tc':
+        cmd = exp_utils.build_tc_experiment_cmd(method, run_artifact_dir, 0, config_str)
+    elif task == 'devmap':
+        cmd = exp_utils.build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fold_idx, dataset, run_artifact_dir, 0, config_str)
 
-        cmd = ' '.join(['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] +
-                       ['\"'] +
-                       ['python'] + cmd +
-                       ['\"'])
-        cmds.append(cmd)
+    cmd = ' '.join(['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] +
+                   ['\"'] +
+                   ['python'] + cmd +
+                   ['\"'])
 
-    job_ids = set()
-    for cmd in cmds:
-        job_id = run_slurm_job(cmd)
-        job_ids.add(job_id)
+    job_id = run_slurm_job(cmd)
 
-    return job_ids, run_artifact_dirs
+    return job_id, run_artifact_dir
 
 
 def wait_for_slurm_jobs(pending_jobs, check_interval_in_seconds):
@@ -206,8 +199,7 @@ class f_lstm_tc(object):
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
                                           method='DeepTuneLSTM',
-                                          config=config,
-                                          num_iterations=NUM_EXP_ITERATIONS)
+                                          config=config)
 
         self.run_artifact_dirs = run_artifact_dirs
 
@@ -236,8 +228,12 @@ def get_lstm_devmap_dimensions_and_default_params():
 
 
 class f_lstm_devmap(object):
-    def __init__(self, fold_mode):
-        self.fold_mode = fold_mode
+    def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        self.train_idx = train_idx
+        self.valid_idx = valid_idx
+        self.test_idx = test_idx
+        self.fold_idx = fold_idx
+        self.dataset = dataset
 
     def trigger(self, *data):
         # Build config
@@ -247,8 +243,6 @@ class f_lstm_devmap(object):
         num_epochs = int(data[0][3])
 
         config = {
-            "fold_mode": self.fold_mode,
-
             "h_size": 2 ** h_size,
             "num_extra_lstm_layers": num_extra_lstm_layers,
 
@@ -261,34 +255,19 @@ class f_lstm_devmap(object):
         # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
-                                          fold_mode=self.fold_mode,
-                                          split_mode='3',
-                                          method='DeepTuneLSTM',
-                                          config=config,
-                                          num_iterations=NUM_EXP_ITERATIONS)
-
+                                                        method='DeepTuneLSTM',
+                                                        config=config,
+                                                        train_idx=self.train_idx,
+                                                        valid_idx=self.valid_idx,
+                                                        test_idx=self.test_idx,
+                                                        fold_idx=self.fold_idx,
+                                                        dataset=self.dataset)
         self.run_artifact_dirs = run_artifact_dirs
 
         return job_ids
 
     def get_result(self):
-        results_df = aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
-
-        # Calculate metric
-        accuracy = np.mean(results_df[results_df['set'] == 'valid']['Correct?'])
-        print('Metric:', accuracy)
-
-        return accuracy * (-1)
-
-
-class f_lstm_devmap_random(f_lstm_devmap):
-    def __init__(self):
-        f_lstm_devmap.__init__(self, 'random')
-
-
-class f_lstm_devmap_grouped(f_lstm_devmap):
-    def __init__(self):
-        f_lstm_devmap.__init__(self, 'grouped')
+        return aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
 
 
 # GNN AST
@@ -317,6 +296,13 @@ def get_gnn_ast_tc_dimensions_and_default_params():
 
 
 class f_gnn_ast_tc(object):
+    def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        self.train_idx = train_idx
+        self.valid_idx = valid_idx
+        self.test_idx = test_idx
+        self.fold_idx = fold_idx
+        self.dataset = dataset
+
     def trigger(self, *data):
         # Build config
         num_timesteps = int(data[0][0])
@@ -396,8 +382,7 @@ class f_gnn_ast_tc(object):
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='tc',
                                           method='DeepTuneGNNClang',
-                                          config=config,
-                                          num_iterations=NUM_EXP_ITERATIONS)
+                                          config=config)
 
         self.run_artifact_dirs = run_artifact_dirs
 
@@ -521,21 +506,20 @@ class f_gnn_ast_devmap(object):
         }
         # utils.pretty_print_dict(config)
 
-        job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
+        job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
                                                         method='DeepTuneGNNClang',
                                                         config=config,
-                                                        num_iterations=NUM_EXP_ITERATIONS,
                                                         train_idx=self.train_idx,
                                                         valid_idx=self.valid_idx,
                                                         test_idx=self.test_idx,
                                                         fold_idx=self.fold_idx,
                                                         dataset=self.dataset)
-        self.run_artifact_dirs = run_artifact_dirs
+        self.run_artifact_dir = run_artifact_dir
 
-        return job_ids
+        return job_id
 
     def get_result(self):
-        return aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
+        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
 
 
 # GNN LLVM
@@ -643,8 +627,7 @@ class f_gnn_llvm_tc(object):
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='tc',
                                           method='DeepTuneGNNLLVM',
-                                          config=config,
-                                          num_iterations=NUM_EXP_ITERATIONS)
+                                          config=config)
 
         self.run_artifact_dirs = run_artifact_dirs
 
@@ -769,7 +752,6 @@ class f_gnn_llvm_devmap(object):
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
                                                         method='DeepTuneGNNLLVM',
                                                         config=config,
-                                                        num_iterations=NUM_EXP_ITERATIONS,
                                                         train_idx=self.train_idx,
                                                         valid_idx=self.valid_idx,
                                                         test_idx=self.test_idx,
@@ -825,10 +807,7 @@ def main():
                 fn_evaluation = f_lstm_tc
             elif args.experiment == 'devmap':
                 fn_dims_and_default_params = get_lstm_devmap_dimensions_and_default_params
-                if args.fold_mode == 'random':
-                    fn_evaluation = f_lstm_devmap_random
-                elif args.fold_mode == 'grouped':
-                    fn_evaluation = f_lstm_devmap_grouped
+                fn_evaluation = f_lstm_devmap
         if args.method == 'DeepTuneGNNClang':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_gnn_ast_tc_dimensions_and_default_params
@@ -852,7 +831,7 @@ def main():
 
             # Split into folds
             # ###############################
-            kfold_k = 7
+            kfold_k = 3
             if dataset == 'amd':
                 df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_amd.csv'))
             elif dataset == 'nvidia':
@@ -860,10 +839,8 @@ def main():
 
             y = np.array([1 if x == "GPU" else 0 for x in df["oracle"].values])
             train_valid_test_split = DevMapExperiment.get_stratified_kfold_train_valid_test_split(y, kfold_k)
-            num_splits = len(train_valid_test_split)
+            num_folds = len(train_valid_test_split)
 
-            # Do optimization
-            # ###############################
             dims, default_params = fn_dims_and_default_params()
             num_iterations = int(args.num_iterations)
             num_parallel_per_iteration = 1
@@ -874,73 +851,99 @@ def main():
                     data = pickle.load(f)
             else:
                 data = {
-                    'iteration': 0,
                     'dataset': dataset,
                     'folds': []
                 }
-                for split_idx in range(num_splits):
+                for fold_idx in range(num_folds):
                     data['folds'].append({
                         'opt': skopt.optimizer.Optimizer(dimensions=dims),
                         'iterations': []
                     })
 
-            iteration = data['iteration']
-            for iteration in range(iteration, num_iterations):
-                # Get params and trigger jobs
-                job_ids = set()
-                for split_idx in range(num_splits):
-                    opt = data['folds'][split_idx]['opt']
+            # Process on taurus
+            # ###############################
+            # Create job queue
+            job_queue = []
+
+            # For each fold, get some initial points from the optimizer and append to job queue
+            for fold_idx in range(num_folds):
+                # Get params from optimizer
+                opt = data['folds'][fold_idx]['opt']
+                x = opt.ask(n_points=num_parallel_per_iteration)
+                data['folds'][fold_idx]['x'] = x
+
+                # Create job and add to queue
+                fold = train_valid_test_split[fold_idx]
+
+                job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
+                job_queue.append((job, fold_idx))
+
+            # Job processing loop
+            run_data = {}
+
+            while len(job_queue) > 0 or len(run_data) > 0:
+                worker_size = num_folds
+                for _ in range(worker_size - len(run_data)):
+                    job, fold_idx = job_queue.pop(0)
+
+                    x = data['folds'][fold_idx]['x']
+                    job_id = job.trigger(x[0])
+                    run_data[job_id] = (job, fold_idx)
+
+                    # Log for monitoring
+                    iteration = len(data['folds'][fold_idx]['iterations'])
+                    print('Adding to queue: Iteration: %i, Fold: %i, Params: %s, Current minimum: %f' %
+                          (iteration,
+                           fold_idx,
+                           str(x),
+                           min(data['folds'][fold_idx]['opt'].yi) if iteration > 0 else 0))
+
+                check_interval_in_seconds = 30
+                time.sleep(check_interval_in_seconds)
+
+                # Get job stati from slurm
+                try:
+                    stati = get_slurm_job_stati()
+                except socket.timeout:
+                    continue
+
+                current_jobs = set(run_data.keys())
+                running_jobs = stati['running'].intersection(current_jobs)
+                completed_jobs = stati['completed'].intersection(current_jobs)
+
+                utils.log_with_time('Running: %s' % (running_jobs))
+                utils.log_with_time('Completed: %s' % (completed_jobs))
+
+                # Report to optimizer and add a job with new params in this fold
+                for job_id in completed_jobs:
+                    job, fold_idx = run_data[job_id]
+                    del run_data[job_id]
+
+                    # Report to optimizer
+                    x = data['folds'][fold_idx]['x']
+                    df_fold = job.get_result()
+                    y = fn_aggregation(df_fold, 'valid')
+
+                    opt = data['folds'][fold_idx]['opt']
+                    res = opt.tell(x, y)
 
                     # Get params from optimizer
                     x = opt.ask(n_points=num_parallel_per_iteration)
-                    data['folds'][split_idx]['x'] = x
+                    data['folds'][fold_idx]['x'] = x
 
-                    # Trigger jobs
-                    data['folds'][split_idx]['jobs'] = []
-                    for v in x:
-                        split = train_valid_test_split[split_idx]
+                    # Create job and add to queue
+                    fold = train_valid_test_split[fold_idx]
 
-                        job = fn_evaluation(split['train_idx'], split['valid_idx'], split['test_idx'], split_idx, dataset)
-                        data['folds'][split_idx]['jobs'].append(job)
+                    job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
+                    job_queue.append((job, fold_idx))
 
-                        job_ids = job_ids.union(job.trigger(v))
-
-                # Wait for jobs to complete
-                wait_for_slurm_jobs(job_ids, 30)
-
-                # Get and aggregate results
-                for split_idx in range(num_splits):
-                    opt = data['folds'][split_idx]['opt']
-
-                    x = data['folds'][split_idx]['x']
-
-                    df_fold = [job.get_result() for job in data['folds'][split_idx]['jobs']]
-                    df_fold = pd.concat(df_fold)
-                    y_valid = fn_aggregation(df_fold, 'valid')
-
-                    # Report to optimizer
-                    res = opt.tell(x, y_valid)
-
-                    data['folds'][split_idx]['iterations'].append({
+                    # Add to result structure
+                    data['folds'][fold_idx]['iterations'].append({
                         'df_fold': df_fold,
                         'y_valid': fn_aggregation(df_fold, 'valid'),
                         'y_test': fn_aggregation(df_fold, 'test')
                     })
-
-                    data['folds'][split_idx]['res'] = res
-
-                # Show metric on stdout
-                df_all_folds = pd.concat([data['folds'][split_idx]['iterations'][-1]['df_fold'] for split_idx in range(num_splits)])
-                print('Validation accuracy: %f' % fn_aggregation(df_all_folds, 'valid'))
-                print('Test accuracy: %f' % fn_aggregation(df_all_folds, 'test'))
-
-                # Show on stdout and store on disk
-                for split_idx in range(num_splits):
-                    opt = data['folds'][split_idx]['opt']
-                    x = data['folds'][split_idx]['x']
-                    print('Iteration: %i, Split: %i, Params: %s, Minimum: %f' % (iteration, split_idx, str(x), min(opt.yi)))
-
-                data['iteration'] = iteration
+                    data['folds'][fold_idx]['res'] = res
 
                 with open(result_file_dataset_specific, 'wb') as f:
                     pickle.dump(data, f)
