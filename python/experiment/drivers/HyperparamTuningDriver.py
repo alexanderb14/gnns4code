@@ -95,7 +95,7 @@ def run_slurm_job(cmd):
     return job_id
 
 
-def trigger_slurm_jobs(task: str, method: str, config: dict, num_iterations: int, fold_mode: str, split_mode: str):
+def trigger_slurm_jobs(task: str, method: str, config: dict, num_iterations: int, train_idx, valid_idx, test_idx, fold_idx, dataset):
     # Run several instances of the experiment on slurm
     # Cleanup and prepare dirs
     pwd = execute_ssh_command('pwd')[0].replace('\n', '')
@@ -124,7 +124,7 @@ def trigger_slurm_jobs(task: str, method: str, config: dict, num_iterations: int
         if task == 'tc':
             cmd = exp_utils.build_tc_experiment_cmd(method, run_artifact_dir, 0, config_str)
         elif task == 'devmap':
-            cmd = exp_utils.build_devmap_experiment_cmd(method, fold_mode, split_mode, run_artifact_dir, 0, config_str)
+            cmd = exp_utils.build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fold_idx, dataset, run_artifact_dir, 0, config_str)
 
         cmd = ' '.join(['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] +
                        ['\"'] +
@@ -154,7 +154,7 @@ def wait_for_slurm_jobs(pending_jobs, check_interval_in_seconds):
         # Remove jobs from pending set on completion
         pending_jobs = pending_jobs - stati['completed']
 
-        utils.log_with_time('Pending: %s' % pending_jobs)
+        utils.log_with_time('Pending: Total: %i, Jobs: %s' % (len(pending_jobs), pending_jobs))
 
 
 def aggregate_results_of_slurm_jobs(run_artifact_dirs):
@@ -202,11 +202,9 @@ class f_lstm_tc(object):
             "num_epochs": 2 ** num_epochs * 50,
             "out_dir": "/tmp",
         }
-        utils.pretty_print_dict(config)
+        # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
-                                          fold_mode=fold_mode,
-                                          split_mode=split_mode,
                                           method='DeepTuneLSTM',
                                           config=config,
                                           num_iterations=NUM_EXP_ITERATIONS)
@@ -260,7 +258,7 @@ class f_lstm_devmap(object):
             "num_epochs": 2 ** num_epochs * 50,
             "out_dir": "/tmp",
         }
-        utils.pretty_print_dict(config)
+        # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
                                           fold_mode=self.fold_mode,
@@ -394,7 +392,7 @@ class f_gnn_ast_tc(object):
 
             "edge_type_filter": []
         }
-        utils.pretty_print_dict(config)
+        # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='tc',
                                           method='DeepTuneGNNClang',
@@ -440,8 +438,12 @@ def get_gnn_ast_devmap_dimensions_and_default_params():
 
 
 class f_gnn_ast_devmap(object):
-    def __init__(self, fold_mode):
-        self.fold_mode = fold_mode
+    def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        self.train_idx = train_idx
+        self.valid_idx = valid_idx
+        self.test_idx = test_idx
+        self.fold_idx = fold_idx
+        self.dataset = dataset
 
     def trigger(self, *data):
         # Build config
@@ -463,7 +465,6 @@ class f_gnn_ast_devmap(object):
 
         config = {
             "run_id": 'foo',
-            'fold_mode': self.fold_mode,
 
             "gnn_type": "GGNN",
 
@@ -505,7 +506,7 @@ class f_gnn_ast_devmap(object):
             "L2_loss_factor": 0.05 * L2_loss_factor,
 
             "batch_size": 64,
-            "num_epochs": 2 ** num_epochs * 100,
+            "num_epochs": 5, # 2 ** num_epochs * 100,
             "out_dir": "/tmp",
 
             "tie_fwd_bkwd": tie_fwd_bkwd,
@@ -518,30 +519,23 @@ class f_gnn_ast_devmap(object):
 
             "edge_type_filter": []
         }
-        utils.pretty_print_dict(config)
+        # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
-                                                        fold_mode=self.fold_mode,
-                                                        split_mode='3',
                                                         method='DeepTuneGNNClang',
                                                         config=config,
-                                                        num_iterations=NUM_EXP_ITERATIONS)
+                                                        num_iterations=NUM_EXP_ITERATIONS,
+                                                        train_idx=self.train_idx,
+                                                        valid_idx=self.valid_idx,
+                                                        test_idx=self.test_idx,
+                                                        fold_idx=self.fold_idx,
+                                                        dataset=self.dataset)
         self.run_artifact_dirs = run_artifact_dirs
 
         return job_ids
 
     def get_result(self):
         return aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
-
-
-class f_gnn_ast_devmap_random(f_gnn_ast_devmap):
-    def __init__(self):
-        f_gnn_ast_devmap.__init__(self, 'random')
-
-
-class f_gnn_ast_devmap_grouped(f_gnn_ast_devmap):
-    def __init__(self):
-        f_gnn_ast_devmap.__init__(self, 'grouped')
 
 
 # GNN LLVM
@@ -645,7 +639,7 @@ class f_gnn_llvm_tc(object):
 
             "edge_type_filter": []
         }
-        utils.pretty_print_dict(config)
+        # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='tc',
                                           method='DeepTuneGNNLLVM',
@@ -767,7 +761,7 @@ class f_gnn_llvm_devmap(object):
 
             "edge_type_filter": []
         }
-        utils.pretty_print_dict(config)
+        # utils.pretty_print_dict(config)
 
         job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
                                           fold_mode=self.fold_mode,
@@ -800,6 +794,13 @@ class f_gnn_llvm_devmap_grouped(f_gnn_llvm_devmap):
         f_gnn_llvm_devmap.__init__(self, 'grouped')
 
 
+# Aggregation functions
+def aggregate_arithmetic_mean(results_df, train_or_test_or_valid):
+    accuracy = np.mean(results_df[results_df['set'] == train_or_test_or_valid]['Correct?'])
+
+    return accuracy * (-1)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', help='Subcommand to run')
@@ -826,38 +827,39 @@ def main():
 
         # Map arguments -> Functions
         fn_dims_and_default_params = None
-        fn_f = None
+        fn_evaluation = None
+        fn_aggregation = None
 
         if args.method == 'DeepTuneLSTM':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_lstm_tc_dimensions_and_default_params
-                fn_f = f_lstm_tc
+                fn_evaluation = f_lstm_tc
             elif args.experiment == 'devmap':
                 fn_dims_and_default_params = get_lstm_devmap_dimensions_and_default_params
                 if args.fold_mode == 'random':
-                    fn_f = f_lstm_devmap_random
+                    fn_evaluation = f_lstm_devmap_random
                 elif args.fold_mode == 'grouped':
-                    fn_f = f_lstm_devmap_grouped
+                    fn_evaluation = f_lstm_devmap_grouped
         if args.method == 'DeepTuneGNNClang':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_gnn_ast_tc_dimensions_and_default_params
-                fn_f = f_gnn_ast_tc
+                fn_evaluation = f_gnn_ast_tc
             elif args.experiment == 'devmap':
                 fn_dims_and_default_params = get_gnn_ast_devmap_dimensions_and_default_params
-                if args.fold_mode == 'random':
-                    fn_f = f_gnn_ast_devmap_random
-                elif args.fold_mode == 'grouped':
-                    fn_f = f_gnn_ast_devmap_grouped
+                fn_evaluation = f_gnn_ast_devmap
         if args.method == 'DeepTuneGNNLLVM':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_gnn_llvm_tc_dimensions_and_default_params
-                fn_f = f_gnn_llvm_tc
+                fn_evaluation = f_gnn_llvm_tc
             elif args.experiment == 'devmap':
                 fn_dims_and_default_params = get_gnn_llvm_devmap_dimensions_and_default_params
                 if args.fold_mode == 'random':
-                    fn_f = f_gnn_llvm_devmap_random
+                    fn_evaluation = f_gnn_llvm_devmap_random
                 elif args.fold_mode == 'grouped':
-                    fn_f = f_gnn_llvm_devmap_grouped
+                    fn_evaluation = f_gnn_llvm_devmap_grouped
+
+        if args.experiment == 'devmap':
+            fn_aggregation = aggregate_arithmetic_mean
 
         # Split into folds
         kfold_k = 3
@@ -884,7 +886,8 @@ def main():
             }
             for split_idx in range(num_splits):
                 data['folds'].append({
-                    'opt': skopt.optimizer.Optimizer(dimensions=dims)
+                    'opt': skopt.optimizer.Optimizer(dimensions=dims),
+                    'iterations': []
                 })
 
         iteration = data['iteration']
@@ -896,14 +899,14 @@ def main():
 
                 # Get params from optimizer
                 x = opt.ask(n_points=num_parallel_per_iteration)
-                if iteration == 0:
-                    x.append(default_params)
                 data['folds'][split_idx]['x'] = x
 
                 # Trigger jobs
                 data['folds'][split_idx]['jobs'] = []
                 for v in x:
-                    job = fn_f()
+                    split = train_valid_test_split[split_idx]
+
+                    job = fn_evaluation(split['train_idx'], split['valid_idx'], split['test_idx'], split_idx, 'nvidia')
                     data['folds'][split_idx]['jobs'].append(job)
 
                     job_ids = job_ids.union(job.trigger(v))
@@ -915,20 +918,35 @@ def main():
             for split_idx in range(num_splits):
                 opt = data['folds'][split_idx]['opt']
 
-                y = [job.get_result() for job in data['folds'][split_idx]['jobs']]
                 x = data['folds'][split_idx]['x']
 
+                df_fold = [job.get_result() for job in data['folds'][split_idx]['jobs']]
+                df_fold = pd.concat(df_fold)
+                y_valid = fn_aggregation(df_fold, 'valid')
+
                 # Report to optimizer
-                res = opt.tell(x, y)
+                res = opt.tell(x, y_valid)
+
+                data['folds'][split_idx]['iterations'].append({
+                    'df_fold': df_fold,
+                    'y_valid': fn_aggregation(df_fold, 'valid'),
+                    'y_test': fn_aggregation(df_fold, 'test')
+                })
 
                 data['folds'][split_idx]['res'] = res
 
+            # Show metric on stdout
+            df_all_folds = pd.concat([data['folds'][split_idx]['iterations'][-1]['df_fold'] for split_idx in range(num_splits)])
+            print('Validation accuracy: %f' % fn_aggregation(df_all_folds, 'valid'))
+            print('Test accuracy: %f' % fn_aggregation(df_all_folds, 'test'))
+
             # Show on stdout and store on disk
             for split_idx in range(num_splits):
-                opt = data['folds'][split_idx]['optimizer']
+                opt = data['folds'][split_idx]['opt']
                 iteration = data['iteration']
+                x = data['folds'][split_idx]['x']
 
-                print('Split: %i, Iteration: %i, Minimum: %f' % (split_idx, iteration, min(opt.yi)))
+                print('Iteration: %i, Split: %i, Params: %s, Minimum: %f' % (iteration, split_idx, str(x), min(opt.yi)))
 
             with open(args.result_file, 'wb') as f:
                 pickle.dump(data, f)
@@ -944,22 +962,24 @@ def main():
 
         args = parser_vis.parse_args(sys.argv[2:])
 
-        res = skopt.load(args.result_file)['result']
+        data = pickle.load(open(args.result_file, "rb"))
+        for fold in data['folds']:
+            res = fold['res']
 
-        ax = plot_convergence(res)
-        plt.grid()
-        plt.legend()
-        plt.show()
+            ax = plot_convergence(res)
+            plt.grid()
+            plt.legend()
+            plt.show()
 
-        ax = plot_evaluations(res)
-        plt.grid()
-        plt.legend()
-        plt.show()
-
-        ax = plot_objective(res)
-        plt.grid()
-        plt.legend()
-        plt.show()
+            # ax = plot_evaluations(res)
+            # plt.grid()
+            # plt.legend()
+            # plt.show()
+            #
+            # ax = plot_objective(res)
+            # plt.grid()
+            # plt.legend()
+            # plt.show()
 
 
 if __name__ == '__main__':

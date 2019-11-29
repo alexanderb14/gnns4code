@@ -238,6 +238,33 @@ def build_devmap_experiment_cmd(method, fold_mode, split_mode, report_write_dir,
     return cmd + args
 
 
+def build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fold_idx, dataset, report_write_dir, seed, config=None):
+    def contract_array(arr):
+        return str(list(arr)).replace(' ', '')
+
+    cmd = ['gnns4code/python/experiment/DevMapExperiment.py']
+
+    experiment_arg = ['experiment_fold']
+    dataset_args = ['--dataset_nvidia gnns4code/data/dev_mapping_task/prediction_task_nvidia.csv',
+                    '--dataset_amd gnns4code/data/dev_mapping_task/prediction_task_amd.csv']
+
+    args = experiment_arg \
+            + dataset_args \
+            + ['--' + method] \
+            + ['--train_idx', contract_array(train_idx)] \
+            + ['--valid_idx', contract_array(valid_idx)] \
+            + ['--test_idx', contract_array(test_idx)] \
+            + ['--fold_idx', str(fold_idx)] \
+            + ['--dataset', dataset] \
+            + ['--report_write_dir', report_write_dir] \
+            + ['--seed', str(seed)] \
+
+    if config:
+        args += ['--config', config]
+
+    return cmd + args
+
+
 def build_devmap_experiment_infos(report_write_root_dir, num_iterations, methods):
     cmds = []
 
