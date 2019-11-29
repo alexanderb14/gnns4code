@@ -254,7 +254,7 @@ class f_lstm_devmap(object):
         }
         # utils.pretty_print_dict(config)
 
-        job_ids, run_artifact_dirs = trigger_slurm_jobs(task='devmap',
+        job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
                                                         method='DeepTuneLSTM',
                                                         config=config,
                                                         train_idx=self.train_idx,
@@ -262,12 +262,12 @@ class f_lstm_devmap(object):
                                                         test_idx=self.test_idx,
                                                         fold_idx=self.fold_idx,
                                                         dataset=self.dataset)
-        self.run_artifact_dirs = run_artifact_dirs
+        self.run_artifact_dir = run_artifact_dir
 
-        return job_ids
+        return job_id
 
     def get_result(self):
-        return aggregate_results_of_slurm_jobs(self.run_artifact_dirs)
+        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
 
 
 # GNN AST
