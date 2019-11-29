@@ -1177,7 +1177,11 @@ class DeepTune(HeterogemeousMappingModel):
                       output_dim=h_size, name="embedding",
                       embeddings_regularizer=l2(l2_factor), activity_regularizer=l2(l2_factor))(code_in)
         # Language model
-        x = LSTM(h_size, implementation=1, return_sequences=True, name="lstm_1",
+        if num_extra_lstm_layers == 0:
+            return_sequences = False
+        else:
+            return_sequences = True
+        x = LSTM(h_size, implementation=1, return_sequences=return_sequences, name="lstm_1",
                  kernel_regularizer=l2(l2_factor), recurrent_regularizer=l2(l2_factor), bias_regularizer=l2(l2_factor))(x)
         for i in range(0, num_extra_lstm_layers):
             return_sequences=True
