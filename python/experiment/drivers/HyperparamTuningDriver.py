@@ -249,7 +249,7 @@ class f_lstm_devmap(object):
             "L2_loss_factor": 0.05 * L2_loss_factor,
 
             "batch_size": 64,
-            "num_epochs": 2 ** num_epochs * 50,
+            "num_epochs": 2 ** num_epochs * 10,
             "out_dir": "/tmp",
         }
         # utils.pretty_print_dict(config)
@@ -960,24 +960,35 @@ def main():
         args = parser_vis.parse_args(sys.argv[2:])
 
         data = pickle.load(open(args.result_file, "rb"))
-        for fold in data['folds']:
-            res = fold['res']
+        # for fold_idx, fold in enumerate(data['folds']):
+        #     res = fold['res']
+        #
+        #     # ax = plot_convergence(res)
+        #     # plt.grid()
+        #     # plt.legend()
+        #     # plt.show()
+        #
+        #     # ax = plot_evaluations(res)
+        #     # plt.grid()
+        #     # plt.legend()
+        #     # plt.show()
+        #
+        #     # ax = plot_objective(res)
+        #     # plt.grid()
+        #     # plt.legend()
+        #     # plt.show()
 
-            ax = plot_convergence(res)
-            plt.grid()
-            plt.legend()
-            plt.show()
+        mins = []
+        for fold_idx, fold in enumerate(data['folds']):
+            if len(fold['iterations']):
+                min_idx = fold['opt'].yi.index(min(fold['opt'].yi))
+                print('fold: %i, iterations: %i, min: %.2f, min_idx: %i, params: %s' %
+                      (fold_idx, len(fold['iterations']), fold['opt'].yi[min_idx], min_idx, str(fold['opt'].Xi[min_idx])))
+                mins.append(fold['opt'].yi[min_idx])
+            else:
+                print('WARNING: Fold %i has 0 iterations.' % fold_idx)
 
-            # ax = plot_evaluations(res)
-            # plt.grid()
-            # plt.legend()
-            # plt.show()
-            #
-            # ax = plot_objective(res)
-            # plt.grid()
-            # plt.legend()
-            # plt.show()
-
+        print('Arithmetic mean: %.2f' % (sum(mins) / len(mins)))
 
 if __name__ == '__main__':
     main()
