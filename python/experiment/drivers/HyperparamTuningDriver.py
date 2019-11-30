@@ -885,19 +885,20 @@ def main():
             while len(job_queue) > 0 or len(run_data) > 0:
                 worker_size = num_folds
                 for _ in range(worker_size - len(run_data)):
-                    job, fold_idx = job_queue.pop(0)
+                    if len(job_queue) > 0:
+                        job, fold_idx = job_queue.pop(0)
 
-                    x = data['folds'][fold_idx]['x']
-                    job_id = job.trigger(x[0])
-                    run_data[job_id] = (job, fold_idx)
+                        x = data['folds'][fold_idx]['x']
+                        job_id = job.trigger(x[0])
+                        run_data[job_id] = (job, fold_idx)
 
-                    # Log for monitoring
-                    iteration = len(data['folds'][fold_idx]['iterations'])
-                    print('Adding to queue: Iteration: %i, Fold: %i, Params: %s, Current minimum: %f' %
-                          (iteration,
-                           fold_idx,
-                           str(x),
-                           min(data['folds'][fold_idx]['opt'].yi) if iteration > 0 else 0))
+                        # Log for monitoring
+                        iteration = len(data['folds'][fold_idx]['iterations'])
+                        print('Adding to queue: Iteration: %i, Fold: %i, Params: %s, Current minimum: %f' %
+                              (iteration,
+                               fold_idx,
+                               str(x),
+                               min(data['folds'][fold_idx]['opt'].yi) if iteration > 0 else 0))
 
                 check_interval_in_seconds = 30
                 time.sleep(check_interval_in_seconds)
