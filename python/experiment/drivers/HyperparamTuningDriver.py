@@ -931,12 +931,6 @@ def main():
                     x = opt.ask(n_points=num_parallel_per_iteration)
                     data['folds'][fold_idx]['x'] = x
 
-                    # Create job and add to queue
-                    fold = train_valid_test_split[fold_idx]
-
-                    job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
-                    job_queue.append((job, fold_idx))
-
                     # Add to result structure
                     data['folds'][fold_idx]['iterations'].append({
                         'df_fold': df_fold,
@@ -944,6 +938,13 @@ def main():
                         'y_test': fn_aggregation(df_fold, 'test')
                     })
                     data['folds'][fold_idx]['res'] = res
+
+                    # Create job and add to queue
+                    if len(data['folds'][fold_idx]['iterations']) < num_iterations:
+                        fold = train_valid_test_split[fold_idx]
+
+                        job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
+                        job_queue.append((job, fold_idx))
 
                 with open(result_file_dataset_specific, 'wb') as f:
                     pickle.dump(data, f)
