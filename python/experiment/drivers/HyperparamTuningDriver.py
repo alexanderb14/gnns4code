@@ -873,10 +873,11 @@ def main():
                 data['folds'][fold_idx]['x'] = x
 
                 # Create job and add to queue
-                fold = train_valid_test_split[fold_idx]
+                if len(data['folds'][fold_idx]['iterations']) < num_iterations:
+                    fold = train_valid_test_split[fold_idx]
 
-                job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
-                job_queue.append((job, fold_idx))
+                    job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
+                    job_queue.append((job, fold_idx))
 
             # Job processing loop
             run_data = {}
