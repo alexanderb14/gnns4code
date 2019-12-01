@@ -123,7 +123,11 @@ def trigger_slurm_jobs(task: str, method: str, config: dict, train_idx, valid_id
     elif task == 'devmap':
         cmd = exp_utils.build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fold_idx, dataset, run_artifact_dir, 0, config_str)
 
-    cmd_full = ['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] + \
+    if method == 'DeepTuneInst2Vec':
+        slurm_config_file = 'ml_long.slurm'
+    else:
+        slurm_config_file = 'ml.slurm'
+    cmd_full = ['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, slurm_config_file)] + \
                    ['\"'] + \
                    ['python'] + cmd + \
                    ['\"']
