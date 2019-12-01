@@ -1,7 +1,7 @@
 import os
 
 
-CONFIG_DIR = 'gnns4code/taurus'
+CONFIG_DIR = '~/gnns4code/taurus'
 TC_CONFIGS = {
     'Magni': {
         'slurm': {
@@ -242,22 +242,28 @@ def build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fol
     def contract_array(arr):
         return str(list(arr)).replace(' ', '')
 
-    cmd = ['gnns4code/python/experiment/DevMapExperiment.py']
+    if method == 'DeepTuneInst2Vec':
+        cmd = ['train_task_devmap.py']
 
-    experiment_arg = ['experiment_fold']
-    dataset_args = ['--dataset_nvidia gnns4code/data/dev_mapping_task/prediction_task_nvidia.csv',
-                    '--dataset_amd gnns4code/data/dev_mapping_task/prediction_task_amd.csv']
+        args = []
+    else:
+        cmd = ['gnns4code/python/experiment/DevMapExperiment.py']
 
-    args = experiment_arg \
-            + dataset_args \
-            + ['--' + method] \
-            + ['--train_idx', contract_array(train_idx)] \
+        experiment_arg = ['experiment_fold']
+        dataset_args = ['--dataset_nvidia gnns4code/data/dev_mapping_task/prediction_task_nvidia.csv',
+                        '--dataset_amd gnns4code/data/dev_mapping_task/prediction_task_amd.csv']
+
+        args = experiment_arg \
+                + dataset_args \
+                + ['--' + method]
+
+    args += ['--train_idx', contract_array(train_idx)] \
             + ['--valid_idx', contract_array(valid_idx)] \
             + ['--test_idx', contract_array(test_idx)] \
             + ['--fold_idx', str(fold_idx)] \
             + ['--dataset', dataset] \
             + ['--report_write_dir', report_write_dir] \
-            + ['--seed', str(seed)] \
+            + ['--seed', str(seed)]
 
     if config:
         args += ['--config', config]

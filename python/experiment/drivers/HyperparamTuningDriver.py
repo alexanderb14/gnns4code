@@ -123,12 +123,16 @@ def trigger_slurm_jobs(task: str, method: str, config: dict, train_idx, valid_id
     elif task == 'devmap':
         cmd = exp_utils.build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fold_idx, dataset, run_artifact_dir, 0, config_str)
 
-    cmd = ' '.join(['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] +
-                   ['\"'] +
-                   ['python'] + cmd +
-                   ['\"'])
+    cmd_full = ['sbatch'] + [os.path.join(exp_utils.CONFIG_DIR, 'ml.slurm')] + \
+                   ['\"'] + \
+                   ['python'] + cmd + \
+                   ['\"']
+    if method == 'DeepTuneInst2Vec':
+        cmd_full = ['cd', 'ncc', '&&'] + cmd_full
+    cmd_full = ' '.join(cmd_full)
 
-    job_id = run_slurm_job(cmd)
+    # Run job
+    job_id = run_slurm_job(cmd_full)
 
     return job_id, run_artifact_dir
 
@@ -161,7 +165,7 @@ def aggregate_results_of_slurm_jobs(run_artifact_dirs):
     return pd.concat(result_dfs)
 
 
-# LSTM
+# DeepTune LSTM
 # ##############
 # Thread Coarsening
 def get_lstm_tc_dimensions_and_default_params():
@@ -256,6 +260,60 @@ class f_lstm_devmap(object):
 
         job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
                                                         method='DeepTuneLSTM',
+                                                        config=config,
+                                                        train_idx=self.train_idx,
+                                                        valid_idx=self.valid_idx,
+                                                        test_idx=self.test_idx,
+                                                        fold_idx=self.fold_idx,
+                                                        dataset=self.dataset)
+        self.run_artifact_dir = run_artifact_dir
+
+        return job_id
+
+    def get_result(self):
+        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
+
+
+# Inst2vec LSTM
+# ##############
+# Device Mapping
+def get_inst2vec_devmap_dimensions_and_default_params():
+    dims_and_default_params = [
+        (skopt.space.Integer(low=0, high=6, name='num_extra_lstm_layers'), 1),
+        (skopt.space.Integer(low=0, high=10, name='L2_loss_factor'), 0),
+        (skopt.space.Integer(low=0, high=3, name='num_epochs'), 0),
+    ]
+
+    return split_dict(dims_and_default_params)
+
+
+class f_inst2vec_devmap(object):
+    def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        self.train_idx = train_idx
+        self.valid_idx = valid_idx
+        self.test_idx = test_idx
+        self.fold_idx = fold_idx
+        self.dataset = dataset
+
+    def trigger(self, *data):
+        # Build config
+        num_extra_lstm_layers = int(data[0][0])
+        L2_loss_factor = int(data[0][1])
+        num_epochs = int(data[0][2])
+
+        config = {
+            "num_extra_lstm_layers": num_extra_lstm_layers,
+
+            "L2_loss_factor": 0.05 * L2_loss_factor,
+
+            "batch_size": 64,
+            "num_epochs": 2 ** num_epochs * 10,
+            "out_dir": "/tmp",
+        }
+        # utils.pretty_print_dict(config)
+
+        job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
+                                                        method='DeepTuneInst2Vec',
                                                         config=config,
                                                         train_idx=self.train_idx,
                                                         valid_idx=self.valid_idx,
@@ -808,6 +866,10 @@ def main():
             elif args.experiment == 'devmap':
                 fn_dims_and_default_params = get_lstm_devmap_dimensions_and_default_params
                 fn_evaluation = f_lstm_devmap
+        if args.method == 'DeepTuneInst2Vec':
+            if args.experiment == 'devmap':
+                fn_dims_and_default_params = get_inst2vec_devmap_dimensions_and_default_params
+                fn_evaluation = f_inst2vec_devmap
         if args.method == 'DeepTuneGNNClang':
             if args.experiment == 'tc':
                 fn_dims_and_default_params = get_gnn_ast_tc_dimensions_and_default_params
