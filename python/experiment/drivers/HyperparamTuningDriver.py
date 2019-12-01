@@ -45,7 +45,7 @@ def split_dict(d: dict):
 
 def execute_ssh_command(cmd):
     global ssh_client
-    if not ssh_client:
+    if ssh_client is None:
         ssh_client = paramiko.SSHClient()
         ssh_client.load_system_host_keys()
         ssh_client.set_missing_host_key_policy(paramiko.WarningPolicy)
@@ -149,7 +149,9 @@ def wait_for_slurm_jobs(pending_jobs, check_interval_in_seconds):
         # Get job stati from slurm
         try:
             stati = get_slurm_job_stati()
-        except socket.timeout:
+        except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
+            global ssh_client
+            ssh_client = None
             continue
 
         # Remove jobs from pending set on completion
@@ -972,7 +974,9 @@ def main():
                 # Get job stati from slurm
                 try:
                     stati = get_slurm_job_stati()
-                except socket.timeout:
+                except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
+                    global ssh_client
+                    ssh_client = None
                     continue
 
                 current_jobs = set(run_data.keys())
