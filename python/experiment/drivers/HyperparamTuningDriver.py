@@ -855,6 +855,7 @@ def main():
         parser_exp.add_argument('--experiment')
         parser_exp.add_argument('--fold_mode')
         parser_exp.add_argument('--method')
+        parser_exp.add_argument('--datasets')
         parser_exp.add_argument('--result_file')
         parser_exp.add_argument('--num_iterations')
 
@@ -894,7 +895,11 @@ def main():
         if args.experiment == 'devmap':
             fn_aggregation = aggregate_arithmetic_mean
 
-        for dataset in ['amd', 'nvidia']:
+        if args.datasets:
+            datasets = [args.datasets]
+        else:
+            datasets = ['amd', 'nvidia']
+        for dataset in datasets:
             result_file_dataset_specific = args.result_file + '_' + dataset + '.pckl'
 
             # Split into folds
