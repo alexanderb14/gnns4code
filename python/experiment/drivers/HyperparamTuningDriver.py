@@ -1026,7 +1026,7 @@ def main():
                 with open(result_file_dataset_specific, 'wb') as f:
                     pickle.dump(data, f)
 
-        global ssh_client
+#        global ssh_client
         ssh_client.close()
 
     # Visualize command
@@ -1056,17 +1056,52 @@ def main():
         #     # plt.legend()
         #     # plt.show()
 
-        mins = []
+        result_df = pd.DataFrame(columns=['fold',
+                                          'iterations',
+                                          'opt_min',
+                                          'opt_min_idx',
+                                          'params',
+                                          'accuracy_valid',
+                                          'accuracy_test',
+                                          'accuracy_valid-accuracy_test',
+                                          'num_trainable_parameters',
+                                          'train_time',
+                                          'inference_time'])
+
         for fold_idx, fold in enumerate(data['folds']):
             if len(fold['iterations']):
                 min_idx = fold['opt'].yi.index(min(fold['opt'].yi))
-                print('fold: %i, iterations: %i, min: %.2f, min_idx: %i, params: %s' %
-                      (fold_idx, len(fold['iterations']), fold['opt'].yi[min_idx], min_idx, str(fold['opt'].Xi[min_idx])))
-                mins.append(fold['opt'].yi[min_idx])
+
+                accuracy_valid = aggregate_arithmetic_mean(fold['iterations'][min_idx]['df_fold'], 'valid') * (-1)
+                accuracy_test = aggregate_arithmetic_mean(fold['iterations'][min_idx]['df_fold'], 'test') * (-1)
+                num_trainable_parameters = fold['iterations'][min_idx]['df_fold'].loc[0]['num_trainable_parameters']
+                train_time = fold['iterations'][min_idx]['df_fold'].loc[0]['train_time']
+                inference_time = fold['iterations'][min_idx]['df_fold'].loc[0]['inference_time']
+
+                result_df.loc[len(result_df)] = [fold_idx,
+                                                 len(fold['iterations']),
+                                                 fold['opt'].yi[min_idx],
+                                                 min_idx,
+                                                 fold['opt'].Xi[min_idx],
+                                                 accuracy_valid,
+                                                 accuracy_test,
+                                                 accuracy_valid - accuracy_test,
+                                                 num_trainable_parameters,
+                                                 train_time,
+                                                 inference_time]
             else:
                 print('WARNING: Fold %i has 0 iterations.' % fold_idx)
 
-        print('Arithmetic mean: %.2f' % (sum(mins) / len(mins)))
+        print('Results')
+        utils.print_dash()
+        utils.print_df(result_df)
+
+        print()
+        print('Arithmetic means')
+        utils.print_dash()
+        pd.set_option('display.float_format', lambda x: '%.3f' % x)
+        print(result_df.mean())
+
 
 if __name__ == '__main__':
     main()

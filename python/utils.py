@@ -372,6 +372,7 @@ def print_df(df, max_rows=100):
     """Print a dataframe to stdout"""
     with pd.option_context('display.max_rows', max_rows,
                            'display.max_columns', None,
+                           'display.width', 120,
                            'max_colwidth', 999999):
         print(df)
 
