@@ -171,6 +171,150 @@ def aggregate_results_of_slurm_jobs(run_artifact_dirs):
     return pd.concat(result_dfs)
 
 
+# Aggregation functions
+def aggregate_arithmetic_mean(results_df, train_or_test_or_valid):
+    accuracy = np.mean(results_df[results_df['set'] == train_or_test_or_valid]['Correct?'])
+
+    return accuracy * (-1)
+
+
+# SLURM Classes
+# ##############
+class Task:
+    def __init__(self, method, task_type, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        self.task_id = str(uuid.uuid4())
+        self.run_artifact_dir = None
+
+        self.method = method
+        self.task_type = task_type
+        self.train_idx = train_idx
+        self.valid_idx = valid_idx
+        self.test_idx = test_idx
+        self.fold_idx = fold_idx
+        self.dataset = dataset
+
+    def set_hyperparams(self, *hyperparams):
+        self.hyperparams = hyperparams[0]
+
+    def get_cmd(self):
+        # Prepare run artifact dir
+        pwd = execute_ssh_command('pwd')[0].replace('\n', '')
+        self.run_artifact_dir = os.path.join(pwd, REPORTS_DIR, self.method + '_' + self.task_id)
+        execute_ssh_command('rm -rf ' + self.run_artifact_dir + ' && mkdir -p ' + self.run_artifact_dir)
+
+        # Build config
+        config = self.get_config()
+        config['seed'] = 1
+        config_str = json.dumps(config).replace('"', '\\\\\\"').replace(',', '\\\\,').replace(' ', '')
+
+        # Build command
+        if self.task_type == 'tc':
+            cmd = exp_utils.build_tc_experiment_cmd(self.method, self.run_artifact_dir, 0, config_str)
+        elif self.task_type == 'devmap':
+            cmd = exp_utils.build_devmap_experiment_fold_cmd(self.method, self.train_idx, self.valid_idx, self.test_idx, self.fold_idx, self.dataset, self.run_artifact_dir, 0, config_str)
+
+        cmd_full = ['python'] + cmd
+        if self.method == 'DeepTuneInst2Vec':
+            cmd_full = ['cd', 'ncc', '&&'] + cmd_full + ['&&', 'cd', '..']
+
+        return cmd_full
+
+    def get_result(self):
+        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
+
+
+class Job:
+    def __init__(self):
+        self.tasks = []
+
+    def trigger(self):
+        cmd = ['echo']
+        cmd += ['\"']
+        for i, task in enumerate(self.tasks):
+            cmd += task.get_cmd()
+            cmd += ['&']
+        cmd += ['wait']
+        cmd += ['\"']
+
+        slurm_config_file = 'ml.slurm'
+        cmd_full = cmd + ['|'] + ['cat'] + [os.path.join(exp_utils.CONFIG_DIR, slurm_config_file)] + ['-'] + \
+            ['|', 'sbatch']
+
+        print('Triggering Job with %i tasks' %
+              (len(self.tasks)))
+
+        job_id = run_slurm_job(' '.join(cmd_full))
+
+        return job_id
+
+
+class ProcessingQueue:
+    def __init__(self, num_parallel_jobs, num_parallel_tasks_per_job):
+        self.__num_parallel_jobs = num_parallel_jobs
+        self.__num_parallel_tasks_per_job = num_parallel_tasks_per_job
+
+        self.__queue = []
+        self.__running = {}
+
+    def push(self, task):
+        if len(self.__queue) == 0:
+            job = Job()
+            self.__queue.append(job)
+
+        job = self.__queue[-1]
+        if len(job.tasks) >= self.__num_parallel_tasks_per_job:
+            job = Job()
+            self.__queue.append(job)
+        job.tasks.append(task)
+
+    def is_processing(self):
+        return len(self.__queue) > 0 or len(self.__running) > 0
+
+    def step(self, check_interval_in_seconds = 5):
+        # Process
+        for _ in range(self.__num_parallel_jobs - len(self.__running)):
+            if len(self.__queue) > 0:
+                job = self.__queue.pop(0)
+                job_id = job.trigger()
+
+                self.__running[job_id] = job
+
+                # Log
+                for task in job.tasks:
+                    print('Adding Task to queue: Iteration: %i, Fold: %i, Params: %s' %
+                          (task.iteration,
+                           task.fold_idx,
+                           str(task.hyperparams)))
+
+        # Wait
+        time.sleep(check_interval_in_seconds)
+
+        # Get job stati from slurm
+        try:
+            stati = get_slurm_job_stati()
+        except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
+            global ssh_client
+            ssh_client = None
+            return self.step()
+
+        current_jobs = set(self.__running.keys())
+        running_jobs = stati['running'].intersection(current_jobs)
+        completed_jobs = stati['completed'].intersection(current_jobs)
+
+        utils.log_with_time('Running jobs: %s' % (running_jobs))
+        utils.log_with_time('Completed jobs: %s' % (completed_jobs))
+
+        # Unpack completed tasks and return
+        tasks = []
+        for job_id in completed_jobs:
+            job = self.__running[job_id]
+            del self.__running[job_id]
+
+            tasks += job.tasks
+
+        return tasks
+
+
 # DeepTune LSTM
 # ##############
 # Thread Coarsening
@@ -237,20 +381,21 @@ def get_lstm_devmap_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-class f_lstm_devmap(object):
+class f_lstm_devmap(Task):
     def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        super(f_lstm_devmap, self).__init__('DeepTuneLSTM', 'devmap', train_idx, valid_idx, test_idx, fold_idx, dataset)
         self.train_idx = train_idx
         self.valid_idx = valid_idx
         self.test_idx = test_idx
         self.fold_idx = fold_idx
         self.dataset = dataset
 
-    def trigger(self, *data):
+    def get_config(self):
         # Build config
-        h_size = int(data[0][0])
-        num_extra_lstm_layers = int(data[0][1])
-        L2_loss_factor = int(data[0][2])
-        num_epochs = int(data[0][3])
+        h_size = int(self.hyperparams[0][0])
+        num_extra_lstm_layers = int(self.hyperparams[0][1])
+        L2_loss_factor = int(self.hyperparams[0][2])
+        num_epochs = int(self.hyperparams[0][3])
 
         config = {
             "h_size": 2 ** h_size,
@@ -262,22 +407,8 @@ class f_lstm_devmap(object):
             "num_epochs": 2 ** num_epochs * 10,
             "out_dir": "/tmp",
         }
-        # utils.pretty_print_dict(config)
 
-        job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
-                                                        method='DeepTuneLSTM',
-                                                        config=config,
-                                                        train_idx=self.train_idx,
-                                                        valid_idx=self.valid_idx,
-                                                        test_idx=self.test_idx,
-                                                        fold_idx=self.fold_idx,
-                                                        dataset=self.dataset)
-        self.run_artifact_dir = run_artifact_dir
-
-        return job_id
-
-    def get_result(self):
-        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
+        return config
 
 
 # Inst2vec LSTM
@@ -293,19 +424,20 @@ def get_inst2vec_devmap_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-class f_inst2vec_devmap(object):
+class f_inst2vec_devmap(Task):
     def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        super(f_inst2vec_devmap, self).__init__('DeepTuneInst2Vec', 'devmap', train_idx, valid_idx, test_idx, fold_idx, dataset)
         self.train_idx = train_idx
         self.valid_idx = valid_idx
         self.test_idx = test_idx
         self.fold_idx = fold_idx
         self.dataset = dataset
 
-    def trigger(self, *data):
+    def get_config(self):
         # Build config
-        num_extra_lstm_layers = int(data[0][0])
-        L2_loss_factor = int(data[0][1])
-        num_epochs = int(data[0][2])
+        num_extra_lstm_layers = int(self.hyperparams[0][0])
+        L2_loss_factor = int(self.hyperparams[0][1])
+        num_epochs = int(self.hyperparams[0][2])
 
         config = {
             "num_extra_lstm_layers": num_extra_lstm_layers,
@@ -316,22 +448,8 @@ class f_inst2vec_devmap(object):
             "num_epochs": 2 ** num_epochs * 10,
             "out_dir": "/tmp",
         }
-        # utils.pretty_print_dict(config)
 
-        job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
-                                                        method='DeepTuneInst2Vec',
-                                                        config=config,
-                                                        train_idx=self.train_idx,
-                                                        valid_idx=self.valid_idx,
-                                                        test_idx=self.test_idx,
-                                                        fold_idx=self.fold_idx,
-                                                        dataset=self.dataset)
-        self.run_artifact_dir = run_artifact_dir
-
-        return job_id
-
-    def get_result(self):
-        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
+        return config
 
 
 # GNN AST
@@ -486,31 +604,32 @@ def get_gnn_ast_devmap_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-class f_gnn_ast_devmap(object):
+class f_gnn_ast_devmap(Task):
     def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        super(f_gnn_ast_devmap, self).__init__('DeepTuneGNNClang', 'devmap', train_idx, valid_idx, test_idx, fold_idx, dataset)
         self.train_idx = train_idx
         self.valid_idx = valid_idx
         self.test_idx = test_idx
         self.fold_idx = fold_idx
         self.dataset = dataset
 
-    def trigger(self, *data):
+    def get_config(self):
         # Build config
-        num_timesteps = int(data[0][0])
-        gnn_h_size = int(data[0][1])
-        gnn_m_size = int(data[0][2])
+        num_timesteps = int(self.hyperparams[0][0])
+        gnn_h_size = int(self.hyperparams[0][1])
+        gnn_m_size = int(self.hyperparams[0][2])
 
-        prediction_cell_mlp_f_m_dims = int(data[0][3])
-        prediction_cell_mlp_g_m_dims = int(data[0][4])
-        prediction_cell_mlp_reduce_dims = int(data[0][5])
+        prediction_cell_mlp_f_m_dims = int(self.hyperparams[0][3])
+        prediction_cell_mlp_g_m_dims = int(self.hyperparams[0][4])
+        prediction_cell_mlp_reduce_dims = int(self.hyperparams[0][5])
 
-        embedding_layer_dims = int(data[0][6])
+        embedding_layer_dims = int(self.hyperparams[0][6])
 
-        learning_rate = int(data[0][7])
-        L2_loss_factor = int(data[0][8])
-        num_epochs = int(data[0][9])
+        learning_rate = int(self.hyperparams[0][7])
+        L2_loss_factor = int(self.hyperparams[0][8])
+        num_epochs = int(self.hyperparams[0][9])
 
-        tie_fwd_bkwd = int(data[0][10])
+        tie_fwd_bkwd = int(self.hyperparams[0][10])
 
         config = {
             "run_id": 'foo',
@@ -568,22 +687,8 @@ class f_gnn_ast_devmap(object):
 
             "edge_type_filter": []
         }
-        # utils.pretty_print_dict(config)
 
-        job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
-                                                        method='DeepTuneGNNClang',
-                                                        config=config,
-                                                        train_idx=self.train_idx,
-                                                        valid_idx=self.valid_idx,
-                                                        test_idx=self.test_idx,
-                                                        fold_idx=self.fold_idx,
-                                                        dataset=self.dataset)
-        self.run_artifact_dir = run_artifact_dir
-
-        return job_id
-
-    def get_result(self):
-        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
+        return config
 
 
 # GNN LLVM
@@ -729,31 +834,32 @@ def get_gnn_llvm_devmap_dimensions_and_default_params():
     return split_dict(dims_and_default_params)
 
 
-class f_gnn_llvm_devmap(object):
+class f_gnn_llvm_devmap(Task):
     def __init__(self, train_idx, valid_idx, test_idx, fold_idx, dataset):
+        super(f_gnn_llvm_devmap, self).__init__('DeepTuneGNNLLVM', 'devmap', train_idx, valid_idx, test_idx, fold_idx, dataset)
         self.train_idx = train_idx
         self.valid_idx = valid_idx
         self.test_idx = test_idx
         self.fold_idx = fold_idx
         self.dataset = dataset
 
-    def trigger(self, *data):
+    def get_config(self):
         # Build config
-        num_timesteps = int(data[0][0])
-        gnn_h_size = int(data[0][1])
-        gnn_m_size = int(data[0][2])
+        num_timesteps = int(self.hyperparams[0][0])
+        gnn_h_size = int(self.hyperparams[0][1])
+        gnn_m_size = int(self.hyperparams[0][2])
 
-        prediction_cell_mlp_f_m_dims = int(data[0][3])
-        prediction_cell_mlp_g_m_dims = int(data[0][4])
-        prediction_cell_mlp_reduce_dims = int(data[0][5])
+        prediction_cell_mlp_f_m_dims = int(self.hyperparams[0][3])
+        prediction_cell_mlp_g_m_dims = int(self.hyperparams[0][4])
+        prediction_cell_mlp_reduce_dims = int(self.hyperparams[0][5])
 
-        embedding_layer_dims = int(data[0][6])
+        embedding_layer_dims = int(self.hyperparams[0][6])
 
-        learning_rate = int(data[0][7])
-        L2_loss_factor = int(data[0][8])
-        num_epochs = int(data[0][9])
+        learning_rate = int(self.hyperparams[0][7])
+        L2_loss_factor = int(self.hyperparams[0][8])
+        num_epochs = int(self.hyperparams[0][9])
 
-        tie_fwd_bkwd = int(data[0][10])
+        tie_fwd_bkwd = int(self.hyperparams[0][10])
 
         config = {
             "run_id": 'foo',
@@ -811,29 +917,8 @@ class f_gnn_llvm_devmap(object):
 
             "edge_type_filter": []
         }
-        # utils.pretty_print_dict(config)
 
-        job_id, run_artifact_dir = trigger_slurm_jobs(task='devmap',
-                                                        method='DeepTuneGNNLLVM',
-                                                        config=config,
-                                                        train_idx=self.train_idx,
-                                                        valid_idx=self.valid_idx,
-                                                        test_idx=self.test_idx,
-                                                        fold_idx=self.fold_idx,
-                                                        dataset=self.dataset)
-        self.run_artifact_dir = run_artifact_dir
-
-        return job_id
-
-    def get_result(self):
-        return aggregate_results_of_slurm_jobs([self.run_artifact_dir])
-
-
-# Aggregation functions
-def aggregate_arithmetic_mean(results_df, train_or_test_or_valid):
-    accuracy = np.mean(results_df[results_df['set'] == train_or_test_or_valid]['Correct?'])
-
-    return accuracy * (-1)
+        return config
 
 
 def main():
@@ -904,7 +989,7 @@ def main():
 
             # Split into folds
             # ###############################
-            kfold_k = 7
+            kfold_k = 3
             if dataset == 'amd':
                 df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_amd.csv'))
             elif dataset == 'nvidia':
@@ -935,8 +1020,8 @@ def main():
 
             # Process on taurus
             # ###############################
-            # Create job queue
-            job_queue = []
+            # Create processing queue
+            queue = ProcessingQueue(num_parallel_jobs=num_folds, num_parallel_tasks_per_job=4)
 
             # For each fold, get some initial points from the optimizer and append to job queue
             for fold_idx in range(num_folds):
@@ -949,56 +1034,21 @@ def main():
                 if len(data['folds'][fold_idx]['iterations']) < num_iterations:
                     fold = train_valid_test_split[fold_idx]
 
-                    job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
-                    job_queue.append((job, fold_idx))
+                    task = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
+                    task.set_hyperparams(x)
+                    task.iteration = len(data['folds'][task.fold_idx]['iterations'])
+                    queue.push(task)
 
-            # Job processing loop
-            run_data = {}
-
-            while len(job_queue) > 0 or len(run_data) > 0:
-                worker_size = num_folds
-                for _ in range(worker_size - len(run_data)):
-                    if len(job_queue) > 0:
-                        job, fold_idx = job_queue.pop(0)
-
-                        x = data['folds'][fold_idx]['x']
-                        job_id = job.trigger(x[0])
-                        run_data[job_id] = (job, fold_idx)
-
-                        # Log for monitoring
-                        iteration = len(data['folds'][fold_idx]['iterations'])
-                        print('Adding to queue: Iteration: %i, Fold: %i, Params: %s, Current minimum: %f' %
-                              (iteration,
-                               fold_idx,
-                               str(x),
-                               min(data['folds'][fold_idx]['opt'].yi) if iteration > 0 else 0))
-
-                check_interval_in_seconds = 30
-                time.sleep(check_interval_in_seconds)
-
-                # Get job stati from slurm
-                try:
-                    stati = get_slurm_job_stati()
-                except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
-                    global ssh_client
-                    ssh_client = None
-                    continue
-
-                current_jobs = set(run_data.keys())
-                running_jobs = stati['running'].intersection(current_jobs)
-                completed_jobs = stati['completed'].intersection(current_jobs)
-
-                utils.log_with_time('Running: %s' % (running_jobs))
-                utils.log_with_time('Completed: %s' % (completed_jobs))
+            while queue.is_processing():
+                completed_tasks = queue.step()
 
                 # Report to optimizer and add a job with new params in this fold
-                for job_id in completed_jobs:
-                    job, fold_idx = run_data[job_id]
-                    del run_data[job_id]
+                for completed_task in completed_tasks:
+                    fold_idx = completed_task.fold_idx
 
                     # Report to optimizer
                     x = data['folds'][fold_idx]['x']
-                    df_fold = job.get_result()
+                    df_fold = completed_task.get_result()
                     y = [fn_aggregation(df_fold, 'valid')]
 
                     opt = data['folds'][fold_idx]['opt']
@@ -1016,12 +1066,14 @@ def main():
                     })
                     data['folds'][fold_idx]['res'] = res
 
-                    # Create job and add to queue
+                    # Create task and add to queue
                     if len(data['folds'][fold_idx]['iterations']) < num_iterations:
                         fold = train_valid_test_split[fold_idx]
 
-                        job = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
-                        job_queue.append((job, fold_idx))
+                        task = fn_evaluation(fold['train_idx'], fold['valid_idx'], fold['test_idx'], fold_idx, dataset)
+                        task.set_hyperparams(x)
+                        task.iteration = len(data['folds'][task.fold_idx]['iterations'])
+                        queue.push(task)
 
                 with open(result_file_dataset_specific, 'wb') as f:
                     pickle.dump(data, f)
@@ -1038,13 +1090,13 @@ def main():
         args = parser_vis.parse_args(sys.argv[2:])
 
         data = pickle.load(open(args.result_file, "rb"))
-        # for fold_idx, fold in enumerate(data['folds']):
-        #     res = fold['res']
-        #
-        #     # ax = plot_convergence(res)
-        #     # plt.grid()
-        #     # plt.legend()
-        #     # plt.show()
+        for fold_idx, fold in enumerate(data['folds']):
+            res = fold['res']
+
+            ax = plot_convergence(res)
+            plt.grid()
+            plt.legend()
+            plt.show()
         #
         #     # ax = plot_evaluations(res)
         #     # plt.grid()
