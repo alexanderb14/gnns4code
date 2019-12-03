@@ -1162,6 +1162,14 @@ class DeepTune(HeterogemeousMappingModel):
         from keras.models import Model
         from keras.regularizers import l2
 
+        # Make tf block less memory
+        from keras.backend.tensorflow_backend import set_session
+        import tensorflow as tf
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        sess = tf.Session(config=config)
+        set_session(sess)
+
         # Parse from config
         h_size = self.config['h_size']
         num_extra_lstm_layers = self.config['num_extra_lstm_layers']
