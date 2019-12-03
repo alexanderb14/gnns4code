@@ -51,7 +51,12 @@ def execute_ssh_command(cmd):
         ssh_client.set_missing_host_key_policy(paramiko.WarningPolicy)
         ssh_client.connect(os.environ['ZIH_LOGIN_SERVER'], username=os.environ['ZIH_USERNAME'], timeout=10)
 
-    stdin, stdout, stderr = ssh_client.exec_command(cmd)
+    try:
+        stdin, stdout, stderr = ssh_client.exec_command(cmd)
+    except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
+        ssh_client = None
+        return execute_ssh_command(cmd)
+
     ret = stdout.readlines()
 
     return ret
@@ -147,12 +152,7 @@ def wait_for_slurm_jobs(pending_jobs, check_interval_in_seconds):
         time.sleep(check_interval_in_seconds)
 
         # Get job stati from slurm
-        try:
-            stati = get_slurm_job_stati()
-        except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
-            global ssh_client
-            ssh_client = None
-            continue
+        stati = get_slurm_job_stati()
 
         # Remove jobs from pending set on completion
         pending_jobs = pending_jobs - stati['completed']
@@ -290,12 +290,7 @@ class ProcessingQueue:
         time.sleep(check_interval_in_seconds)
 
         # Get job stati from slurm
-        try:
-            stati = get_slurm_job_stati()
-        except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
-            global ssh_client
-            ssh_client = None
-            return self.step()
+        stati = get_slurm_job_stati()
 
         current_jobs = set(self.__running.keys())
         running_jobs = stati['running'].intersection(current_jobs)
