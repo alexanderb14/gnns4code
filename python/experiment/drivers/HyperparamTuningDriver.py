@@ -989,7 +989,7 @@ def main():
 
             # Split into folds
             # ###############################
-            kfold_k = 3
+            kfold_k = 7
             if dataset == 'amd':
                 df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_amd.csv'))
             elif dataset == 'nvidia':
