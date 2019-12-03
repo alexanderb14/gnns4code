@@ -270,7 +270,7 @@ class ProcessingQueue:
     def is_processing(self):
         return len(self.__queue) > 0 or len(self.__running) > 0
 
-    def step(self, check_interval_in_seconds = 5):
+    def step(self, check_interval_in_seconds = 30):
         # Process
         for _ in range(self.__num_parallel_jobs - len(self.__running)):
             if len(self.__queue) > 0:
