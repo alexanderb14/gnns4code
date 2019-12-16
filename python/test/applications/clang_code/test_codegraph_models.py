@@ -50,15 +50,17 @@ def make_graph(c_file, datadir, tmpdir, is_open_cl_code: bool=False):
     graph = codegraph_models.codegraphs_create_from_miner_output(graph_j)[0]
 
     # # Save dot graph
-    # codegraph_models.save_dot_graph(graph, graph_out_file + '.png', 'png', True)
-    # # subprocess.call(['open', graph_out_file + '.png'])
+    codegraph_models.save_dot_graph(graph, graph_out_file + '.png', 'png', True)
+    # subprocess.call(['xdg-open', graph_out_file + '.png'])
 
     # Transform graph:
     codegraph_models.transform_graph(graph)
 
     # # Save reduced dot graph
-    # codegraph_models.save_dot_graph(graph, graph_out_file + '.reduced' + '.png', 'png', True)
-    # # subprocess.call(['open', graph_out_file + '.reduced' + '.png'])
+    codegraph_models.save_dot_graph(graph, graph_out_file + '.reduced' + '.png', 'png', True)
+    subprocess.call(['xdg-open', graph_out_file + '.reduced' + '.png'])
+
+    print(graph_out_file)
 
     return graph
 
@@ -115,6 +117,11 @@ def test_gen_and_compile_add(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')
     print(tmpdir)
     assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'add.c')) == True
+
+def test_gen_and_compile_example(tmpdir_factory):
+    tmpdir = tmpdir_factory.mktemp('out')
+    print(tmpdir)
+    assert format_gen_and_compile_graph_result(gen_and_compile_graph(tmpdir, TEST_DATA_DIR, 'example.c')) == True
 
 def test_gen_and_compile_forward_decl(tmpdir_factory):
     tmpdir = tmpdir_factory.mktemp('out')

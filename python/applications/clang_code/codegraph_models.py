@@ -91,6 +91,7 @@ class Function(object):
         self.specifics = {}
 
         self.all_statements = []
+        self.all_cfg_blocks = []
         self.edges = []
 
         self.function_node_type = -1
@@ -106,9 +107,14 @@ class Function(object):
 
         visitor.visit(self)
 
+        # AST
         for edge in edges:
             if edge.type == 'AST':
                 edge.accept(visitor, sorting_function)
+
+        # CFG
+        for cfg_block in self.all_cfg_blocks:
+            cfg_block.accept(visitor)
 
         visitor.visit_end(self)
 
@@ -210,6 +216,13 @@ class Statement(object):
                 visitor.visit_intermediate(self, edge)
 
         visitor.visit_end(self)
+
+class CFGBlock(object):
+    def __init__(self):
+        self.edges = []
+
+    def accept(self, visitor:object) -> None:
+        visitor.visit(self)
 
 class Edge(object):
     """
@@ -397,8 +410,12 @@ class DotGraphVisitor(VisitorBase):
         self.node_types = node_types
 
         self.rank_subraphs = {}
+        self.cfg_subgraph = None
+        self.ast_subgraph = None
 
         self.dot = pydot.Dot(graph_type="digraph", rankdir="TB")
+        self.ast_subgraph = pydot.Cluster('ast', label="AST")
+        self.dot.add_subgraph(self.ast_subgraph)
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Function):
@@ -408,7 +425,7 @@ class DotGraphVisitor(VisitorBase):
 
             subgraph = pydot.Subgraph(rank='same')
             subgraph.add_node(node)
-            self.dot.add_subgraph(subgraph)
+            self.ast_subgraph.add_subgraph(subgraph)
 
             # Add edges
             for edge in obj.edges:
@@ -417,16 +434,19 @@ class DotGraphVisitor(VisitorBase):
 
                 if edge.type == 'LIVE':
                     color = "blue"
+                    from_name, to_name = to_name, from_name
+                    constraint=False
                 else:
                     color = "black"
+                    constraint=True
 
-                self.dot.add_edge(pydot.Edge(from_name, to_name, color=color))
+                self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
 
         if isinstance(obj, Statement):
             # Get or create subgraph
             if obj.rank not in self.rank_subraphs:
-                self.rank_subraphs[obj.rank] = pydot.Subgraph(rank='same')
-                self.dot.add_subgraph(self.rank_subraphs[obj.rank])
+                self.rank_subraphs[obj.rank] = pydot.Subgraph(rank='same', rankdir="LR")
+                self.ast_subgraph.add_subgraph(self.rank_subraphs[obj.rank])
             subgraph = self.rank_subraphs[obj.rank]
 
             # Create node
@@ -440,7 +460,7 @@ class DotGraphVisitor(VisitorBase):
             if hasattr(obj, 'rank_next'):
                 from_name = 'node_' + str(obj.node_id)
                 to_name = 'node_' + str(obj.rank_next.node_id)
-                self.dot.add_edge(pydot.Edge(from_name, to_name, color='green' if self.debug else 'invis'))
+                self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color='green' if self.debug else 'invis'))
 
             # Add edges
             for edge in obj.edges:
@@ -449,13 +469,36 @@ class DotGraphVisitor(VisitorBase):
 
                 if edge.type == 'LIVE':
                     color = "blue"
+                    from_name, to_name = to_name, from_name
+                    constraint=False
                 else:
                     color = "black"
+                    constraint=True
 
                 if self.debug:
-                    self.dot.add_edge(pydot.Edge(from_name, to_name, color=color, xlabel=str(edge.idx)))
+                    self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color=color, xlabel=str(edge.idx), constraint=constraint))
                 else:
-                    self.dot.add_edge(pydot.Edge(from_name, to_name, color=color))
+                    self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
+
+        if isinstance(obj, CFGBlock):
+            if self.cfg_subgraph == None:
+                self.cfg_subgraph = pydot.Cluster('cfg', label="CFG")
+                self.dot.add_subgraph(self.cfg_subgraph)
+
+            # Create node
+            node_name = 'node_' + str(obj.node_id)
+            node = pydot.Node(node_name, label="BB", color="black", shape="circle")
+            self.cfg_subgraph.add_node(node)
+
+            # Add edges
+            for edge in obj.edges:
+                from_name = 'node_' + str(edge.src.node_id)
+                to_name = 'node_' + str(edge.dest.node_id)
+                if isinstance(edge.src, Statement) or isinstance(edge.dest, Statement):
+                    constraint = False
+                else:
+                    constraint = True
+                self.dot.add_edge(pydot.Edge(from_name, to_name, color="green", constraint=constraint))
 
     def _build_node_name(self, obj: object):
         ret = str(obj.name)
@@ -1005,6 +1048,12 @@ def transform_graph(graph: object) -> object:
 def save_dot_graph(graph: object, filename: str, filetype: str, node_types: dict, debug: bool = False):
     # Assign node ids
     assign_node_ids_in_bfs_order(graph)
+    for function in graph.functions:
+        num_statements = len(function.all_statements)
+
+        for i, cfg_block in enumerate(function.all_cfg_blocks):
+            cfg_block.node_id = num_statements + i
+
 
     # Assign edge idx
     eic_vstr = EdgeIdxCreateVisitor()
@@ -1404,5 +1453,32 @@ def codegraphs_create_from_miner_output(jRoot: dict) -> list:
                         edge = Edge('LIVE', stmt_to, stmt_from)
                         stmt_to.edges.append(edge)
         cgs.append(cg)
+
+        # CFG
+        if jFunction['cfg_blocks'] is not None:
+            # Create CFG blocks
+            for cfg_block_idx, cfg_block_obj in enumerate(jFunction['cfg_blocks']):
+                cfg_block = CFGBlock()
+                function.all_cfg_blocks.append(cfg_block)
+
+            # Create CFG edges
+            for cfg_block_idx, cfg_block_obj in enumerate(jFunction['cfg_blocks']):
+                block_from = function.all_cfg_blocks[cfg_block_idx]
+
+                # Between CFG blocks
+                if 'successors' in cfg_block_obj:
+                    for cfg_block_to_idx in cfg_block_obj['successors']:
+                        block_to = function.all_cfg_blocks[cfg_block_to_idx]
+
+                        edge = Edge('CFG', block_from, block_to)
+                        block_to.edges.append(edge)
+
+                # Between CFG blocks and statements
+                if 'statements' in cfg_block_obj:
+                    for stmt_to_idx in cfg_block_obj['statements']:
+                        stmt_to = function.all_statements[stmt_to_idx]
+
+                        edge = Edge('CFG', stmt_to, block_from)
+                        block_to.edges.append(edge)
 
     return cgs

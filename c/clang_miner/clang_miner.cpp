@@ -249,16 +249,47 @@ public:
             jFunction["body"] = jBody;
 
             // 3. CFGBlocks
+            // Assign node ids
+            int nodeIdCounter = 0;
+            std::map<NodeContainerPtr, int> cfgBlockIds;
+            for(auto const& cfgBlock: functionContainer->_cfgBlocks) {
+                cfgBlockIds.insert(std::pair<NodeContainerPtr, int>(cfgBlock, nodeIdCounter));
+                nodeIdCounter++;
+            }
+
             json jCFGBlocks;
             for(auto const& cfgBlock: functionContainer->_cfgBlocks) {
                 // Build JSON
                 json jNode;
 
+                // Statements
                 json jStatements;
                 for(auto const& stmt: cfgBlock->cfgblockInfo->stmts) {
                     jStatements.push_back(stmt->nodeId);
                 }
-                jNode["statements"] = jStatements;
+                if(jStatements.size() > 0) {
+                    jNode["statements"] = jStatements;
+                }
+
+                // Predecessors
+                json jPredecessors;
+                for(auto const& cfgBlockNode: cfgBlock->cfgblockInfo->preds) {
+                    int nodeId = cfgBlockIds.find(cfgBlockNode)->second;
+                    jPredecessors.push_back(nodeId);
+                }
+                if(jPredecessors.size() > 0) {
+                    jNode["predecessors"] = jPredecessors;
+                }
+
+                // Successors
+                json jSuccessors;
+                for(auto const& cfgBlockNode: cfgBlock->cfgblockInfo->succs) {
+                    int nodeId = cfgBlockIds.find(cfgBlockNode)->second;
+                    jSuccessors.push_back(nodeId);
+                }
+                if(jSuccessors.size() > 0) {
+                    jNode["successors"] = jSuccessors;
+                }
 
                 jCFGBlocks.push_back(jNode);
             }
@@ -484,9 +515,34 @@ public:
             //CFG
             std::unique_ptr<CFG> cfg = CFG::buildCFG(f, funcBody, &_context, CFG::BuildOptions());
 
+            LangOptions lo;
+            cfg->dump(lo, true);
+
+            // Blocks
+            for (CFG::iterator Ib = cfg->begin(), Eb = cfg->end() ; Ib != Eb ; ++Ib) {
+                CFGBlock* B = *Ib;
+
+                // Statements
+                for (CFGBlock::const_iterator Is = B->begin(), Es = B->end() ; Is != Es ; ++Is) {
+                    const Stmt *S;
+
+                    if (Optional<CFGStmt> CS = Is->getAs<CFGStmt>()) {
+                        S = CS->getStmt();
+                        llvm::errs() << S->getStmtClassName() << "\n";
+                    }
+
+                    if (B->getTerminator()) {
+                        S = B->getTerminator().getStmt();
+                        llvm::errs() << S->getStmtClassName() << "\n";
+                    }
+                }
+            }
+
             std::map<const CFGBlock*, NodeContainerPtr> cfgBlocks;
 
             // Pass 1: Create BBs
+            CFGBlock b = cfg->getEntry();
+
             for (CFG::iterator Ib = cfg->begin(), Eb = cfg->end() ; Ib != Eb ; ++Ib) {
                 CFGBlock *B = *Ib;
 
@@ -498,22 +554,28 @@ public:
             }
 
             // Pass 2: Add Statements, Predecessors, Successors
-            for (CFG::iterator Ib = cfg->begin(), Eb = cfg->end() ; Ib != Eb ; ++Ib) {
-                CFGBlock* B = *Ib;
+            for (const auto &cfgBlock : cfgBlocks) {
+                const CFGBlock* B = cfgBlock.first;
 
                 NodeContainerPtr cfgNode = cfgBlocks.find(B)->second;
 
                 llvm::errs() << "Basic Block" << "\n";
 
                 for (CFGBlock::const_iterator Is = B->begin(), Es = B->end() ; Is != Es ; ++Is) {
+                    // Add Statements
                     if (Optional<CFGStmt> CS = Is->getAs<CFGStmt>()) {
                         const Stmt *S = CS->getStmt();
 
-                        // Add Statements
                         NodeContainerPtr innerStmt = ClangCodeGraph::getInstance().GetNodeContainerByClangStmt(S);
                         cfgNode->cfgblockInfo->stmts.push_back(innerStmt);
+                    }
 
-                        llvm::errs() << " " << S->getStmtClassName() << "\n";
+                    // Add the terminator as it also is a statement
+                    if (B->getTerminator()) {
+                        const Stmt *S = B->getTerminator().getStmt();
+
+                        NodeContainerPtr innerStmt = ClangCodeGraph::getInstance().GetNodeContainerByClangStmt(S);
+                        cfgNode->cfgblockInfo->stmts.push_back(innerStmt);
                     }
                 }
 
@@ -522,8 +584,8 @@ public:
                      Ipred != Epred; ++Ipred) {
                     CFGBlock* Bpred = *Ipred;
 
-                    NodeContainerPtr cfgNode = cfgBlocks.find(B)->second;
-                    cfgNode->cfgblockInfo->preds.push_back(cfgNode);
+                    NodeContainerPtr cfgPredNode = cfgBlocks.find(Bpred)->second;
+                    cfgNode->cfgblockInfo->preds.push_back(cfgPredNode);
                 }
 
                 // Add Successors
@@ -531,8 +593,8 @@ public:
                      Isucc != Esucc; ++Isucc) {
                     CFGBlock* Bsucc = *Isucc;
 
-                    NodeContainerPtr cfgNode = cfgBlocks.find(B)->second;
-                    cfgNode->cfgblockInfo->succs.push_back(cfgNode);
+                    NodeContainerPtr cfgSuccNode = cfgBlocks.find(Bsucc)->second;
+                    cfgNode->cfgblockInfo->succs.push_back(cfgSuccNode);
                 }
             }
 
