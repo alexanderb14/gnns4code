@@ -38,6 +38,8 @@ static llvm::cl::OptionCategory ToolingSampleCategory("Tooling Sample");
 static llvm::cl::opt<std::string> outFileName("o", llvm::cl::desc("Filename to write the graph as json"),
                                               llvm::cl::cat(ToolingSampleCategory));
 
+struct NodeContainer;
+
 struct StmtInfo {
     Stmt* clangStmt = nullptr;
 
@@ -54,9 +56,18 @@ struct DeclInfo {
     // Data
     int scalarType;
     std::string functionNameStr;
-
 };
 using DeclInfoPtr = std::shared_ptr<DeclInfo>;
+
+struct CFGBlockInfo {
+    CFGBlock* clangCFGBlock = nullptr;
+
+    // Data
+    std::vector<std::shared_ptr<NodeContainer>> stmts;
+    std::vector<std::shared_ptr<NodeContainer>> preds;
+    std::vector<std::shared_ptr<NodeContainer>> succs;
+};
+using CFGBlockInfoPtr = std::shared_ptr<CFGBlockInfo>;
 
 struct NodeContainer {
     int nodeId = -1;
@@ -64,6 +75,7 @@ struct NodeContainer {
 
     StmtInfoPtr stmtInfo = nullptr;
     DeclInfoPtr declInfo = nullptr;
+    CFGBlockInfoPtr cfgblockInfo = nullptr;
 
     std::vector<std::shared_ptr<NodeContainer>> livenessRelations;
     std::vector<std::shared_ptr<NodeContainer>> astRelations;
@@ -76,6 +88,7 @@ struct FunctionContainer {
 
     std::vector<NodeContainerPtr> _functionArguments;
     NodeContainerPtr _bodyRootStmt;
+    std::vector<NodeContainerPtr> _cfgBlocks;
 };
 using FunctionContainerPtr = std::shared_ptr<FunctionContainer>;
 
@@ -125,10 +138,12 @@ public:
         for (std::vector<FunctionContainerPtr>::iterator it = _functionContainers.begin();
              it != _functionContainers.end(); ++it) {
 
-            std::string name = (*it)->_name;
-            int scalarReturnType = (*it)->_scalarReturnType;
-            std::vector<NodeContainerPtr> functionArguments = (*it)->_functionArguments;
-            NodeContainerPtr bodyRootStmt = (*it)->_bodyRootStmt;
+            FunctionContainerPtr functionContainer = *it;
+
+            std::string name = functionContainer->_name;
+            int scalarReturnType = functionContainer->_scalarReturnType;
+            std::vector<NodeContainerPtr> functionArguments = functionContainer->_functionArguments;
+            NodeContainerPtr bodyRootStmt = functionContainer->_bodyRootStmt;
 
             json jFunction;
 
@@ -164,6 +179,7 @@ public:
 
                 jArguments.push_back(jArgument);
             }
+            jFunction["arguments"] = jArguments;
 
             // 2. Body
             json jBody;
@@ -230,9 +246,23 @@ public:
 
                 jBody.push_back(jNode);
             }
-
-            jFunction["arguments"] = jArguments;
             jFunction["body"] = jBody;
+
+            // 3. CFGBlocks
+            json jCFGBlocks;
+            for(auto const& cfgBlock: functionContainer->_cfgBlocks) {
+                // Build JSON
+                json jNode;
+
+                json jStatements;
+                for(auto const& stmt: cfgBlock->cfgblockInfo->stmts) {
+                    jStatements.push_back(stmt->nodeId);
+                }
+                jNode["statements"] = jStatements;
+
+                jCFGBlocks.push_back(jNode);
+            }
+            jFunction["cfg_blocks"] = jCFGBlocks;
 
             jFunctions.push_back(jFunction);
         }
@@ -452,9 +482,64 @@ public:
             }
 
             //CFG
-            std::unique_ptr<CFG> sourceCFG = CFG::buildCFG(f, funcBody, &_context, CFG::BuildOptions());
+            std::unique_ptr<CFG> cfg = CFG::buildCFG(f, funcBody, &_context, CFG::BuildOptions());
 
-//            sourceCFG->print(llvm::errs(), LangOptions(), true);
+            std::map<const CFGBlock*, NodeContainerPtr> cfgBlocks;
+
+            // Pass 1: Create BBs
+            for (CFG::iterator Ib = cfg->begin(), Eb = cfg->end() ; Ib != Eb ; ++Ib) {
+                CFGBlock *B = *Ib;
+
+                NodeContainerPtr cfgNode(new NodeContainer);
+                cfgNode->cfgblockInfo.reset(new CFGBlockInfo);
+                cfgNode->cfgblockInfo->clangCFGBlock = B;
+
+                cfgBlocks.insert(std::pair<const CFGBlock*, NodeContainerPtr>(B, cfgNode));
+            }
+
+            // Pass 2: Add Statements, Predecessors, Successors
+            for (CFG::iterator Ib = cfg->begin(), Eb = cfg->end() ; Ib != Eb ; ++Ib) {
+                CFGBlock* B = *Ib;
+
+                NodeContainerPtr cfgNode = cfgBlocks.find(B)->second;
+
+                llvm::errs() << "Basic Block" << "\n";
+
+                for (CFGBlock::const_iterator Is = B->begin(), Es = B->end() ; Is != Es ; ++Is) {
+                    if (Optional<CFGStmt> CS = Is->getAs<CFGStmt>()) {
+                        const Stmt *S = CS->getStmt();
+
+                        // Add Statements
+                        NodeContainerPtr innerStmt = ClangCodeGraph::getInstance().GetNodeContainerByClangStmt(S);
+                        cfgNode->cfgblockInfo->stmts.push_back(innerStmt);
+
+                        llvm::errs() << " " << S->getStmtClassName() << "\n";
+                    }
+                }
+
+                // Add Predecessors
+                for (CFGBlock::const_pred_iterator Ipred = B->pred_begin(), Epred = B->pred_end();
+                     Ipred != Epred; ++Ipred) {
+                    CFGBlock* Bpred = *Ipred;
+
+                    NodeContainerPtr cfgNode = cfgBlocks.find(B)->second;
+                    cfgNode->cfgblockInfo->preds.push_back(cfgNode);
+                }
+
+                // Add Successors
+                for (CFGBlock::const_succ_iterator Isucc = B->succ_begin(), Esucc = B->succ_end();
+                     Isucc != Esucc; ++Isucc) {
+                    CFGBlock* Bsucc = *Isucc;
+
+                    NodeContainerPtr cfgNode = cfgBlocks.find(B)->second;
+                    cfgNode->cfgblockInfo->succs.push_back(cfgNode);
+                }
+            }
+
+            // Add to fn info
+            for (const auto &cfgBlock : cfgBlocks) {
+                fnInfo->_cfgBlocks.push_back(cfgBlock.second);
+            }
 
             ClangCodeGraph::getInstance()._functionContainers.push_back(fnInfo);
         }
@@ -523,6 +608,61 @@ public:
     }
 };
 
+class CFGChecker : public Checker<check::ASTCodeBody> {
+public:
+    void checkASTCodeBody(const Decl *D, AnalysisManager &Mgr, BugReporter &BR) const {
+        llvm::errs() << "CFGChecker::checkASTCodeBody" << "\n";
+
+//        if (CFG *cfg = Mgr.getCFG(D)) {
+//            // Pass 1: Create BBs
+//            for (CFG::iterator Ib = cfg->begin(), Eb = cfg->end() ; Ib != Eb ; ++Ib) {
+//                CFGBlock* B = *Ib;
+//
+//                NodeContainerPtr cfgNode(new NodeContainer);
+//                cfgNode->cfgblockInfo.reset(new CFGBlockInfo);
+//                cfgNode->cfgblockInfo->clangCFGBlock = B;
+//
+//                ClangCodeGraph::getInstance().addCFGBlock(cfgNode);
+//            }
+//
+//            // Pass 2: Add Statements, Predecessors, Successors
+//            for (CFG::iterator Ib = cfg->begin(), Eb = cfg->end() ; Ib != Eb ; ++Ib) {
+//                CFGBlock* B = *Ib;
+//
+//                NodeContainerPtr cfgNode = ClangCodeGraph::getInstance().GetNodeContainerByClangCFGBlock(B);
+//
+//                for (CFGBlock::const_iterator Is = B->begin(), Es = B->end() ; Is != Es ; ++Is) {
+//                    if (Optional<CFGStmt> CS = Is->getAs<CFGStmt>()) {
+//                        const Stmt *S = CS->getStmt();
+//
+//                        // Add Statements
+//                        NodeContainerPtr innerStmt = ClangCodeGraph::getInstance().GetNodeContainerByClangStmt(S);
+//                        cfgNode->cfgblockInfo->stmts.push_back(innerStmt);
+//                    }
+//                }
+//
+//                // Add Predecessors
+//                for (CFGBlock::const_pred_iterator Ipred = B->pred_begin(), Epred = B->pred_end();
+//                     Ipred != Epred; ++Ipred) {
+//                    CFGBlock* Bpred = *Ipred;
+//
+//                    NodeContainerPtr cfgPredNode = ClangCodeGraph::getInstance().GetNodeContainerByClangCFGBlock(Bpred);
+//                    cfgNode->cfgblockInfo->preds.push_back(cfgPredNode);
+//                }
+//
+//                // Add Successors
+//                for (CFGBlock::const_succ_iterator Isucc = B->succ_begin(), Esucc = B->succ_end();
+//                     Isucc != Esucc; ++Isucc) {
+//                    CFGBlock* Bsucc = *Isucc;
+//
+//                    NodeContainerPtr cfgSuccNode = ClangCodeGraph::getInstance().GetNodeContainerByClangCFGBlock(Bsucc);
+//                    cfgNode->cfgblockInfo->succs.push_back(cfgSuccNode);
+//                }
+//            }
+//        }
+    }
+};
+
 class CustomFrontendAction : public ASTFrontendAction {
 public:
     std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, StringRef file) override {
@@ -531,7 +671,7 @@ public:
         // Create consumers
         std::vector<std::unique_ptr<ASTConsumer>> consumers;
 
-        // LiveVariables consumer
+        // LiveVariables and CFG consumer
         std::unique_ptr<AnalysisASTConsumer> analysis_consumer = CreateAnalysisConsumer(CI);
         CI.getAnalyzerOpts()->CheckersControlList = {{"custom.LiveVariablesChecker", true}};
         analysis_consumer->AddCheckerRegistrationFn([](CheckerRegistry &Registry) {
