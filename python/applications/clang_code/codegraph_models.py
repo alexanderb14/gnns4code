@@ -414,8 +414,12 @@ class DotGraphVisitor(VisitorBase):
         self.ast_subgraph = None
 
         self.dot = pydot.Dot(graph_type="digraph", rankdir="TB")
-        self.ast_subgraph = pydot.Cluster('ast', label="AST")
+
+        self.ast_subgraph = pydot.Cluster('ast', label="AST", style="invis")
         self.dot.add_subgraph(self.ast_subgraph)
+
+        self.cfg_subgraph = pydot.Cluster('cfg', label="CFG", style="invis")
+        self.dot.add_subgraph(self.cfg_subgraph)
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Function):
@@ -435,10 +439,10 @@ class DotGraphVisitor(VisitorBase):
                 if edge.type == 'LIVE':
                     color = "blue"
                     from_name, to_name = to_name, from_name
-                    constraint=False
-                else:
+                    constraint = False
+                elif edge.type == 'AST':
                     color = "black"
-                    constraint=True
+                    constraint = True
 
                 self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
 
@@ -470,10 +474,10 @@ class DotGraphVisitor(VisitorBase):
                 if edge.type == 'LIVE':
                     color = "blue"
                     from_name, to_name = to_name, from_name
-                    constraint=False
-                else:
+                    constraint = False
+                elif edge.type == 'AST':
                     color = "black"
-                    constraint=True
+                    constraint = True
 
                 if self.debug:
                     self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color=color, xlabel=str(edge.idx), constraint=constraint))
@@ -481,10 +485,6 @@ class DotGraphVisitor(VisitorBase):
                     self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
 
         if isinstance(obj, CFGBlock):
-            if self.cfg_subgraph == None:
-                self.cfg_subgraph = pydot.Cluster('cfg', label="CFG")
-                self.dot.add_subgraph(self.cfg_subgraph)
-
             # Create node
             node_name = 'node_' + str(obj.node_id)
             node = pydot.Node(node_name, label="BB", color="black", shape="circle")
@@ -494,11 +494,17 @@ class DotGraphVisitor(VisitorBase):
             for edge in obj.edges:
                 from_name = 'node_' + str(edge.src.node_id)
                 to_name = 'node_' + str(edge.dest.node_id)
+
+                if edge.type == 'CFG':
+                    color = "red"
+                elif edge.type == 'BB':
+                    color = "grey"
+
                 if isinstance(edge.src, Statement) or isinstance(edge.dest, Statement):
                     constraint = False
                 else:
                     constraint = True
-                self.dot.add_edge(pydot.Edge(from_name, to_name, color="green", constraint=constraint))
+                self.dot.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
 
     def _build_node_name(self, obj: object):
         ret = str(obj.name)
@@ -552,7 +558,8 @@ class DotGraphVisitor(VisitorBase):
             graph.write_png(filename)
         elif filetype == 'pdf':
             graph.write_pdf(filename)
-
+        elif filetype == 'dot':
+            graph.write_dot(filename)
 
 class CodeGenVisitor(VisitorBase):
     """
@@ -1043,6 +1050,49 @@ def transform_graph(graph: object) -> object:
         graph.accept(nic_vstr)
         num_nodes = nic_vstr.current_node_id
 
+    # Eliminate CFG nodes that don't have BB references
+    for function in graph.functions:
+        if len(function.all_cfg_blocks) > 0:
+            # Create predecessor lookup map
+            predecessors = {}
+            for cfg_block in function.all_cfg_blocks:
+                for edge in cfg_block.edges:
+                    if edge.type == 'CFG':
+                        if edge.dest not in predecessors:
+                            predecessors[edge.dest] = []
+                        predecessors[edge.dest].append(edge)
+
+            # Eliminate
+            all_cfg_blocks_new = []
+            for cfg_block in function.all_cfg_blocks:
+                bb_edges = []
+                for edge in cfg_block.edges:
+                    if edge.type == 'BB':
+                        bb_edges.append(edge)
+
+                # Get succ cfg edges
+                succ_cfg_edges = []
+                for edge in cfg_block.edges:
+                    if edge.type == 'CFG':
+                        succ_cfg_edges.append(edge)
+
+                # Get pred cfg edges
+                if cfg_block in predecessors:
+                    pred_cfg_edges = predecessors[cfg_block]
+                else:
+                    pred_cfg_edges = []
+
+                if len(bb_edges) == 0 and len(succ_cfg_edges) == 1:
+                    if len(succ_cfg_edges) == 1:
+                        succ_cfg_edge = succ_cfg_edges[0]
+
+                        for pred_cfg_edge in pred_cfg_edges:
+                            pred_cfg_edge.dest = succ_cfg_edge.dest
+                else:
+                    all_cfg_blocks_new.append(cfg_block)
+
+            function.all_cfg_blocks = all_cfg_blocks_new
+
     return graph
 
 def save_dot_graph(graph: object, filename: str, filetype: str, node_types: dict, debug: bool = False):
@@ -1092,6 +1142,11 @@ def assign_node_ids_in_bfs_order(graph: object):
 
     for idx, node in enumerate(nodes):
         node.node_id = idx
+    num_nodes = len(nodes)
+
+    for function in graph.functions:
+        for idx, cfg_block in enumerate(function.all_cfg_blocks):
+            cfg_block.node_id = idx + num_nodes
 
 def get_node_types(graphs, with_functionnames, with_callnames):
     nic_vstr = NodeTypeIdCreateVisitor(with_functionnames=with_functionnames, with_callnames=with_callnames)
@@ -1357,7 +1412,7 @@ def is_graph_in_statement_names_whitelist(graph, statement_names) -> bool:
 
     return True
 
-def codegraphs_create_from_miner_output(jRoot: dict) -> list:
+def codegraphs_create_from_miner_output(jRoot: dict, with_cfg: bool=False) -> list:
     """
     Creates a CodeGraph and associated domain objects by parsing the output of the Clang miner pass
     """
@@ -1455,30 +1510,31 @@ def codegraphs_create_from_miner_output(jRoot: dict) -> list:
         cgs.append(cg)
 
         # CFG
-        if jFunction['cfg_blocks'] is not None:
-            # Create CFG blocks
-            for cfg_block_idx, cfg_block_obj in enumerate(jFunction['cfg_blocks']):
-                cfg_block = CFGBlock()
-                function.all_cfg_blocks.append(cfg_block)
+        if with_cfg:
+            if jFunction['cfg_blocks'] is not None:
+                # Create CFG blocks
+                for cfg_block_idx, cfg_block_obj in enumerate(jFunction['cfg_blocks']):
+                    cfg_block = CFGBlock()
+                    function.all_cfg_blocks.append(cfg_block)
 
-            # Create CFG edges
-            for cfg_block_idx, cfg_block_obj in enumerate(jFunction['cfg_blocks']):
-                block_from = function.all_cfg_blocks[cfg_block_idx]
+                # Create CFG edges
+                for cfg_block_idx, cfg_block_obj in enumerate(jFunction['cfg_blocks']):
+                    block_from = function.all_cfg_blocks[cfg_block_idx]
 
-                # Between CFG blocks
-                if 'successors' in cfg_block_obj:
-                    for cfg_block_to_idx in cfg_block_obj['successors']:
-                        block_to = function.all_cfg_blocks[cfg_block_to_idx]
+                    # Between CFG blocks
+                    if 'successors' in cfg_block_obj:
+                        for cfg_block_to_idx in cfg_block_obj['successors']:
+                            block_to = function.all_cfg_blocks[cfg_block_to_idx]
 
-                        edge = Edge('CFG', block_from, block_to)
-                        block_to.edges.append(edge)
+                            edge = Edge('CFG', block_from, block_to)
+                            block_from.edges.append(edge)
 
-                # Between CFG blocks and statements
-                if 'statements' in cfg_block_obj:
-                    for stmt_to_idx in cfg_block_obj['statements']:
-                        stmt_to = function.all_statements[stmt_to_idx]
+                    # Between CFG blocks and statements
+                    if 'statements' in cfg_block_obj:
+                        for stmt_to_idx in cfg_block_obj['statements']:
+                            stmt_to = function.all_statements[stmt_to_idx]
 
-                        edge = Edge('CFG', stmt_to, block_from)
-                        block_to.edges.append(edge)
+                            edge = Edge('BB', stmt_to, block_from)
+                            block_from.edges.append(edge)
 
     return cgs
