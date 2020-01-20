@@ -58,6 +58,11 @@ class PredictionCellState(object):
                                                               self.config['prediction_cell']['mlp_reduce_after_aux_in_2_activation'],
                                                               'mlp_reduce_after_aux_in_2')
 
+        self.weights['graph_model_out'] = utils.MLP(self.config['prediction_cell']['mlp_reduce_out_dim'],
+                                                              self.config['prediction_cell']['mlp_reduce_after_aux_in_2_out_dim'],
+                                                              [],
+                                                              'sigmoid',
+                                                              'graph_model_out')
 
 class PredictionCell(object):
     """
@@ -100,7 +105,7 @@ class PredictionCell(object):
             self.placeholders['aux_in'] = tf.placeholder(tf.float32, [None, 2], name='aux_in')
             aux_in = tf.cast(self.placeholders['aux_in'], dtype=tf.float32)
 
-        # Model
+        # Graph Model
         # #########################################
         gate_input = tf.concat([embeddings, self.initial_embeddings], axis=-1)                                  # [b*v, 2h + h_init]
         h_v_G = self.state.weights['mlp_f_m'](embeddings)                                                       # [b*v, 2h]
@@ -115,6 +120,11 @@ class PredictionCell(object):
                                       num_segments=num_graphs)                                                  # [b, 2h]
         h_G = self.state.weights['mlp_reduce'](h_G)                                                             # [b, 2]
 
+        # (also train the graph model as done in DeepTune)
+        graphmodel_logits = self.state.weights['graph_model_out'](h_G)
+
+        # Prediction model
+        # #########################################
         if self.with_aux_in:
             aux_in = tf.layers.batch_normalization(aux_in, training=is_training)
 
@@ -123,7 +133,7 @@ class PredictionCell(object):
         output = self.state.weights['mlp_reduce_after_aux_in_1'](h_G)                                           # [b, 32]
         output = self.state.weights['mlp_reduce_after_aux_in_2'](output)                                        # [b, 2]
 
-        output = tf.nn.softmax(output)                                                                          # [b, 2]
+        predictionmodel_logits = tf.nn.softmax(output)                                                                          # [b, 2]
 
         # Training
         if self.enable_training:
@@ -131,12 +141,15 @@ class PredictionCell(object):
             self.placeholders['labels'] = tf.placeholder(tf.int32, [None, self.config['prediction_cell']['output_dim']], name='labels')
             labels = tf.cast(self.placeholders['labels'], dtype=tf.float32)
 
-            # Loss
-            diff_loss = output - labels                                                                         # [b, 2]
-            loss = 0.5 * tf.square(diff_loss)                                                                   # [b, 2]
+            # Graph model
+            graphmodel_loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=graphmodel_logits)                     # [b, 2]
 
-            loss = tf.reduce_sum(loss)                                                                          # [b]
+            # Prediction model
+            predictionmodel_loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=predictionmodel_logits)                     # [b, 2]
+
+            # Loss
+            loss = tf.reduce_sum(graphmodel_loss + 0.2 * predictionmodel_loss)                                                                          # [b]
 
             self.ops['loss'] = loss
 
-        self.ops['output'] = output
+        self.ops['output'] = predictionmodel_logits
