@@ -385,7 +385,7 @@ def get_files_by_extension(dirname, extension):
             if file.endswith(extension):
                 filepaths.append(os.path.join(root, file))
 
-    return filepaths
+    return sorted(filepaths)
 
 
 def delete_and_create_folder(path):
