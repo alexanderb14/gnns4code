@@ -1145,6 +1145,73 @@ class Grewe(HeterogemeousMappingModel):
     def get_num_trainable_parameters(self):
         return None
 
+
+# Experiment: AuxInOnly
+class AuxInOnly(HeterogemeousMappingModel):
+    __name__ = "AuxInOnly"
+    __basename__ = "auxinonly"
+
+    def __init__(self, config):
+        self.config = config
+
+    def init(self, seed: int):
+        np.random.seed(seed)
+
+        from keras.layers import Input, Embedding, LSTM, Dense
+        from keras.layers.merge import Concatenate
+        from keras.layers.normalization import BatchNormalization
+        from keras.models import Model
+        from keras.regularizers import l2
+
+        # Make tf block less memory
+        from keras.backend.tensorflow_backend import set_session
+        import tensorflow as tf
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        sess = tf.Session(config=config)
+        set_session(sess)
+
+        # Auxiliary inputs. wgsize and dsize.
+        auxiliary_inputs = Input(shape=(2,))
+
+        # Heuristic model. Takes as inputs the language model,
+        #   outputs 1-hot encoded device mapping
+        x = BatchNormalization()(auxiliary_inputs)
+        x = Dense(32, activation="relu")(x)
+        out = Dense(2, activation="sigmoid")(x)
+
+        self.model = Model(inputs=auxiliary_inputs, outputs=out)
+        self.model.compile(
+            optimizer="adam", metrics=['accuracy'],
+            loss="categorical_crossentropy")
+
+        return self
+
+    def save(self, outpath):
+        self.model.save(outpath)
+
+    def restore(self, inpath):
+        from keras.models import load_model
+        self.model = load_model(inpath)
+
+    def train(self, **data):
+        # Parse from config
+        num_epochs = self.config['num_epochs']
+        batch_size = self.config['batch_size']
+
+        self.model.fit(data["aux_in_train"], data["y_1hot"],
+                       epochs=num_epochs, batch_size=batch_size, verbose=data["verbose"], shuffle=True)
+
+    def predict(self, **data):
+        p = np.array(self.model.predict(
+            [data["aux_in_test"], data["sequences"]], batch_size=64, verbose=data["verbose"]))
+        indices = [np.argmax(x) for x in p[0]]
+        return indices
+
+    def get_num_trainable_parameters(self):
+        return self.model.count_params()
+
+
 # Experiment: DeepTune
 class DeepTune(HeterogemeousMappingModel):
     __name__ = "DeepTune"
@@ -1638,6 +1705,7 @@ def main():
         parser_exp.add_argument('--DeepTuneGNNLLVMCFGEdges', action='store_true')
         parser_exp.add_argument('--DeepTuneGNNLLVMCFGDataflowEdges', action='store_true')
         parser_exp.add_argument('--DeepTuneGNNLLVMCFGDataflowCallEdges', action='store_true')
+        parser_exp.add_argument('--AuxInOnly', action='store_true')
 
         parser_exp.add_argument('--dataset_nvidia')
         parser_exp.add_argument('--dataset_amd')
@@ -1686,6 +1754,17 @@ def main():
             }
 
             model = DeepTune(config)
+
+        if args.AuxInOnly:
+            config = json.loads(args.config) if args.config else {
+                "h_size": 64,
+                "num_extra_lstm_layers": 1,
+                "L2_loss_factor": 0,
+                "batch_size": 64,
+                "num_epochs": 5000
+            }
+
+            model = AuxInOnly(config)
 
         if args.DeepTuneGNNClang or args.DeepTuneGNNClangASTEdges:
             config = json.loads(args.config) if args.config else {
