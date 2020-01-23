@@ -249,20 +249,20 @@ class DeepGMGCell(object):
                         # Action type: add node
                         if action_meta['type'] in ['add_node', 'add_const_value_node', 'add_type_node', 'add_instruction_node']:
                             # Model
-                            f_an = self.state.weights[function_name](h_G)                                       # [b, input_dimension]
-                            f_an = tf.nn.softmax(f_an)                                                          # [b, input_dimension]
+                            f_an_logits = self.state.weights[function_name](h_G)                                # [b, input_dimension]
+                            f_an = tf.nn.softmax(f_an_logits)                                                   # [b, input_dimension]
                             self.ops[function_name] = f_an
 
                             # Training
                             if self.enable_training:
                                 # Input
-
                                 self.placeholders[label_name] = tf.placeholder(tf.int32, [None], name=label_name)
-                                labels = tf.one_hot(self.placeholders[label_name], input_dimension)        # [b, input_dimension]
+                                labels = tf.one_hot(self.placeholders[label_name], input_dimension)             # [b, input_dimension]
 
                                 # Loss
-                                diff_loss = f_an - labels                                                       # [b, input_dimension]
-                                loss_an = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
+                                loss_an = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels,
+                                                                                    logits=f_an_logits)         # [b, 2]
+                                loss_an = tf.expand_dims(loss_an, axis=1)
                                 loss_an = loss_an * loss_scaling_factor
 
                                 self.ops['loss_' + action_meta['type']] = loss_an
@@ -271,8 +271,8 @@ class DeepGMGCell(object):
                         # Action type: add edge
                         if action_meta['type'] == 'add_edge':
                             # Model
-                            f_ae = self.state.weights[function_name](h_G)                                       # [b, input_dimension]
-                            f_ae = tf.nn.sigmoid(f_ae)                                                          # [b, input_dimension]
+                            f_ae_logits = self.state.weights[function_name](h_G)                                # [b, input_dimension]
+                            f_ae = tf.nn.sigmoid(f_ae_logits)                                                   # [b, input_dimension]
                             self.ops[function_name] = f_ae
 
                             # Training
@@ -282,8 +282,9 @@ class DeepGMGCell(object):
                                 labels = tf.one_hot(self.placeholders[label_name], input_dimension)             # [b, input_dimension]
 
                                 # Loss
-                                diff_loss = f_ae - labels                                                       # [b, input_dimension]
-                                loss_ae = tf.reduce_sum(0.5 * tf.square(diff_loss), 1, keep_dims=True)          # [b, 1]
+                                loss_ae = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels,
+                                                                                     logits=f_ae_logits)        # [b, 2]
+                                loss_ae = tf.expand_dims(loss_ae, axis=1)
                                 loss_ae = loss_ae * loss_scaling_factor
 
                                 self.ops['loss_ae'] = loss_ae
@@ -342,8 +343,7 @@ class DeepGMGCell(object):
                             s_u = self.state.weights[function_name](h_u_all_h_v)                                # [b*v, e]
 
                             # Softmax
-                            # a) Normalize probabilities
-
+                            # - Normalize probabilities
                             s_u_max = tf.unsorted_segment_max(data=s_u,
                                                               segment_ids=embeddings_to_graph_mappings_existent,
                                                               num_segments=num_graphs)                          # [b, e]
@@ -377,10 +377,9 @@ class DeepGMGCell(object):
                                 labels = self.placeholders[label_name]                                          # [b*v, e]
 
                                 # Loss
-                                diff_loss = f_nodes - labels                                                    # [b*v, e]
-                                sqared_loss = tf.square(diff_loss)                                              # [b*v, e]
+                                loss_log = labels * tf.log(f_nodes) * (-1)
 
-                                loss_nodes = tf.unsorted_segment_sum(data=sqared_loss,
+                                loss_nodes = tf.unsorted_segment_sum(data=loss_log,
                                                                      segment_ids=embeddings_to_graph_mappings_existent,
                                                                      num_segments=num_graphs)                   # [b, e]
 

@@ -397,7 +397,7 @@ def test_train_and_gen_defaultgraph_medium_2():
         'gnn_h_size': 16,
 
         "learning_rate": 0.001,
-        "num_training_unroll": 55,
+        "num_training_unroll": 56,
         "run_id": "one_defaultgraph_medium_2",
 
         "num_node_types": 7,
@@ -464,7 +464,7 @@ def test_train_and_gen_defaultgraph_medium_4():
         "run_id": "one_defaultgraph_medium_4",
 
         "num_node_types": 4,
-        "num_edge_types": 3,
+        "num_edge_types": 4,
 
         "num_epochs": 1000,
         "gen_num_node_max": 12
@@ -558,7 +558,7 @@ def test_train_and_gen_two_different_defaultgraphs_small():
         "num_node_types": 3,
         "num_edge_types": 2,
 
-        "num_epochs": 500,
+        "num_epochs": 1000,
         "gen_num_node_max": 5
     })
 
