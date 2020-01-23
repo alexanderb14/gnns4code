@@ -17,33 +17,6 @@ import applications.utils as app_utils
 import utils
 
 
-def get_files_by_file_size(dirname, reverse=False):
-    """ Return list of file paths in directory sorted by file size.
-     From: https://stackoverflow.com/questions/20252669/get-files-from-directory-argument-sorting-by-size """
-
-    # Get list of files
-    filepaths = []
-    for basename in os.listdir(dirname):
-        filename = os.path.join(dirname, basename)
-        if os.path.isfile(filename):
-            filepaths.append(filename)
-
-    # Re-populate list with filename, size tuples
-    for i in range(len(filepaths)):
-        filepaths[i] = (filepaths[i], os.path.getsize(filepaths[i]))
-
-    # Sort list by file size
-    # If reverse=True sort from largest to smallest
-    # If reverse=False sort from smallest to largest
-    filepaths.sort(key=lambda filename: filename[1], reverse=reverse)
-
-    # Re-populate list with just filenames
-    for i in range(len(filepaths)):
-        filepaths[i] = os.path.join(dirname, filepaths[i][0])
-
-    return filepaths
-
-
 def opencl_kernel_c_code_to_llvm_graph(c_code:str):
     # Code to json file
     with open('/tmp/tmp.c', 'w') as f:
@@ -85,7 +58,7 @@ def process_source_file(src_file, additional_args=[], is_opencl_source=True):
 
     result = process.wait()
 
-    return stdout, stderr, result
+    return stdout, stderr, result, cmd
 
 def process_source_directory(files, preprocessing_artifact_dir, substract_str, is_opencl_source=True):
     out_dir = os.path.join(preprocessing_artifact_dir, 'out')
@@ -99,9 +72,10 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str, i
             out_filename = filename.replace(substract_str + '/', '') + '.json'
             out_filename = os.path.join(out_dir, out_filename)
 
-            utils.create_folder(os.path.dirname(out_filename))
         else:
-            out_filename = filename
+            out_filename = os.path.join(out_dir, os.path.basename(filename) + '.json')
+
+        utils.create_folder(os.path.dirname(out_filename))
 
         additional_args = []
         if is_opencl_source:
@@ -113,7 +87,7 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str, i
             if 'nvidia' in filename or ('rodinia' in filename and 'pathfinder' not in filename):
                 additional_args += ['-extra-arg=-DBLOCK_SIZE=64']
 
-        stdout, stderr, result = process_source_file(filename, additional_args=additional_args)
+        stdout, stderr, result, cmd = process_source_file(filename, additional_args=additional_args)
 
         # In case of an error
         if result != 0:
@@ -122,7 +96,7 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str, i
                 filename.replace('/', '_') + '.txt')
 
             # write error report file containing source, stdout, stderr
-            utils.write_error_report_file(filename, report_filename, [stdout], [stderr], result, '')
+            utils.write_error_report_file(filename, report_filename, [stdout], [stderr], result, cmd)
 
             shutil.copyfile(filename, os.path.join(bad_code_dir, os.path.basename(filename)))
         else:

@@ -1,6 +1,7 @@
 {
     "functions": [
         {
+            "name": "A",
             "num_functions": 1,
             "arguments": [
                 {

@@ -13,26 +13,26 @@ LITERAL_NAMES = ['IntegerLiteral', 'FloatLiteral', 'CharacterLiteral']
 # Helper functions
 def get_id_for_edge_type(name: str) -> int:
     if name == 'AST':
-        return 1
+        return 0
     elif name == 'LIVE':
-        return 3
+        return 1
 
 def get_id_for_reverse_edge_type(name: str) -> int:
     if name == 'AST':
         return 2
     elif name == 'LIVE':
-        return 4
+        return 3
 
 def is_forward_edge_type(edge_type_id) -> bool:
-    if edge_type_id % 2 == 1:
+    if edge_type_id == 0 or edge_type_id == 1:
         return True
     else:
         return False
 
 def get_edge_name_by_edge_type(edge_type_id) -> str:
-    if edge_type_id == 1 or edge_type_id == 2:
+    if edge_type_id == 0 or edge_type_id == 1:
         return 'AST'
-    elif edge_type_id == 3 or edge_type_id == 4:
+    elif edge_type_id == 2 or edge_type_id == 3:
         return 'LIVE'
 
 def sort_edges_conforming_c_syntax(edges_in):
@@ -91,7 +91,7 @@ class Function(object):
         self.specifics = {}
 
         self.all_statements = []
-        self.all_cfg_blocks = []
+        # self.all_cfg_blocks = []
         self.edges = []
 
         self.function_node_type = -1
@@ -112,9 +112,9 @@ class Function(object):
             if edge.type == 'AST':
                 edge.accept(visitor, sorting_function)
 
-        # CFG
-        for cfg_block in self.all_cfg_blocks:
-            cfg_block.accept(visitor)
+        # # CFG
+        # for cfg_block in self.all_cfg_blocks:
+        #     cfg_block.accept(visitor)
 
         visitor.visit_end(self)
 
@@ -217,12 +217,12 @@ class Statement(object):
 
         visitor.visit_end(self)
 
-class CFGBlock(object):
-    def __init__(self):
-        self.edges = []
-
-    def accept(self, visitor:object) -> None:
-        visitor.visit(self)
+# class CFGBlock(object):
+#     def __init__(self):
+#         self.edges = []
+#
+#     def accept(self, visitor:object) -> None:
+#         visitor.visit(self)
 
 class Edge(object):
     """
@@ -410,7 +410,7 @@ class DotGraphVisitor(VisitorBase):
         self.node_types = node_types
 
         self.rank_subraphs = {}
-        self.cfg_subgraph = None
+        # self.cfg_subgraph = None
         self.ast_subgraph = None
 
         self.dot = pydot.Dot(graph_type="digraph", rankdir="TB")
@@ -418,8 +418,8 @@ class DotGraphVisitor(VisitorBase):
         self.ast_subgraph = pydot.Cluster('ast', label="AST", style="invis")
         self.dot.add_subgraph(self.ast_subgraph)
 
-        self.cfg_subgraph = pydot.Cluster('cfg', label="CFG", style="invis")
-        self.dot.add_subgraph(self.cfg_subgraph)
+        # self.cfg_subgraph = pydot.Cluster('cfg', label="CFG", style="invis")
+        # self.dot.add_subgraph(self.cfg_subgraph)
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Function):
@@ -484,27 +484,27 @@ class DotGraphVisitor(VisitorBase):
                 else:
                     self.ast_subgraph.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
 
-        if isinstance(obj, CFGBlock):
-            # Create node
-            node_name = 'node_' + str(obj.node_id)
-            node = pydot.Node(node_name, label="BB", color="black", shape="circle")
-            self.cfg_subgraph.add_node(node)
-
-            # Add edges
-            for edge in obj.edges:
-                from_name = 'node_' + str(edge.src.node_id)
-                to_name = 'node_' + str(edge.dest.node_id)
-
-                if edge.type == 'CFG':
-                    color = "red"
-                elif edge.type == 'BB':
-                    color = "grey"
-
-                if isinstance(edge.src, Statement) or isinstance(edge.dest, Statement):
-                    constraint = False
-                else:
-                    constraint = True
-                self.dot.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
+        # if isinstance(obj, CFGBlock):
+        #     # Create node
+        #     node_name = 'node_' + str(obj.node_id)
+        #     node = pydot.Node(node_name, label="BB", color="black", shape="circle")
+        #     self.cfg_subgraph.add_node(node)
+        #
+        #     # Add edges
+        #     for edge in obj.edges:
+        #         from_name = 'node_' + str(edge.src.node_id)
+        #         to_name = 'node_' + str(edge.dest.node_id)
+        #
+        #         if edge.type == 'CFG':
+        #             color = "red"
+        #         elif edge.type == 'BB':
+        #             color = "grey"
+        #
+        #         if isinstance(edge.src, Statement) or isinstance(edge.dest, Statement):
+        #             constraint = False
+        #         else:
+        #             constraint = True
+        #         self.dot.add_edge(pydot.Edge(from_name, to_name, color=color, constraint=constraint))
 
     def _build_node_name(self, obj: object):
         ret = str(obj.name)
@@ -1050,48 +1050,48 @@ def transform_graph(graph: object) -> object:
         graph.accept(nic_vstr)
         num_nodes = nic_vstr.current_node_id
 
-    # Eliminate CFG nodes that don't have BB references
-    for function in graph.functions:
-        if len(function.all_cfg_blocks) > 0:
-            # Create predecessor lookup map
-            predecessors = {}
-            for cfg_block in function.all_cfg_blocks:
-                for edge in cfg_block.edges:
-                    if edge.type == 'CFG':
-                        if edge.dest not in predecessors:
-                            predecessors[edge.dest] = []
-                        predecessors[edge.dest].append(edge)
-
-            # Eliminate
-            all_cfg_blocks_new = []
-            for cfg_block in function.all_cfg_blocks:
-                bb_edges = []
-                for edge in cfg_block.edges:
-                    if edge.type == 'BB':
-                        bb_edges.append(edge)
-
-                # Get succ cfg edges
-                succ_cfg_edges = []
-                for edge in cfg_block.edges:
-                    if edge.type == 'CFG':
-                        succ_cfg_edges.append(edge)
-
-                # Get pred cfg edges
-                if cfg_block in predecessors:
-                    pred_cfg_edges = predecessors[cfg_block]
-                else:
-                    pred_cfg_edges = []
-
-                if len(bb_edges) == 0 and len(succ_cfg_edges) == 1:
-                    if len(succ_cfg_edges) == 1:
-                        succ_cfg_edge = succ_cfg_edges[0]
-
-                        for pred_cfg_edge in pred_cfg_edges:
-                            pred_cfg_edge.dest = succ_cfg_edge.dest
-                else:
-                    all_cfg_blocks_new.append(cfg_block)
-
-            function.all_cfg_blocks = all_cfg_blocks_new
+    # # Eliminate CFG nodes that don't have BB references
+    # for function in graph.functions:
+    #     if len(function.all_cfg_blocks) > 0:
+    #         # Create predecessor lookup map
+    #         predecessors = {}
+    #         for cfg_block in function.all_cfg_blocks:
+    #             for edge in cfg_block.edges:
+    #                 if edge.type == 'CFG':
+    #                     if edge.dest not in predecessors:
+    #                         predecessors[edge.dest] = []
+    #                     predecessors[edge.dest].append(edge)
+    #
+    #         # Eliminate
+    #         all_cfg_blocks_new = []
+    #         for cfg_block in function.all_cfg_blocks:
+    #             bb_edges = []
+    #             for edge in cfg_block.edges:
+    #                 if edge.type == 'BB':
+    #                     bb_edges.append(edge)
+    #
+    #             # Get succ cfg edges
+    #             succ_cfg_edges = []
+    #             for edge in cfg_block.edges:
+    #                 if edge.type == 'CFG':
+    #                     succ_cfg_edges.append(edge)
+    #
+    #             # Get pred cfg edges
+    #             if cfg_block in predecessors:
+    #                 pred_cfg_edges = predecessors[cfg_block]
+    #             else:
+    #                 pred_cfg_edges = []
+    #
+    #             if len(bb_edges) == 0 and len(succ_cfg_edges) == 1:
+    #                 if len(succ_cfg_edges) == 1:
+    #                     succ_cfg_edge = succ_cfg_edges[0]
+    #
+    #                     for pred_cfg_edge in pred_cfg_edges:
+    #                         pred_cfg_edge.dest = succ_cfg_edge.dest
+    #             else:
+    #                 all_cfg_blocks_new.append(cfg_block)
+    #
+    #         function.all_cfg_blocks = all_cfg_blocks_new
 
     return graph
 
@@ -1144,9 +1144,9 @@ def assign_node_ids_in_bfs_order(graph: object):
         node.node_id = idx
     num_nodes = len(nodes)
 
-    for function in graph.functions:
-        for idx, cfg_block in enumerate(function.all_cfg_blocks):
-            cfg_block.node_id = idx + num_nodes
+    # for function in graph.functions:
+    #     for idx, cfg_block in enumerate(function.all_cfg_blocks):
+    #         cfg_block.node_id = idx + num_nodes
 
 def get_node_types(graphs, with_functionnames, with_callnames):
     nic_vstr = NodeTypeIdCreateVisitor(with_functionnames=with_functionnames, with_callnames=with_callnames)
@@ -1346,7 +1346,8 @@ def create_action_sequence(graph: object, debug: bool = False):
         print('    <not_add_node (type %i)> \t\t %s' % (0, str(actions[step_idx])))
     step_idx += 1
 
-    print('Total length of action sequence: %i' % len(actions))
+    if debug:
+        print('Total length of action sequence: %i' % len(actions))
 
     return actions
 
