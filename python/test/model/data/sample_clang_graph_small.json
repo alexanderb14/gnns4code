@@ -1,6 +1,7 @@
 {
     "functions": [
         {
+            "name": "A",
             "arguments": [
                 {
                     "liveness_relations": [

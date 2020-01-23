@@ -629,7 +629,7 @@ def test_train_and_gen_clang_codegraph_medium():
     training_graph = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)[0]
 
     training_graph_2 = clang_codegraph_models.transform_graph(training_graph)
-    clang_codegraph_models.save_dot_graph(training_graph_2, '/tmp/out.png', 'png')
+#    clang_codegraph_models.save_dot_graph(training_graph_2, '/tmp/out.png', 'png')
 
     train_generate_and_validate_clang_graph(training_graph, config, NUM_GRAPHS_TO_GENERATE, NUM_GRAPHS_TO_BE_EQUAL)
 

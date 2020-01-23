@@ -777,6 +777,11 @@ class DeepGMGTrainer(DeepGMGModel):
 
         result = self.state.sess.run(fetch_list, feed_dict=feed_dict)
 
+        if self.with_gradient_monitoring:
+            (gradients, clipped_gradients) = (result[6], result[7])
+            self.train_writer.add_summary(gradients, iteration)
+            self.train_writer.add_summary(clipped_gradients, iteration)
+
         return result
 
     def train(self, train_datas) -> None:
@@ -859,6 +864,9 @@ class DeepGMGTrainer(DeepGMGModel):
                     self.state.backup_best_weights()
 
                     best_epoch_count = 0
+
+            if epoch % 100 == 0:
+                self.state.save_weights_to_disk(self.model_file)
 
             # Logging
             summary = tf.Summary()
