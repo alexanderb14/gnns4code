@@ -12,6 +12,7 @@ import skopt
 import socket
 import sys
 import time
+import tqdm
 import uuid
 from datetime import datetime, timedelta
 from io import StringIO
@@ -1082,26 +1083,49 @@ def main():
 
         parser_vis.add_argument('--result_file')
 
+        parser_vis.add_argument('--plot_convergence', action='store_true')
+        parser_vis.add_argument('--plot_evaluations', action='store_true')
+        parser_vis.add_argument('--plot_objective', action='store_true')
+
+        parser_vis.add_argument('--pgf_out_dir')
+
         args = parser_vis.parse_args(sys.argv[2:])
 
         data = pickle.load(open(args.result_file, "rb"))
-        for fold_idx, fold in enumerate(data['folds']):
+        for fold_idx, fold in tqdm.tqdm(enumerate(data['folds'])):
             res = fold['res']
 
-            ax = plot_convergence(res)
-            plt.grid()
-            plt.legend()
-            plt.show()
-        #
-        #     # ax = plot_evaluations(res)
-        #     # plt.grid()
-        #     # plt.legend()
-        #     # plt.show()
-        #
-        #     # ax = plot_objective(res)
-        #     # plt.grid()
-        #     # plt.legend()
-        #     # plt.show()
+            if args.plot_convergence:
+                ax = plot_convergence(res)
+                ax.set_title("Fold %i" % fold_idx)
+                plt.grid()
+                plt.legend()
+                if args.pgf_out_dir:
+                    plt.savefig(os.path.join(args.pgf_out_dir, 'convergence_%i.pgf' % fold_idx))
+                else:
+                    plt.show()
+                plt.close()
+                plt.clf()
+
+            if args.plot_evaluations:
+                ax = plot_evaluations(res)
+                plt.grid()
+                plt.legend()
+
+                if args.pgf_out_dir:
+                    plt.savefig(os.path.join(args.pgf_out_dir, 'evaluations_%i.pgf' % fold_idx))
+                else:
+                    plt.show()
+
+            if args.plot_objective:
+                ax = plot_objective(res)
+                plt.grid()
+                plt.legend()
+
+                if args.pgf_out_dir:
+                    plt.savefig(os.path.join(args.pgf_out_dir, 'objective_%i.pgf' % fold_idx))
+                else:
+                    plt.show()
 
         result_df = pd.DataFrame(columns=['fold',
                                           'iterations',
