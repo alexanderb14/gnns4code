@@ -131,7 +131,7 @@ def train_generate_and_validate_default_graphs(training_graphs, config, num_grap
 
 def train_generate_and_validate_clang_graph(training_graph, config, num_graphs_to_gen, num_graphs_to_be_equal):
     # Transform graph
-    clang_codegraph_models.transform_graph(training_graph)
+    training_graph = clang_codegraph_models.transform_graph(training_graph)
 
     # Create node type ids
     nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor()
@@ -365,13 +365,13 @@ def test_train_and_gen_defaultgraph_medium_1():
         'gnn_h_size': 16,
 
         "learning_rate": 0.001,
-        "num_training_unroll": 55,
+        "num_training_unroll": 56,
         "run_id": "one_defaultgraph_medium_1",
 
         "num_node_types": 7,
         "num_edge_types": 5,
 
-        "num_epochs": 1000,
+        "num_epochs": 500,
         "gen_num_node_max": 12
     })
 
@@ -403,7 +403,7 @@ def test_train_and_gen_defaultgraph_medium_2():
         "num_node_types": 7,
         "num_edge_types": 5,
 
-        "num_epochs": 1000,
+        "num_epochs": 500,
         "gen_num_node_max": 12
     })
 
@@ -429,13 +429,13 @@ def test_train_and_gen_defaultgraph_medium_3():
         'gnn_h_size': 16,
 
         "learning_rate": 0.001,
-        "num_training_unroll": 43,
+        "num_training_unroll": 44,
         "run_id": "one_defaultgraph_medium_3",
 
         "num_node_types": 7,
         "num_edge_types": 5,
 
-        "num_epochs": 1000,
+        "num_epochs": 500,
         "gen_num_node_max": 12
     })
 
@@ -460,13 +460,13 @@ def test_train_and_gen_defaultgraph_medium_4():
         'gnn_h_size': 8,
 
         "learning_rate": 0.001,
-        "num_training_unroll": 45,
+        "num_training_unroll": 46,
         "run_id": "one_defaultgraph_medium_4",
 
         "num_node_types": 4,
         "num_edge_types": 4,
 
-        "num_epochs": 1000,
+        "num_epochs": 500,
         "gen_num_node_max": 12
     })
 
@@ -498,7 +498,7 @@ def test_train_and_gen_many_defaultgraphs_medium():
         "num_node_types": 4,
         "num_edge_types": 4,
 
-        "num_epochs": 1000,
+        "num_epochs": 500,
         "gen_num_node_max": 12
     })
 
