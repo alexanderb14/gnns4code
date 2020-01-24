@@ -272,7 +272,7 @@ class DeepGMGCell(object):
                         if action_meta['type'] == 'add_edge':
                             # Model
                             f_ae_logits = self.state.weights[function_name](h_G)                                # [b, input_dimension]
-                            f_ae = tf.nn.sigmoid(f_ae_logits)                                                   # [b, input_dimension]
+                            f_ae = tf.nn.softmax(f_ae_logits)                                                   # [b, input_dimension]
                             self.ops[function_name] = f_ae
 
                             # Training
