@@ -50,13 +50,13 @@ class DeepGMGCellState(object):
                 mlp_dim = h_size * m_size
 
                 if action_meta['type'] == 'add_node':
-                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_node')
+                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'linear', 'add_node')
 
                 elif action_meta['type'] == 'add_edge':
-                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'sigmoid', 'add_edge')
+                    self.weights[function_name] = utils.MLP(mlp_dim, input_dimension, [], 'linear', 'add_edge')
 
                 elif action_meta['type'] == 'add_edge_to':
-                    self.weights[function_name] = utils.MLP(h_size * 2, input_dimension, [], 'sigmoid', 'add_edge_to')
+                    self.weights[function_name] = utils.MLP(h_size * 2, input_dimension, [], 'linear', 'add_edge_to')
 
                 elif action_meta['type'] == 'add_function':
                     self.weights[function_name] = utils.MLP(h_size * m_size, input_dimension, [], 'sigmoid', 'add_function')
@@ -377,7 +377,7 @@ class DeepGMGCell(object):
                                 labels = self.placeholders[label_name]                                          # [b*v, e]
 
                                 # Loss
-                                loss_log = labels * tf.log(f_nodes) * (-1)
+                                loss_log = labels * (s_u - s_u_max - tf.log(es_sum)) * (-1)
 
                                 loss_nodes = tf.unsorted_segment_sum(data=loss_log,
                                                                      segment_ids=embeddings_to_graph_mappings_existent,
