@@ -28,7 +28,7 @@ CONFIG_DEFAULTGRAPH = {
     'batch_size': 100,
     "num_epochs": 100,
 
-    'tie_fwd_bkwd': 1,
+    'tie_fwd_bkwd': 0,
     "use_edge_bias": 0,
 
     "out_dir": '/tmp',

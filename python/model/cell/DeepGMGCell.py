@@ -377,7 +377,7 @@ class DeepGMGCell(object):
                                 labels = self.placeholders[label_name]                                          # [b*v, e]
 
                                 # Loss
-                                loss_log = labels * (s_u - s_u_max - tf.log(es_sum)) * (-1)
+                                loss_log = labels * (s_u_normalized - tf.log(es_sum)) * (-1)
 
                                 loss_nodes = tf.unsorted_segment_sum(data=loss_log,
                                                                      segment_ids=embeddings_to_graph_mappings_existent,

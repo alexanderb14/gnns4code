@@ -9,6 +9,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
@@ -51,6 +52,7 @@ class DeepGMGState(object):
         tf_config = tf.ConfigProto()
         tf_config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=self.graph, config=tf_config)
+        # self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
 
         self.best_epoch_weights = None
 
@@ -188,7 +190,6 @@ class DeepGMGModel(object):
                 batch_data = batch_data_by_cell[cell_idx]
 
                 # Generative model
-
                 if action and utils.AE.ACTION in action:
                     action_index = None
                     action_name = get_class_key(utils.A, action[utils.AE.ACTION]).lower()
@@ -654,7 +655,7 @@ class DeepGMGTrainer(DeepGMGModel):
     """
     Implementation of the training process.
     """
-    def __init__(self, config: dict, state: DeepGMGState):
+    def __init__(self, config: dict, state: DeepGMGState, artifact_dir):
         super().__init__(config, state)
 
         self.with_gradient_monitoring = True if 'gradient_monitoring' in self.config and self.config['gradient_monitoring'] == 1 else False
@@ -665,36 +666,31 @@ class DeepGMGTrainer(DeepGMGModel):
             self.__make_train_step()
             self._initialize_model()
 
-        # Configure directories and save model configuration
-        SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-        if 'out_dir' in self.config:
-            self.out_dir = self.config['out_dir'] + '/_out/'
-        else:
-            self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
+        # Configure directories
+        self.out_dir = os.path.join(artifact_dir, 'training')
 
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
 
-        if 'run_id' in self.config:
-            self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-        else:
-            self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-
-        self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
-        if os.path.exists(self.out_dir):
-            shutil.rmtree(self.out_dir)
-
+        # - for model
         model_path = self.out_dir + '/model'
+        print(model_path)
         os.makedirs(model_path, exist_ok=True)
         self.model_file = os.path.join(model_path, 'model.pickle')
 
+        # - for tensorboard
         self.tensorboard_dir = self.out_dir + '/tensorboard'
         os.makedirs(self.tensorboard_dir, exist_ok=True)
 
+        # Restore model if it already exists
+        if os.path.exists(self.model_file):
+            self.state.restore_weights_from_disk(self.model_file)
+
+        # Save model configuration
         with open(self.out_dir + '/config.json', 'w') as fp:
             json.dump(self.config, fp)
 
-        # Configure TensorBoard
+        # Configure tensorboard writer
         self.train_writer = tf.summary.FileWriter(os.path.join(self.tensorboard_dir, 'train'), graph=self.state.graph)
 
     def __make_model(self) -> None:
@@ -782,6 +778,8 @@ class DeepGMGTrainer(DeepGMGModel):
             self.train_writer.add_summary(gradients, iteration)
             self.train_writer.add_summary(clipped_gradients, iteration)
 
+            self.train_writer.flush()
+
         return result
 
     def train(self, train_datas) -> None:
@@ -865,7 +863,7 @@ class DeepGMGTrainer(DeepGMGModel):
 
                     best_epoch_count = 0
 
-            if epoch % 100 == 0:
+            if epoch % self.config['save_best_model_interval'] == 0:
                 self.state.save_weights_to_disk(self.model_file)
 
             # Logging

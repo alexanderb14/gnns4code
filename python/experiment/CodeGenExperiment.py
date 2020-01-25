@@ -9,6 +9,8 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
 
 import utils
+import applications.utils as app_utils
+
 import applications.clang_code.codegraph_models as clang_codegraph_models
 import applications.clang_code.preprocess as clang_preprocess
 from model.DeepGMGModel import DeepGMGModel, DeepGMGState, DeepGMGTrainer, DeepGMGGenerator
@@ -40,25 +42,24 @@ FILE_NAME_BLACKLIST_10_30_STATEMENT_NAME_WHITELIST_COMPLEX_TYPE_FILTERED = [
 ]
 
 CONFIG = {
-    "run_id": "clang_code_graph",
-    "out_dir": "/tmp",
-
     "f_add_edge_to_relevant_node_masking": 1,
     "use_edge_bias": 1,
     "tie_fwd_bkwd": 0,
 
-    "num_training_unroll": 200,
+    "save_best_model_interval": 1,
+
     "num_edge_types": 4,
-    "num_node_types": 59,
 
     "learning_rate": 0.0001,
     "clamp_gradient_norm": 1.0,
 
-    "batch_size": 50,
+    "batch_size": 100,
 
     "gnn_h_size": 128,
     "gnn_m_size": 2,
     "num_timesteps": 4,
+
+    "gen_num_node_max": 100,
 
     "gradient_monitoring": 1,
     "do_validstep": 0,
@@ -118,7 +119,7 @@ def main():
         # Parse args
         parser_train = subparsers.add_parser('train')
 
-        parser_train.add_argument("--preprocessing_artifact_dir", type=str,
+        parser_train.add_argument("--artifact_dir", type=str,
                                  help="out directory containing preprocessing information")
 
         args = parser_train.parse_args(sys.argv[2:])
@@ -126,25 +127,104 @@ def main():
         #
         # Build Config
         config = CONFIG
-        print('Config: %s' % json.dumps(config))
 
         # Load data
-        with open(os.path.join(args.preprocessing_artifact_dir, 'actions.json'), 'r') as f:
+        with open(os.path.join(args.artifact_dir, 'actions.json'), 'r') as f:
             data = json.load(f)
 
             train_data = json.loads(json.dumps(data), object_hook=utils.json_keys_to_int)
 
-        utils.get_data_stats(train_data)
+        # Get statistics of dataset and dimension model
+        data_stats = utils.get_data_stats(train_data)
+        utils.pretty_print_dict(data_stats)
+        config['num_training_unroll'] = data_stats['num_actions_max'] + 1
+        config['num_node_types'] = data_stats['num_node_types'] + 1
+
+        with open(os.path.join(args.artifact_dir, 'config.json'), 'w') as fp:
+            json.dump(config, fp)
+        utils.pretty_print_dict(config)
 
         # Create objects
         state = DeepGMGState(config)
-        trainer = DeepGMGTrainer(config, state)
+        trainer = DeepGMGTrainer(config, state, args.artifact_dir)
 
         # Train
         trainer.train(train_data)
 
         # Save weights
         state.save_weights_to_disk(trainer.model_file)
+
+    # Generate command
+    if command_arg.command == 'generate':
+        # Parse args
+        parser_generate = subparsers.add_parser('generate')
+
+        parser_generate.add_argument("--artifact_dir", type=str,
+                                    help="directory containing training information")
+        parser_generate.add_argument('--num_generate')
+        parser_generate.add_argument("--create_pngs")
+
+        args = parser_generate.parse_args(sys.argv[2:])
+
+        #
+        # Build Config
+        with open(os.path.join(args.artifact_dir, 'config.json'), 'r') as fp:
+            config = json.load(fp)
+        print('Config: %s' % json.dumps(config))
+
+        # Create objects
+        state = DeepGMGState(config)
+        generator = DeepGMGGenerator(config, state)
+        state.restore_weights_from_disk(os.path.join(args.artifact_dir, 'training', 'model', 'model.pickle'))
+
+        # Generate
+        graphs = []
+        graphs_valid = []
+
+        for i in range(0, int(args.num_generate)):
+            # Restore node types
+            with open(os.path.join(args.artifact_dir, 'node_types.json'), 'r') as f:
+                node_types = json.load(f)
+
+            graph, p_codegraph, p_min = generator.generate_clang(node_types)
+            graphs.append(graph)
+
+            # Optional: Write dot graphs
+            if args.create_pngs:
+                try:
+                    clang_codegraph_models.save_dot_graph(
+                        graph, os.path.join(args.create_pngs, 'graph_%i.png' % i), 'png', node_types, True)
+                except RecursionError:
+                    pass
+
+            # Optional: Validate
+            try:
+                # Generate code
+                cg_vstr = clang_codegraph_models.CodeGenVisitor(500)
+                graph.accept(cg_vstr, clang_codegraph_models.sort_edges_conforming_c_syntax)
+
+                # Format code
+                code = cg_vstr.get_code_as_str()
+                code_formatted, returncode_format = app_utils.format_c_code(code)
+
+                _, returncode_compile = app_utils.compile_to_bytecode(code)
+
+                if returncode_format == 0 and returncode_compile == 0:
+                    print('C Code:')
+                    print(code_formatted)
+
+                    graph.c_code = code_formatted
+                    graphs_valid.append(graph)
+
+            except:
+                pass
+
+            print('p_codegraph: %.4f, p_min: %.4f' % (p_codegraph, p_min))
+            print('Number generated: %i, Number valid: %i, Percent valid: %.4f' % (
+                i, len(graphs_valid), len(graphs_valid) / len(graphs)))
+            utils.print_dash()
+
+
 
     # Preprocess command
     if command_arg.command == 'preprocess':
@@ -153,7 +233,7 @@ def main():
 
         parser_prep.add_argument("--code_dir", type=str,
                             help="directory of c code files")
-        parser_prep.add_argument("--preprocessing_artifact_dir", type=str,
+        parser_prep.add_argument("--artifact_dir", type=str,
                                  help="out directory containing preprocessing information")
 
         # Filter
@@ -193,7 +273,7 @@ def main():
         # clang_preprocess.process_source_directory(filenames, args.preprocessing_artifact_dir, None)
 
         # Actionize
-        graph_dir = os.path.join(args.preprocessing_artifact_dir, 'out')
+        graph_dir = os.path.join(args.artifact_dir, 'out')
 
         # PROCESSING 1: Create graphs from json files in graph_dir
         num_ok = 0
@@ -285,8 +365,17 @@ def main():
             graph.accept(final_nic_vstr)
         node_types = final_nic_vstr.node_type_ids_by_statements
 
+        # PROCESSING 6: Again, create action sequences of graphs. This is needed because the node types changed
+        #               and they're part of the action sequences.
+        nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False)
+
+        for i, graph in enumerate(tqdm.tqdm(graphs_filtered, desc='Creating action sequences')):
+            # Action sequence
+            graph.accept(nic_vstr)
+            graph.actions = clang_codegraph_models.create_action_sequence(graph, args.debug)
+
         # Save node types
-        with open(os.path.join(args.preprocessing_artifact_dir, 'node_types.json'), 'w') as outfile:
+        with open(os.path.join(args.artifact_dir, 'node_types.json'), 'w') as outfile:
             json.dump(node_types, outfile)
 
         # Save actions to disk
@@ -296,7 +385,7 @@ def main():
                 utils.AE.GRAPH_IDX: i,
                 utils.AE.ACTIONS: graph.actions
             })
-        with open(os.path.join(args.preprocessing_artifact_dir, 'actions.json'), 'w') as outfile:
+        with open(os.path.join(args.artifact_dir, 'actions.json'), 'w') as outfile:
             json.dump(preprocessed, outfile)
 
         # Optional: Print stats
