@@ -609,7 +609,7 @@ class DeepGMGGenerator(DeepGMGModel):
         node_type, p_addnode = self.__sample_add_node_action()
         p_codegraph.append(p_addnode[node_type])
 
-        while self.last_added_node_id < self.num_nodes_max:
+        while self.last_added_node_id < self.num_nodes_max - 1:
             self.last_added_node_type = node_type
             if is_first_node:
                 is_first_node = False

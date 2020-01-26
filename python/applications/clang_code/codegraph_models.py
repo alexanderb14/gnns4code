@@ -53,7 +53,7 @@ def sort_edges_conforming_c_syntax(edges_in):
             edges_LIVE = [edges_LIVE[1], edges_LIVE[0]]
 
         if len(edges_AST) == 1:
-            if edges_LIVE[0].dest.name in LITERAL_NAMES:
+            if len(edges_LIVE) == 1 and edges_LIVE[0].dest.name in LITERAL_NAMES:
                 return edges_AST + edges_LIVE
             else:
                 return edges_LIVE + edges_AST
