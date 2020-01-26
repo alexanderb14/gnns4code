@@ -144,6 +144,10 @@ class DeepGMGCell(object):
         self.placeholders['actions'] = tf.placeholder(tf.int32, [None], name='actions')
         actions = tf.one_hot(self.placeholders['actions'], len(action_metas))                               # [b, num_action_metas]
 
+        # Sampling temperature
+        self.placeholders['temperature'] = tf.placeholder(tf.float32, shape=(), name='temperature')
+        temperature = self.placeholders['temperature']
+
         # Model
         # #########################################
         with tf.variable_scope('DeepGMGCell_%i' % self.cell_id):
@@ -250,6 +254,7 @@ class DeepGMGCell(object):
                         if action_meta['type'] in ['add_node', 'add_const_value_node', 'add_type_node', 'add_instruction_node']:
                             # Model
                             f_an_logits = self.state.weights[function_name](h_G)                                # [b, input_dimension]
+                            f_an_logits = tf.divide(f_an_logits, temperature)
                             f_an = tf.nn.softmax(f_an_logits)                                                   # [b, input_dimension]
                             self.ops[function_name] = f_an
 
@@ -272,6 +277,7 @@ class DeepGMGCell(object):
                         if action_meta['type'] == 'add_edge':
                             # Model
                             f_ae_logits = self.state.weights[function_name](h_G)                                # [b, input_dimension]
+                            f_ae_logits = tf.divide(f_ae_logits, temperature)
                             f_ae = tf.nn.softmax(f_ae_logits)                                                   # [b, input_dimension]
                             self.ops[function_name] = f_ae
 
@@ -341,6 +347,7 @@ class DeepGMGCell(object):
                             h_u_all_h_v = tf.concat([h_u_all, h_v_repeated], 1)                                 # [b*v, 2h]
 
                             s_u = self.state.weights[function_name](h_u_all_h_v)                                # [b*v, e]
+                            s_u = tf.divide(s_u, temperature)
 
                             # Softmax
                             # - Normalize probabilities

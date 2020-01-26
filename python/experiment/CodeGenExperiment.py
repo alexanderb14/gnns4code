@@ -61,7 +61,7 @@ CONFIG = {
 
     "gen_num_node_max": 100,
 
-    "gradient_monitoring": 1,
+    "gradient_monitoring": 0,
     "do_validstep": 0,
     "batch_scheduling_policy": "LIFO",
 
@@ -163,6 +163,7 @@ def main():
                                     help="directory containing training information")
         parser_generate.add_argument('--num_generate')
         parser_generate.add_argument("--create_pngs")
+        parser_generate.add_argument("--temperature", type=float)
 
         args = parser_generate.parse_args(sys.argv[2:])
 
@@ -174,7 +175,7 @@ def main():
 
         # Create objects
         state = DeepGMGState(config)
-        generator = DeepGMGGenerator(config, state)
+        generator = DeepGMGGenerator(config, state, args.temperature)
         state.restore_weights_from_disk(os.path.join(args.artifact_dir, 'training', 'model', 'model.pickle'))
 
         # Generate
@@ -216,8 +217,8 @@ def main():
                     graph.c_code = code_formatted
                     graphs_valid.append(graph)
 
-            except:
-                pass
+            except Exception as e:
+                print(str(e))
 
             print('p_codegraph: %.4f, p_min: %.4f' % (p_codegraph, p_min))
             print('Number generated: %i, Number valid: %i, Percent valid: %.4f' % (

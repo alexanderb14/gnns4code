@@ -100,11 +100,11 @@ def train_generate_and_validate_default_graphs(training_graphs, config, num_grap
 
     # Train
     state = DeepGMGState(config)
-    trainer = DeepGMGTrainer(config, state)
+    trainer = DeepGMGTrainer(config, state, '/tmp')
     trainer.train(train_datas)
 
     # Generate and validate
-    generator = DeepGMGGenerator(config, state)
+    generator = DeepGMGGenerator(config, state, 1)
 
     num_graphs_equal = 0
     for _ in range(num_graphs_to_gen):

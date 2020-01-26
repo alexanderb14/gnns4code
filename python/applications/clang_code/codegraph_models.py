@@ -602,7 +602,10 @@ class CodeGenVisitor(VisitorBase):
                 pass
 
             elif obj.name == 'CallExpr':
-                function_name = obj.specifics['function_name']
+                if 'function_name' in obj.specifics:
+                    function_name = obj.specifics['function_name']
+                else:
+                    function_name = 'foo'
                 self.body.append(function_name + '(')
 
             elif obj.name == 'CharacterLiteral':
