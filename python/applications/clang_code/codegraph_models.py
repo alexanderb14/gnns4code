@@ -30,9 +30,9 @@ def is_forward_edge_type(edge_type_id) -> bool:
         return False
 
 def get_edge_name_by_edge_type(edge_type_id) -> str:
-    if edge_type_id == 0 or edge_type_id == 1:
+    if edge_type_id == 0 or edge_type_id == 2:
         return 'AST'
-    elif edge_type_id == 2 or edge_type_id == 3:
+    elif edge_type_id == 1 or edge_type_id == 3:
         return 'LIVE'
 
 def sort_edges_conforming_c_syntax(edges_in):
@@ -53,7 +53,7 @@ def sort_edges_conforming_c_syntax(edges_in):
             edges_LIVE = [edges_LIVE[1], edges_LIVE[0]]
 
         if len(edges_AST) == 1:
-            if edges_LIVE[0].dest.name in LITERAL_NAMES:
+            if len(edges_LIVE) == 1 and edges_LIVE[0].dest.name in LITERAL_NAMES:
                 return edges_AST + edges_LIVE
             else:
                 return edges_LIVE + edges_AST
@@ -602,7 +602,10 @@ class CodeGenVisitor(VisitorBase):
                 pass
 
             elif obj.name == 'CallExpr':
-                function_name = obj.specifics['function_name']
+                if 'function_name' in obj.specifics:
+                    function_name = obj.specifics['function_name']
+                else:
+                    function_name = 'foo'
                 self.body.append(function_name + '(')
 
             elif obj.name == 'CharacterLiteral':
@@ -1098,11 +1101,11 @@ def transform_graph(graph: object) -> object:
 def save_dot_graph(graph: object, filename: str, filetype: str, node_types: dict, debug: bool = False):
     # Assign node ids
     assign_node_ids_in_bfs_order(graph)
-    for function in graph.functions:
-        num_statements = len(function.all_statements)
-
-        for i, cfg_block in enumerate(function.all_cfg_blocks):
-            cfg_block.node_id = num_statements + i
+    # for function in graph.functions:
+    #     num_statements = len(function.all_statements)
+    #
+    #     for i, cfg_block in enumerate(function.all_cfg_blocks):
+    #         cfg_block.node_id = num_statements + i
 
 
     # Assign edge idx

@@ -9,6 +9,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
@@ -51,6 +52,7 @@ class DeepGMGState(object):
         tf_config = tf.ConfigProto()
         tf_config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=self.graph, config=tf_config)
+        # self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
 
         self.best_epoch_weights = None
 
@@ -126,12 +128,14 @@ class DeepGMGModel(object):
     """
     Base class of the Trainer and Generator.
     """
-    def __init__(self, config, state):
+    def __init__(self, config, state, temperature):
         self.config = config
         self.state = state
 
         self.ggnn_layers = []
         self.cells = []
+
+        self.temperature = temperature
 
         with self.state.graph.as_default():
             self.ops = {}
@@ -145,7 +149,7 @@ class DeepGMGModel(object):
                            tf.local_variables_initializer())
         self.state.sess.run(init_op)
 
-    def _graphs_to_batch_feed_dict(self, actions_by_graphs: list, graph_sizes: list, len_unroll: int) -> dict:
+    def _graphs_to_batch_feed_dict(self, actions_by_graphs: list, graph_sizes: list, len_unroll: int, temperature: float) -> dict:
         num_edge_types = self.config['num_edge_types']
         extended_init = 'extended_init' in self.config and self.config['extended_init']
 
@@ -188,7 +192,6 @@ class DeepGMGModel(object):
                 batch_data = batch_data_by_cell[cell_idx]
 
                 # Generative model
-
                 if action and utils.AE.ACTION in action:
                     action_index = None
                     action_name = get_class_key(utils.A, action[utils.AE.ACTION]).lower()
@@ -292,6 +295,9 @@ class DeepGMGModel(object):
                 feed_dict[self.cells[cell_idx].placeholders['extended_init']] \
                     = cell_data['extended_init']
 
+            # Temperature
+            feed_dict[self.cells[cell_idx].placeholders['temperature']] = temperature
+
             # Labels
             label_index = 1
 
@@ -327,8 +333,8 @@ class DeepGMGGenerator(DeepGMGModel):
     """
     Implementation of the generation process.
     """
-    def __init__(self, config: dict, state: DeepGMGState):
-        super().__init__(config, state)
+    def __init__(self, config: dict, state: DeepGMGState, temperature):
+        super().__init__(config, state, temperature)
 
         self.debug = self.config['debug'] == 1
 
@@ -387,7 +393,7 @@ class DeepGMGGenerator(DeepGMGModel):
             utils.AE.ADJ_LIST:                  utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[0],
             utils.AE.NUMS_INCOMING_EDGES_BY_TYPE:utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
         }
-        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1, self.temperature)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
 
         fetch_list = [self.cells[0].ops['embeddings']]
@@ -417,7 +423,7 @@ class DeepGMGGenerator(DeepGMGModel):
             action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] \
                 = utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
 
-        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1, self.temperature)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
 
         fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops['f_add_node']]
@@ -459,7 +465,7 @@ class DeepGMGGenerator(DeepGMGModel):
             action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] \
                 = utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
 
-        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1, self.temperature)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
 
         fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops['f_add_edge']]
@@ -498,7 +504,7 @@ class DeepGMGGenerator(DeepGMGModel):
             action[utils.AE.NUMS_INCOMING_EDGES_BY_TYPE] \
                 = utils.graph_to_adjacency_lists(self.current_graph[utils.T.EDGES], self.config['tie_fwd_bkwd'])[1]
 
-        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1)
+        feed_dict = self._graphs_to_batch_feed_dict([{0: action}], [self.num_nodes_max], 1, self.temperature)
         feed_dict[self.placeholders['embeddings_in']] = self.embeddings
 
         fetch_list = [self.cells[0].ops['embeddings'], self.cells[0].ops['f_add_edge_to']]
@@ -603,7 +609,7 @@ class DeepGMGGenerator(DeepGMGModel):
         node_type, p_addnode = self.__sample_add_node_action()
         p_codegraph.append(p_addnode[node_type])
 
-        while self.last_added_node_id < self.num_nodes_max:
+        while self.last_added_node_id < self.num_nodes_max - 1:
             self.last_added_node_type = node_type
             if is_first_node:
                 is_first_node = False
@@ -654,8 +660,8 @@ class DeepGMGTrainer(DeepGMGModel):
     """
     Implementation of the training process.
     """
-    def __init__(self, config: dict, state: DeepGMGState):
-        super().__init__(config, state)
+    def __init__(self, config: dict, state: DeepGMGState, artifact_dir):
+        super().__init__(config, state, 1)
 
         self.with_gradient_monitoring = True if 'gradient_monitoring' in self.config and self.config['gradient_monitoring'] == 1 else False
 
@@ -665,36 +671,31 @@ class DeepGMGTrainer(DeepGMGModel):
             self.__make_train_step()
             self._initialize_model()
 
-        # Configure directories and save model configuration
-        SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-        if 'out_dir' in self.config:
-            self.out_dir = self.config['out_dir'] + '/_out/'
-        else:
-            self.out_dir = SCRIPT_DIR + '/..' + '/_out/'
+        # Configure directories
+        self.out_dir = os.path.join(artifact_dir, 'training')
 
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
 
-        if 'run_id' in self.config:
-            self.run_id = self.config['run_id'] + '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-        else:
-            self.run_id = '_'.join([time.strftime('%Y-%m-%d-%H-%M-%S'), str(os.getpid())])
-
-        self.out_dir += str(len(next(os.walk(self.out_dir))[1])) + '_' + self.run_id
-        if os.path.exists(self.out_dir):
-            shutil.rmtree(self.out_dir)
-
+        # - for model
         model_path = self.out_dir + '/model'
+        print(model_path)
         os.makedirs(model_path, exist_ok=True)
         self.model_file = os.path.join(model_path, 'model.pickle')
 
+        # - for tensorboard
         self.tensorboard_dir = self.out_dir + '/tensorboard'
         os.makedirs(self.tensorboard_dir, exist_ok=True)
 
+        # Restore model if it already exists
+        if os.path.exists(self.model_file):
+            self.state.restore_weights_from_disk(self.model_file)
+
+        # Save model configuration
         with open(self.out_dir + '/config.json', 'w') as fp:
             json.dump(self.config, fp)
 
-        # Configure TensorBoard
+        # Configure tensorboard writer
         self.train_writer = tf.summary.FileWriter(os.path.join(self.tensorboard_dir, 'train'), graph=self.state.graph)
 
     def __make_model(self) -> None:
@@ -782,6 +783,8 @@ class DeepGMGTrainer(DeepGMGModel):
             self.train_writer.add_summary(gradients, iteration)
             self.train_writer.add_summary(clipped_gradients, iteration)
 
+            self.train_writer.flush()
+
         return result
 
     def train(self, train_datas) -> None:
@@ -833,7 +836,7 @@ class DeepGMGTrainer(DeepGMGModel):
 
                 # Build feed dict
                 # 1. Graph info
-                feed_dict = self._graphs_to_batch_feed_dict(batch_actions_by_graphs, batch_graph_sizes, self.config['num_training_unroll'])
+                feed_dict = self._graphs_to_batch_feed_dict(batch_actions_by_graphs, batch_graph_sizes, self.config['num_training_unroll'], 1)
 
                 # 2. Initial node embeddings
                 num_nodes_all_graphs = sum(batch_graph_sizes)
@@ -865,7 +868,7 @@ class DeepGMGTrainer(DeepGMGModel):
 
                     best_epoch_count = 0
 
-            if epoch % 100 == 0:
+            if 'save_best_model_interval' in self.config and epoch % self.config['save_best_model_interval'] == 0:
                 self.state.save_weights_to_disk(self.model_file)
 
             # Logging

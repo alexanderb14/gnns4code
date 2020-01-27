@@ -326,13 +326,13 @@ def get_data_stats(data):
                 edge_type = action[L.LABEL_1]
                 edge_types.append(edge_type)
 
-
-    print("Dataset Statistics")
-    print("- num_graphs: %i" % (len(data)))
-    print("- num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
-    print("- node_types (max of it): %i" % (max(node_types)))
-    print("- edge_types (max of it): %i" % (max(edge_types)))
-
+    return {
+        'num_graphs': len(data),
+        'num_actions_min': min(num_actions),
+        'num_actions_max': max(num_actions),
+        'num_node_types': max(node_types),
+        'num_edge_types': max(edge_types)
+    }
 
 def freeze_dict(d):
     if isinstance(d, dict):
@@ -524,6 +524,8 @@ class MLP(object):
                 acts = tf.nn.sigmoid(hid)
             elif self.activation == 'linear':
                 acts = hid
+            elif self.activation == 'tanh':
+                acts = tf.nn.tanh(hid)
             else:
                 raise Exception('Unknown activation function: %s' % self.activation)
         last_hidden = hid

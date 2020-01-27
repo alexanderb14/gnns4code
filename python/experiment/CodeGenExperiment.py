@@ -1,14 +1,20 @@
 import argparse
 import json
 import os
+import pickle
 import shutil
+import subprocess
 import sys
 import tqdm
+from queue import Queue, Empty
+from threading import Thread
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(SCRIPT_DIR + '/..')
 
 import utils
+import applications.utils as app_utils
+
 import applications.clang_code.codegraph_models as clang_codegraph_models
 import applications.clang_code.preprocess as clang_preprocess
 from model.DeepGMGModel import DeepGMGModel, DeepGMGState, DeepGMGTrainer, DeepGMGGenerator
@@ -40,27 +46,26 @@ FILE_NAME_BLACKLIST_10_30_STATEMENT_NAME_WHITELIST_COMPLEX_TYPE_FILTERED = [
 ]
 
 CONFIG = {
-    "run_id": "clang_code_graph",
-    "out_dir": "/tmp",
-
     "f_add_edge_to_relevant_node_masking": 1,
     "use_edge_bias": 1,
     "tie_fwd_bkwd": 0,
 
-    "num_training_unroll": 200,
+    "save_best_model_interval": 1,
+
     "num_edge_types": 4,
-    "num_node_types": 59,
 
     "learning_rate": 0.0001,
     "clamp_gradient_norm": 1.0,
 
-    "batch_size": 50,
+    "batch_size": 100,
 
     "gnn_h_size": 128,
     "gnn_m_size": 2,
     "num_timesteps": 4,
 
-    "gradient_monitoring": 1,
+    "gen_num_node_max": 80,
+
+    "gradient_monitoring": 0,
     "do_validstep": 0,
     "batch_scheduling_policy": "LIFO",
 
@@ -101,6 +106,50 @@ CONFIG = {
 }
 
 
+class Worker(Thread):
+    def __init__(self, tasks, graphs, graphs_valid):
+        Thread.__init__(self)
+        self.tasks = tasks
+        self.graphs = graphs
+        self.graphs_valid = graphs_valid
+        self.daemon = True
+        self.start()
+
+    def run(self):
+        while True:
+            ok = True
+
+            func, args, kargs = self.tasks.get()
+            try:
+                func(*args, **kargs)
+            except Exception as e:
+                # print(e)
+                ok = False
+
+            if ok:
+                self.graphs_valid.append(args)
+
+                print('Number graphs: %i, Number valid graphs: %i, Percent valid: %.4f' % (
+                    len(self.graphs), len(self.graphs_valid), len(self.graphs_valid) / len(self.graphs)))
+
+            self.tasks.task_done()
+
+
+class ThreadPool:
+    def __init__(self, num_threads, graphs, graphs_valid):
+        self.tasks = Queue(num_threads)
+        self.graphs = graphs
+        self.graphs_valid = graphs_valid
+        for _ in range(num_threads):
+            Worker(self.tasks, self.graphs, self.graphs_valid)
+
+    def add_task(self, func, *args, **kargs):
+        self.tasks.put((func, args, kargs))
+
+    def wait_completion(self):
+        self.tasks.join()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', help='Subcommand to run')
@@ -118,7 +167,7 @@ def main():
         # Parse args
         parser_train = subparsers.add_parser('train')
 
-        parser_train.add_argument("--preprocessing_artifact_dir", type=str,
+        parser_train.add_argument("--artifact_dir", type=str,
                                  help="out directory containing preprocessing information")
 
         args = parser_train.parse_args(sys.argv[2:])
@@ -126,25 +175,110 @@ def main():
         #
         # Build Config
         config = CONFIG
-        print('Config: %s' % json.dumps(config))
 
         # Load data
-        with open(os.path.join(args.preprocessing_artifact_dir, 'actions.json'), 'r') as f:
+        with open(os.path.join(args.artifact_dir, 'actions.json'), 'r') as f:
             data = json.load(f)
 
             train_data = json.loads(json.dumps(data), object_hook=utils.json_keys_to_int)
 
-        utils.get_data_stats(train_data)
+        # Get statistics of dataset and dimension model
+        data_stats = utils.get_data_stats(train_data)
+        utils.pretty_print_dict(data_stats)
+        config['num_training_unroll'] = data_stats['num_actions_max'] + 1
+        config['num_node_types'] = data_stats['num_node_types'] + 1
+
+        with open(os.path.join(args.artifact_dir, 'config.json'), 'w') as fp:
+            json.dump(config, fp)
+        utils.pretty_print_dict(config)
 
         # Create objects
         state = DeepGMGState(config)
-        trainer = DeepGMGTrainer(config, state)
+        trainer = DeepGMGTrainer(config, state, args.artifact_dir)
 
         # Train
         trainer.train(train_data)
 
         # Save weights
         state.save_weights_to_disk(trainer.model_file)
+
+    # Generate command
+    if command_arg.command == 'generate':
+        # Parse args
+        parser_generate = subparsers.add_parser('generate')
+
+        parser_generate.add_argument("--artifact_dir", type=str,
+                                    help="directory containing training information")
+        parser_generate.add_argument('--num_generate')
+        parser_generate.add_argument("--create_pngs")
+        parser_generate.add_argument("--temperature", type=float)
+
+        args = parser_generate.parse_args(sys.argv[2:])
+
+        #
+        # Build Config
+        with open(os.path.join(args.artifact_dir, 'config.json'), 'r') as fp:
+            config = json.load(fp)
+        print('Config: %s' % json.dumps(config))
+
+        # Create objects
+        state = DeepGMGState(config)
+        generator = DeepGMGGenerator(config, state, args.temperature)
+        state.restore_weights_from_disk(os.path.join(args.artifact_dir, 'training', 'model', 'model.pickle'))
+
+        # Generate
+        graphs = []
+        graphs_valid = []
+
+        def work(graph, p_codegraph, p_min):
+            try:
+                # Generate code
+                cg_vstr = clang_codegraph_models.CodeGenVisitor(500)
+                graph.accept(cg_vstr, clang_codegraph_models.sort_edges_conforming_c_syntax)
+
+                # Format code
+                code = cg_vstr.get_code_as_str()
+                code_formatted, returncode_format = app_utils.format_c_code(code)
+
+                _, returncode_compile = app_utils.compile_to_bytecode(code)
+
+                if returncode_format == 0 and returncode_compile == 0:
+                    graph.c_code = code_formatted
+                else:
+                    raise Exception()
+
+            except Exception as e:
+                # print(str(e))
+                raise e
+
+            utils.print_dash()
+            print(graph.c_code)
+            print('p_codegraph: %.4f, p_min: %.4f' % (p_codegraph, p_min))
+            utils.print_dash()
+
+            return graph
+
+        pool = ThreadPool(5, graphs, graphs_valid)
+
+        for i in range(0, int(args.num_generate)):
+            # Restore node types
+            with open(os.path.join(args.artifact_dir, 'node_types.json'), 'r') as f:
+                node_types = json.load(f)
+
+            graph, p_codegraph, p_min = generator.generate_clang(node_types)
+            graphs.append(graph)
+
+            # Optional: Write dot graphs
+            if args.create_pngs:
+                try:
+                    clang_codegraph_models.save_dot_graph(
+                        graph, os.path.join(args.create_pngs, 'graph_%i.png' % i), 'png', node_types, True)
+                except RecursionError:
+                    pass
+
+            # Validate
+            pool.add_task(work, graph, p_codegraph, p_min)
+
 
     # Preprocess command
     if command_arg.command == 'preprocess':
@@ -153,7 +287,7 @@ def main():
 
         parser_prep.add_argument("--code_dir", type=str,
                             help="directory of c code files")
-        parser_prep.add_argument("--preprocessing_artifact_dir", type=str,
+        parser_prep.add_argument("--artifact_dir", type=str,
                                  help="out directory containing preprocessing information")
 
         # Filter
@@ -186,16 +320,16 @@ def main():
 
         args = parser_prep.parse_args(sys.argv[2:])
 
-        # # C -> JSON Kernels
+        # # PROCESSING 1: C -> JSON Kernels
         # filenames = utils.get_files_by_file_size(args.code_dir, False)
         #
         # utils.prepare_preprocessing_artifact_dir(args.preprocessing_artifact_dir)
         # clang_preprocess.process_source_directory(filenames, args.preprocessing_artifact_dir, None)
 
         # Actionize
-        graph_dir = os.path.join(args.preprocessing_artifact_dir, 'out')
+        graph_dir = os.path.join(args.artifact_dir, 'out')
 
-        # PROCESSING 1: Create graphs from json files in graph_dir
+        # PROCESSING 2: Create graphs from json files in graph_dir
         num_ok = 0
         num_not_ok = 0
 
@@ -232,12 +366,12 @@ def main():
         print('ok: %i, not_ok: %i' % (num_ok, num_not_ok))
         print('size of data set:', len(graphs))
 
-        # PROCESSING 2: Transform graphs
+        # PROCESSING 3: Transform graphs
         graphs_transformed = []
         for graph in tqdm.tqdm(graphs, desc='Transforming graphs'):
             graphs_transformed.append(clang_codegraph_models.transform_graph(graph))
 
-        # PROCESSING 3: Create action sequences of graphs
+        # PROCESSING 4: Create action sequences of graphs
         nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False)
 
         for i, graph in enumerate(tqdm.tqdm(graphs_transformed, desc='Creating action sequences')):
@@ -245,7 +379,7 @@ def main():
             graph.accept(nic_vstr)
             graph.actions = clang_codegraph_models.create_action_sequence(graph, args.debug)
 
-        # PROCESSING 4: Get statistics and perform filtering
+        # PROCESSING 5: Get statistics and perform filtering
         graphs_filtered = []
         for graph in tqdm.tqdm(graphs_transformed, desc='Filtering graphs'):
             stats_vstr = clang_codegraph_models.StatisticsVisitor()
@@ -278,15 +412,54 @@ def main():
             if ok:
                 graphs_filtered.append(graph)
 
-        # PROCESSING 5: Get final node types
+        # CHECK: Can we compile graphs back to C code?
+        graphs_filtered_new = []
+        for i, graph in tqdm.tqdm(enumerate(graphs_filtered), desc='Compile check'):
+            # Graph -> C code
+            cg_vstr = clang_codegraph_models.CodeGenVisitor(500)
+            graph.accept(cg_vstr, clang_codegraph_models.sort_edges_conforming_c_syntax)
+            c_code = cg_vstr.get_code_as_str()
+
+            # Prepare files
+            tmpdir = '/tmp'
+            c_out_filename = os.path.join(tmpdir, str(i) + '_generated.cl')
+
+            with open(c_out_filename, 'w') as f:
+                f.write(c_code)
+
+            # Compile c code and save stdout, stderr to file
+            cmd = ['clang', '-c', c_out_filename, '-o', c_out_filename + '.a']
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            if process.returncode != 0:
+                stdout, stderr = process.communicate()
+
+            ok = process.returncode == 0
+
+            # Select if ok
+            if ok:
+                graphs_filtered_new.append(graph)
+        print('Dropping %i graphs because of compile check.' % (len(graphs_filtered) - len(graphs_filtered_new)))
+        graphs_filtered = graphs_filtered_new
+
+        # PROCESSING 6: Get final node types
         final_nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False)
         for i, graph in enumerate(tqdm.tqdm(graphs_filtered, desc='Creating final node ids')):
             # Action sequence
             graph.accept(final_nic_vstr)
         node_types = final_nic_vstr.node_type_ids_by_statements
 
+        # PROCESSING 7: Again, create action sequences of graphs. This is needed because the node types changed
+        #               and they're part of the action sequences.
+        nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False)
+
+        for i, graph in enumerate(tqdm.tqdm(graphs_filtered, desc='Creating action sequences')):
+            # Action sequence
+            graph.accept(nic_vstr)
+            graph.actions = clang_codegraph_models.create_action_sequence(graph, args.debug)
+
         # Save node types
-        with open(os.path.join(args.preprocessing_artifact_dir, 'node_types.json'), 'w') as outfile:
+        with open(os.path.join(args.artifact_dir, 'node_types.json'), 'w') as outfile:
             json.dump(node_types, outfile)
 
         # Save actions to disk
@@ -296,7 +469,7 @@ def main():
                 utils.AE.GRAPH_IDX: i,
                 utils.AE.ACTIONS: graph.actions
             })
-        with open(os.path.join(args.preprocessing_artifact_dir, 'actions.json'), 'w') as outfile:
+        with open(os.path.join(args.artifact_dir, 'actions.json'), 'w') as outfile:
             json.dump(preprocessed, outfile)
 
         # Optional: Print stats
