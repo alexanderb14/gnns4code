@@ -162,6 +162,25 @@ def main():
         parser.print_help()
         exit(1)
 
+    # Evaluate command
+    if command_arg.command == 'evaluate':
+        # Parse args
+        parser_eval = subparsers.add_parser('evaluate')
+
+        parser_eval.add_argument("--artifact_dir", type=str,
+                                 help="out directory containing generate information")
+
+        args = parser_eval.parse_args(sys.argv[2:])
+
+        #
+        selected_kernels_dir = os.path.join(args.artifact_dir, 'filtered_c')
+        files = os.listdir(selected_kernels_dir)
+        for i, filename in enumerate(tqdm.tqdm(files, desc='Extracting Clang AST from files')):
+            dir_and_filename = os.path.join(SCRIPT_DIR, selected_kernels_dir, filename)
+
+            stdout, stderr, result, cmd = clang_preprocess.process_source_file(dir_and_filename)
+            print(stdout)
+
     # Train command
     if command_arg.command == 'train':
         # Parse args
@@ -313,8 +332,6 @@ def main():
                             help='Break dataset processing at this number.')
         parser_prep.add_argument("--create_pngs",
                             help="create pngs of training graphs", action='store_true')
-        parser_prep.add_argument("--dump_selected_graphs_as_c_files", type=str,
-                        help="dump selected graphs as c files")
         parser_prep.add_argument("--debug",
                             help="write verbose output to stdout", action='store_true')
 
@@ -472,6 +489,19 @@ def main():
         with open(os.path.join(args.artifact_dir, 'actions.json'), 'w') as outfile:
             json.dump(preprocessed, outfile)
 
+        # Copy selected graphs as c files
+        dump_dir = os.path.join(args.artifact_dir, 'filtered_c')
+        if os.path.exists(dump_dir):
+            shutil.rmtree(dump_dir)
+        os.makedirs(dump_dir)
+
+        for graph in tqdm.tqdm(graphs_filtered, desc='Saving C files'):
+            filename, _ = os.path.splitext(graph.name)
+
+            shutil.copyfile(
+                os.path.join(args.code_dir, filename),
+                os.path.join(dump_dir, filename))
+
         # Optional: Print stats
         if args.debug:
             utils.pretty_print_dict(node_types)
@@ -491,19 +521,6 @@ def main():
         print('num_nodes_max:', num_nodes_max)
         print('num_graphs:', len(graphs_filtered))
 
-        # Optional: Dump graphs as c files
-        if args.dump_selected_graphs_as_c_files:
-            dump_dir = args.dump_selected_graphs_as_c_files
-            if os.path.exists(dump_dir):
-                shutil.rmtree(dump_dir)
-            os.makedirs(dump_dir)
-
-            for graph in tqdm.tqdm(graphs_filtered, desc='Saving C files'):
-                filename, _ = os.path.splitext(graph.name)
-
-                shutil.copyfile(
-                    os.path.join(args.code_dir, filename),
-                    os.path.join(dump_dir, filename))
 
 if __name__ == '__main__':
     main()
