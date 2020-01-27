@@ -1077,11 +1077,51 @@ def main():
 #        global ssh_client
         ssh_client.close()
 
+    # Dump csv command
+    if command_arg.command == 'dump_csv':
+        parser_dump = subparsers.add_parser('dump_csv')
+
+        parser_dump.add_argument('--result_files', nargs='+', default=[])
+        parser_dump.add_argument('--result_labels', nargs='+', default=[])
+
+        parser_dump.add_argument('--out_csv')
+
+        args = parser_dump.parse_args(sys.argv[2:])
+
+        #
+        result_df = pd.DataFrame(columns=['Method', 'Fold', 'Iteration', 'y_valid', 'y_valid_max' 'y_test', 'y_test_max'])
+        for result_file_idx, result_file in enumerate(args.result_files):
+            res = pickle.load(open(result_file, "rb"))
+
+            for fold_idx, fold_data in enumerate(res['folds']):
+                y_valid_max, y_test_max = float('-inf'), float('-inf')
+
+                for iteration_idx, iteration_data in enumerate(fold_data['iterations']):
+                    y_valid = iteration_data['y_valid'] * (-1)
+                    y_test = iteration_data['y_test'] * (-1)
+
+                    y_valid_max = max(y_valid_max, y_valid)
+                    y_test_max = max(y_test_max, y_test)
+
+                    result_df = result_df.append({
+                        'Method': args.result_labels[result_file_idx],
+                        'Fold': fold_idx,
+                        'Iteration': iteration_idx,
+                        'y_valid': y_valid,
+                        'y_valid_max': y_valid_max,
+                        'y_test': y_test,
+                        'y_test_max': y_test_max
+                    }, ignore_index=True)
+
+        utils.print_df(result_df)
+        result_df.to_csv(args.out_csv)
+
     # Visualize command
     if command_arg.command == 'visualize':
         parser_vis = subparsers.add_parser('visualize')
 
-        parser_vis.add_argument('--result_file')
+        parser_vis.add_argument('--result_files', nargs='+', default=[])
+        parser_vis.add_argument('--result_labels', nargs='+', default=[])
 
         parser_vis.add_argument('--plot_convergence', action='store_true')
         parser_vis.add_argument('--plot_evaluations', action='store_true')
@@ -1091,15 +1131,33 @@ def main():
 
         args = parser_vis.parse_args(sys.argv[2:])
 
-        data = pickle.load(open(args.result_file, "rb"))
-        for fold_idx, fold in tqdm.tqdm(enumerate(data['folds'])):
-            res = fold['res']
+        #
+        datas = []
+        for result_file in args.result_files:
+            datas.append(pickle.load(open(result_file, "rb")))
+
+        for fold_idx, _ in tqdm.tqdm(enumerate(datas[0]['folds'])):
+            ress = []
+            for idx in range(len(datas)):
+                ress.append((args.result_labels[idx], datas[idx]['folds'][fold_idx]['res']))
 
             if args.plot_convergence:
-                ax = plot_convergence(res)
+                plt.figure(figsize=(4.5, 4))
+                plt.xlabel("x", labelpad=0)
+                plt.ylabel("y", labelpad=0)
+
+                ax = plt.axes()
+                ax.tick_params(axis='both', which='major', pad=0)
+                ax = plot_convergence(*ress, ax=ax, true_minimum=-1)
+
                 ax.set_title("Fold %i" % fold_idx)
                 plt.grid()
-                plt.legend()
+
+                if fold_idx == 4:
+                    plt.legend()
+
+                plt.yticks(np.arange(-1, -0.4, step=0.1))
+
                 if args.pgf_out_dir:
                     plt.savefig(os.path.join(args.pgf_out_dir, 'convergence_%i.pgf' % fold_idx))
                 else:
@@ -1108,7 +1166,7 @@ def main():
                 plt.clf()
 
             if args.plot_evaluations:
-                ax = plot_evaluations(res)
+                ax = plot_evaluations(ress)
                 plt.grid()
                 plt.legend()
 
@@ -1118,7 +1176,7 @@ def main():
                     plt.show()
 
             if args.plot_objective:
-                ax = plot_objective(res)
+                ax = plot_objective(ress)
                 plt.grid()
                 plt.legend()
 
