@@ -65,7 +65,7 @@ CONFIG = {
 
     "gen_num_node_max": 80,
 
-    "gradient_monitoring": 0,
+    "gradient_monitoring": 1,
     "do_validstep": 0,
     "batch_scheduling_policy": "LIFO",
 
