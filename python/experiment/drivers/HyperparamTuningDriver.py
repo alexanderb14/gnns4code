@@ -74,7 +74,11 @@ def get_slurm_job_stati():
     running_jobs = set()
 
     for line in lines[2:]:
-        job_id = int(re.findall('[0-9]+', line)[0])
+        job_id_matches = re.findall('[0-9]{8}? ', line)
+        if len(job_id_matches) > 0:
+            job_id = int(job_id_matches[0])
+        else:
+            continue
         job_status = re.findall('[A-Z]+', line)[0]
 
         if job_status == 'COMPLETED':
@@ -231,9 +235,22 @@ class Job:
     def trigger(self):
         cmd = ['echo']
         cmd += ['\"']
+
+        # Wrapper that saves CUDA_VISIBLE_DEVICES
+        # Wrapper that blocks until completion of all slurm job steps, which keeps the GPU allocated.
+        cmd += ['srun', '--gres=gpu:1', './gnns4code/taurus/wrapper.sh', 'gnns4code/taurus/checker.sh', str(len(self.tasks))]
+        cmd += ['&']
+
         for i, task in enumerate(self.tasks):
+            cmd += ['srun']
+
+            # Wrapper that loads and sets CUDA_VISIBLE_DEVICES
+            cmd += ['--gres=gpu:0']
+            cmd += ['./gnns4code/taurus/wrapper.sh']
+
             cmd += task.get_cmd()
             cmd += ['&']
+
         cmd += ['wait']
         cmd += ['\"']
 
@@ -243,6 +260,8 @@ class Job:
 
         print('Triggering Job with %i tasks' %
               (len(self.tasks)))
+
+        print(' '.join(cmd_full))
 
         job_id = run_slurm_job(' '.join(cmd_full))
 
@@ -985,7 +1004,7 @@ def main():
 
             # Split into folds
             # ###############################
-            kfold_k = 7
+            kfold_k = 10
             if dataset == 'amd':
                 df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_amd.csv'))
             elif dataset == 'nvidia':
@@ -1017,7 +1036,7 @@ def main():
             # Process on taurus
             # ###############################
             # Create processing queue
-            queue = ProcessingQueue(num_parallel_jobs=num_folds, num_parallel_tasks_per_job=4)
+            queue = ProcessingQueue(num_parallel_jobs=num_folds, num_parallel_tasks_per_job=6)
 
             # For each fold, get some initial points from the optimizer and append to job queue
             for fold_idx in range(num_folds):
