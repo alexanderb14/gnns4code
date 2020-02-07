@@ -1,11 +1,14 @@
 import argparse
+import concurrent.futures
 import json
 import os
 import pickle
+import pandas as pd
 import shutil
 import subprocess
 import sys
 import tqdm
+import uuid
 from queue import Queue, Empty
 from threading import Thread
 
@@ -150,6 +153,137 @@ class ThreadPool:
         self.tasks.join()
 
 
+def generate(artifact_dir, num_generate, create_pngs, temperature, generate_dir):
+    # Build Config
+    with open(os.path.join(artifact_dir, 'config.json'), 'r') as fp:
+        config = json.load(fp)
+    print('Config: %s' % json.dumps(config))
+
+    # Create objects
+    state = DeepGMGState(config)
+    generator = DeepGMGGenerator(config, state, temperature)
+    state.restore_weights_from_disk(os.path.join(artifact_dir, 'training', 'model', 'model.pickle'))
+
+    # Generate
+    graphs = []
+    graphs_valid = []
+
+
+    def work(graph, p_codegraph, p_min):
+        try:
+            # Generate code
+            cg_vstr = clang_codegraph_models.CodeGenVisitor(500)
+            graph.accept(cg_vstr, clang_codegraph_models.sort_edges_conforming_c_syntax)
+
+            # Format code
+            code = cg_vstr.get_code_as_str()
+            code_formatted, returncode_format = app_utils.format_c_code(code)
+
+            _, returncode_compile = app_utils.compile_to_bytecode(code)
+
+            if returncode_format == 0 and returncode_compile == 0:
+                graph.c_code = code_formatted
+            else:
+                raise Exception()
+
+        except Exception as e:
+            # print(str(e))
+            raise e
+
+        utils.print_dash()
+        print(graph.c_code)
+        print('p_codegraph: %.4f, p_min: %.4f' % (p_codegraph, p_min))
+        utils.print_dash()
+
+        with open(os.path.join(generate_dir, str(uuid.uuid4()) + '.c'), 'w') as file:
+            file.write(graph.c_code)
+
+        return graph
+
+
+    pool = ThreadPool(5, graphs, graphs_valid)
+
+    if os.path.exists(generate_dir):
+        shutil.rmtree(generate_dir)
+    os.makedirs(generate_dir)
+
+    counter = 0
+    while True:
+        counter += 1
+
+        num_files = len(os.listdir(generate_dir))
+        print('Progress: %i/%i -> %.2f' % (num_files, num_generate, num_files / num_generate))
+
+        if num_files >= num_generate:
+            break
+
+        # Restore node types
+        with open(os.path.join(artifact_dir, 'node_types.json'), 'r') as f:
+            node_types = json.load(f)
+
+        try:
+            graph, p_codegraph, p_min = generator.generate_clang(node_types)
+        except:
+            continue
+
+        graphs.append(graph)
+
+        # Optional: Write dot graphs
+        if create_pngs:
+            try:
+                clang_codegraph_models.save_dot_graph(
+                    graph, os.path.join(create_pngs, 'graph_%i.png' % i), 'png', node_types, True)
+            except RecursionError:
+                pass
+
+        # Validate
+        pool.add_task(work, graph, p_codegraph, p_min)
+
+    num_files = len(os.listdir(generate_dir))
+    validity = float(num_files) / float(counter)
+
+    return validity
+
+def get_ast_depths_and_num_nodes(kernel_dir):
+    files = os.listdir(kernel_dir)
+
+    def fnc(filename):
+        dir_and_filename = os.path.join(SCRIPT_DIR, kernel_dir, filename)
+
+        stdout, stderr, result, cmd = clang_preprocess.process_source_file(dir_and_filename)
+        try:
+            jRoot = json.loads(stdout)
+        except:
+            return {
+                'AST Depth': -1,
+                'Number AST nodes': -1
+            }
+            
+
+        gs = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)
+        if len(gs) != 1:
+            raise Exception()
+        g = gs[0]
+
+        nr_vstr = clang_codegraph_models.NodeRankCreateVisitor()
+        g.accept(nr_vstr)
+
+        stats_vstr = clang_codegraph_models.StatisticsVisitor()
+        g.accept(stats_vstr)
+
+        return {
+            'AST Depth': nr_vstr.max_rank,
+            'Number AST nodes': stats_vstr.num_nodes
+        }
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        for result in tqdm.tqdm(executor.map(fnc, files), desc='Extracting Clang AST from files', total=len(files)):
+            results.append(result)
+
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', help='Subcommand to run')
@@ -169,17 +303,40 @@ def main():
 
         parser_eval.add_argument("--artifact_dir", type=str,
                                  help="out directory containing generate information")
+        parser_eval.add_argument('--out_csv')
 
         args = parser_eval.parse_args(sys.argv[2:])
 
-        #
-        selected_kernels_dir = os.path.join(args.artifact_dir, 'filtered_c')
-        files = os.listdir(selected_kernels_dir)
-        for i, filename in enumerate(tqdm.tqdm(files, desc='Extracting Clang AST from files')):
-            dir_and_filename = os.path.join(SCRIPT_DIR, selected_kernels_dir, filename)
+        # Training set
+        result_df = pd.DataFrame(columns=['Dataset', 'AST Depth', 'Number AST nodes', 'Temperature', 'Validity'])
 
-            stdout, stderr, result, cmd = clang_preprocess.process_source_file(dir_and_filename)
-            print(stdout)
+        results = get_ast_depths_and_num_nodes(os.path.join(args.artifact_dir, 'filtered_c'))
+        for result in results:
+            result_df = result_df.append({
+                'Dataset': 'Training',
+                'AST Depth': result['AST Depth'],
+                'Number AST nodes': result['Number AST nodes'],
+            }, ignore_index=True)
+
+        num_files_trainingset = len(os.listdir(os.path.join(args.artifact_dir, 'filtered_c')))
+
+        # Generate
+        for temperature in [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.5, 3, 4, 5]:
+            generate_dir = os.path.join(args.artifact_dir, 'generated_c_' + str(temperature))
+
+            validity = generate(args.artifact_dir, num_files_trainingset, False, temperature, generate_dir)
+            results = get_ast_depths_and_num_nodes(os.path.join(args.artifact_dir, generate_dir))
+
+            for result in results:
+                result_df = result_df.append({
+                    'Dataset': 'GNN',
+                    'AST Depth': result['AST Depth'],
+                    'Number AST nodes': result['Number AST nodes'],
+                    'Temperature': temperature,
+                    'Validity': round(validity, 5)
+                }, ignore_index=True)
+
+            result_df.to_csv(args.out_csv)
 
     # Train command
     if command_arg.command == 'train':
@@ -228,76 +385,13 @@ def main():
 
         parser_generate.add_argument("--artifact_dir", type=str,
                                     help="directory containing training information")
-        parser_generate.add_argument('--num_generate')
+        parser_generate.add_argument('--num_generate', type=int)
         parser_generate.add_argument("--create_pngs")
         parser_generate.add_argument("--temperature", type=float)
 
         args = parser_generate.parse_args(sys.argv[2:])
 
-        #
-        # Build Config
-        with open(os.path.join(args.artifact_dir, 'config.json'), 'r') as fp:
-            config = json.load(fp)
-        print('Config: %s' % json.dumps(config))
-
-        # Create objects
-        state = DeepGMGState(config)
-        generator = DeepGMGGenerator(config, state, args.temperature)
-        state.restore_weights_from_disk(os.path.join(args.artifact_dir, 'training', 'model', 'model.pickle'))
-
-        # Generate
-        graphs = []
-        graphs_valid = []
-
-        def work(graph, p_codegraph, p_min):
-            try:
-                # Generate code
-                cg_vstr = clang_codegraph_models.CodeGenVisitor(500)
-                graph.accept(cg_vstr, clang_codegraph_models.sort_edges_conforming_c_syntax)
-
-                # Format code
-                code = cg_vstr.get_code_as_str()
-                code_formatted, returncode_format = app_utils.format_c_code(code)
-
-                _, returncode_compile = app_utils.compile_to_bytecode(code)
-
-                if returncode_format == 0 and returncode_compile == 0:
-                    graph.c_code = code_formatted
-                else:
-                    raise Exception()
-
-            except Exception as e:
-                # print(str(e))
-                raise e
-
-            utils.print_dash()
-            print(graph.c_code)
-            print('p_codegraph: %.4f, p_min: %.4f' % (p_codegraph, p_min))
-            utils.print_dash()
-
-            return graph
-
-        pool = ThreadPool(5, graphs, graphs_valid)
-
-        for i in range(0, int(args.num_generate)):
-            # Restore node types
-            with open(os.path.join(args.artifact_dir, 'node_types.json'), 'r') as f:
-                node_types = json.load(f)
-
-            graph, p_codegraph, p_min = generator.generate_clang(node_types)
-            graphs.append(graph)
-
-            # Optional: Write dot graphs
-            if args.create_pngs:
-                try:
-                    clang_codegraph_models.save_dot_graph(
-                        graph, os.path.join(args.create_pngs, 'graph_%i.png' % i), 'png', node_types, True)
-                except RecursionError:
-                    pass
-
-            # Validate
-            pool.add_task(work, graph, p_codegraph, p_min)
-
+        generate(args.artifact_dir, args.num_generate, args.create_pngs, args.temperature)
 
     # Preprocess command
     if command_arg.command == 'preprocess':
@@ -475,19 +569,19 @@ def main():
             graph.accept(nic_vstr)
             graph.actions = clang_codegraph_models.create_action_sequence(graph, args.debug)
 
-        # Save node types
-        with open(os.path.join(args.artifact_dir, 'node_types.json'), 'w') as outfile:
-            json.dump(node_types, outfile)
-
-        # Save actions to disk
-        preprocessed = []
-        for i, graph in enumerate(graphs_filtered):
-            preprocessed.append({
-                utils.AE.GRAPH_IDX: i,
-                utils.AE.ACTIONS: graph.actions
-            })
-        with open(os.path.join(args.artifact_dir, 'actions.json'), 'w') as outfile:
-            json.dump(preprocessed, outfile)
+        # # Save node types
+        # with open(os.path.join(args.artifact_dir, 'node_types.json'), 'w') as outfile:
+        #     json.dump(node_types, outfile)
+        #
+        # # Save actions to disk
+        # preprocessed = []
+        # for i, graph in enumerate(graphs_filtered):
+        #     preprocessed.append({
+        #         utils.AE.GRAPH_IDX: i,
+        #         utils.AE.ACTIONS: graph.actions
+        #     })
+        # with open(os.path.join(args.artifact_dir, 'actions.json'), 'w') as outfile:
+        #     json.dump(preprocessed, outfile)
 
         # Copy selected graphs as c files
         dump_dir = os.path.join(args.artifact_dir, 'filtered_c')
