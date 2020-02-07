@@ -989,6 +989,7 @@ def main():
         preprocessing_artifact_dir_llvm_mem2reg = os.path.join(args.preprocessing_artifact_dir, 'llvm_mem2reg')
         utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_clang)
         utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm)
+        utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm_mem2reg)
 
         # Find all .cl files and extract code graphs from them
         files = utils.get_files_by_extension(args.code_dir, '.cl')
