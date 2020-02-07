@@ -97,7 +97,7 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str=No
 
         if mem2reg:
             cmd_mem2reg = [app_utils.OPT_EXECUTABLE,
-                           '-mem2reg', out_filename + '.ll', '-o', out_filename + '.ll']
+                           '-passes', 'mem2reg', out_filename + '.ll', '-o', out_filename + '.ll']
             process = subprocess.Popen(cmd_mem2reg, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             stdout_mem2reg, stderr_mem2reg = process.communicate()
             result_mem2reg = process.returncode
