@@ -54,7 +54,7 @@ def execute_ssh_command(cmd):
 
     try:
         stdin, stdout, stderr = ssh_client.exec_command(cmd)
-    except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
+    except (socket.timeout, paramiko.ssh_exception.SSHException, ConnectionResetError) as e:
         ssh_client = None
         return execute_ssh_command(cmd)
 
@@ -74,7 +74,11 @@ def get_slurm_job_stati():
     running_jobs = set()
 
     for line in lines[2:]:
-        job_id = int(re.findall('[0-9]+', line)[0])
+        job_id_matches = re.findall('[0-9]{8}? ', line)
+        if len(job_id_matches) > 0:
+            job_id = int(job_id_matches[0])
+        else:
+            continue
         job_status = re.findall('[A-Z]+', line)[0]
 
         if job_status == 'COMPLETED':
@@ -129,7 +133,7 @@ def trigger_slurm_jobs(task: str, method: str, config: dict, train_idx, valid_id
     elif task == 'devmap':
         cmd = exp_utils.build_devmap_experiment_fold_cmd(method, train_idx, valid_idx, test_idx, fold_idx, dataset, run_artifact_dir, 0, config_str)
 
-    if method == 'DeepTuneInst2Vec':
+    if method == 'DeepTuneInst2Vec' or method == 'DeepTuneLSTM':
         slurm_config_file = 'ml_long.slurm'
     else:
         slurm_config_file = 'ml.slurm'
@@ -231,9 +235,22 @@ class Job:
     def trigger(self):
         cmd = ['echo']
         cmd += ['\"']
+
+        # Wrapper that saves CUDA_VISIBLE_DEVICES
+        # Wrapper that blocks until completion of all slurm job steps, which keeps the GPU allocated.
+        cmd += ['srun', '--gres=gpu:1', './gnns4code/taurus/wrapper.sh', 'gnns4code/taurus/checker.sh', str(len(self.tasks))]
+        cmd += ['&']
+
         for i, task in enumerate(self.tasks):
+            cmd += ['srun']
+
+            # Wrapper that loads and sets CUDA_VISIBLE_DEVICES
+            cmd += ['--gres=gpu:0']
+            cmd += ['./gnns4code/taurus/wrapper.sh']
+
             cmd += task.get_cmd()
             cmd += ['&']
+
         cmd += ['wait']
         cmd += ['\"']
 
@@ -243,6 +260,8 @@ class Job:
 
         print('Triggering Job with %i tasks' %
               (len(self.tasks)))
+
+        # print(' '.join(cmd_full))
 
         job_id = run_slurm_job(' '.join(cmd_full))
 
@@ -985,7 +1004,7 @@ def main():
 
             # Split into folds
             # ###############################
-            kfold_k = 7
+            kfold_k = 10
             if dataset == 'amd':
                 df = pd.read_csv(os.path.join(SCRIPT_DIR, '../../../data/dev_mapping_task/prediction_task_amd.csv'))
             elif dataset == 'nvidia':
@@ -1017,14 +1036,17 @@ def main():
             # Process on taurus
             # ###############################
             # Create processing queue
-            queue = ProcessingQueue(num_parallel_jobs=num_folds, num_parallel_tasks_per_job=4)
+            queue = ProcessingQueue(num_parallel_jobs=num_folds, num_parallel_tasks_per_job=3)
 
             # For each fold, get some initial points from the optimizer and append to job queue
             for fold_idx in range(num_folds):
-                # Get params from optimizer
-                opt = data['folds'][fold_idx]['opt']
-                x = opt.ask(n_points=num_parallel_per_iteration)
-                data['folds'][fold_idx]['x'] = x
+                if len(data['folds'][fold_idx]['iterations']) == 0:
+                    # Take init parameters
+                    x = [default_params]
+                else:
+                    # Get params from optimizer
+                    opt = data['folds'][fold_idx]['opt']
+                    x = opt.ask(n_points=num_parallel_per_iteration)
 
                 # Create job and add to queue
                 if len(data['folds'][fold_idx]['iterations']) < num_iterations:
@@ -1100,8 +1122,12 @@ def main():
                     y_valid = iteration_data['y_valid'] * (-1)
                     y_test = iteration_data['y_test'] * (-1)
 
-                    y_valid_max = max(y_valid_max, y_valid)
-                    y_test_max = max(y_test_max, y_test)
+                    if y_valid > y_valid_max:
+                        y_valid_max = y_valid
+                        y_test_max = y_test
+
+#                    y_valid_max = max(y_valid_max, y_valid)
+#                    y_test_max = max(y_test_max, y_test)
 
                     result_df = result_df.append({
                         'Method': args.result_labels[result_file_idx],
@@ -1136,6 +1162,7 @@ def main():
         for result_file in args.result_files:
             datas.append(pickle.load(open(result_file, "rb")))
 
+        result_dfs = []
         for fold_idx, _ in tqdm.tqdm(enumerate(datas[0]['folds'])):
             ress = []
             for idx in range(len(datas)):
@@ -1185,7 +1212,7 @@ def main():
                 else:
                     plt.show()
 
-        result_df = pd.DataFrame(columns=['fold',
+            result_dfs.append(pd.DataFrame(columns=['fold',
                                           'iterations',
                                           'opt_min',
                                           'opt_min_idx',
@@ -1195,41 +1222,46 @@ def main():
                                           'accuracy_valid-accuracy_test',
                                           'num_trainable_parameters',
                                           'train_time',
-                                          'inference_time'])
+                                          'inference_time']))
 
-        for fold_idx, fold in enumerate(data['folds']):
-            if len(fold['iterations']):
-                min_idx = fold['opt'].yi.index(min(fold['opt'].yi))
+        for data, label, result_df in zip(datas, args.result_labels, result_dfs):
+          for fold_idx, fold in enumerate(data['folds']):
+              if len(fold['iterations']):
+                  min_idx = fold['opt'].yi.index(min(fold['opt'].yi))
 
-                accuracy_valid = aggregate_arithmetic_mean(fold['iterations'][min_idx]['df_fold'], 'valid') * (-1)
-                accuracy_test = aggregate_arithmetic_mean(fold['iterations'][min_idx]['df_fold'], 'test') * (-1)
-                num_trainable_parameters = fold['iterations'][min_idx]['df_fold'].loc[0]['num_trainable_parameters']
-                train_time = fold['iterations'][min_idx]['df_fold'].loc[0]['train_time']
-                inference_time = fold['iterations'][min_idx]['df_fold'].loc[0]['inference_time']
+                  accuracy_valid = aggregate_arithmetic_mean(fold['iterations'][min_idx]['df_fold'], 'valid') * (-1)
+                  accuracy_test = aggregate_arithmetic_mean(fold['iterations'][min_idx]['df_fold'], 'test') * (-1)
+                  num_trainable_parameters = fold['iterations'][min_idx]['df_fold'].loc[0]['num_trainable_parameters']
+                  train_time = fold['iterations'][min_idx]['df_fold'].loc[0]['train_time']
+                  inference_time = fold['iterations'][min_idx]['df_fold'].loc[0]['inference_time']
 
-                result_df.loc[len(result_df)] = [fold_idx,
-                                                 len(fold['iterations']),
-                                                 fold['opt'].yi[min_idx],
-                                                 min_idx,
-                                                 fold['opt'].Xi[min_idx],
-                                                 accuracy_valid,
-                                                 accuracy_test,
-                                                 accuracy_valid - accuracy_test,
-                                                 num_trainable_parameters,
-                                                 train_time,
-                                                 inference_time]
-            else:
-                print('WARNING: Fold %i has 0 iterations.' % fold_idx)
+                  result_df.loc[len(result_df)] = [fold_idx,
+                                                   len(fold['iterations']),
+                                                   fold['opt'].yi[min_idx],
+                                                   min_idx,
+                                                   fold['opt'].Xi[min_idx],
+                                                   accuracy_valid,
+                                                   accuracy_test,
+                                                   accuracy_valid - accuracy_test,
+                                                   num_trainable_parameters,
+                                                   train_time,
+                                                   inference_time]
+              else:
+                  print('WARNING: Fold %i has 0 iterations.' % fold_idx)
 
-        print('Results')
-        utils.print_dash()
-        utils.print_df(result_df)
+        # Print
+        for label, result_df in zip(args.result_labels, result_dfs):
+          print('Results of %s' % label)
+          utils.print_dash()
+          utils.print_df(result_df)
+          print()
 
-        print()
-        print('Arithmetic means')
-        utils.print_dash()
-        pd.set_option('display.float_format', lambda x: '%.3f' % x)
-        print(result_df.mean())
+        for label, result_df in zip(args.result_labels, result_dfs):
+          print('Arithmetic means of %s' % label)
+          utils.print_dash()
+          pd.set_option('display.float_format', lambda x: '%.3f' % x)
+          print(result_df.mean())
+          print()
 
 
 if __name__ == '__main__':
