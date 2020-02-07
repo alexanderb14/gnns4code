@@ -307,6 +307,8 @@ class NodeRankCreateVisitor(VisitorBase):
     def __init__(self, debug: int = False):
         super(NodeRankCreateVisitor, self).__init__()
 
+        self.max_rank = 0
+
     def visit(self, obj: object) -> None:
         if isinstance(obj, Function):
             obj.rank = 0
@@ -321,6 +323,9 @@ class NodeRankCreateVisitor(VisitorBase):
                 if edge.type == 'AST' or (edge.type == 'LIVE' and edge.dest.name == 'IntegerLiteral'):
                     statement = edge.dest
                     statement.rank = obj.rank + 1
+
+            if obj.rank > self.max_rank:
+                self.max_rank = obj.rank
 
 class RankNeighborsCreateVisitor(VisitorBase):
     def __init__(self, debug: int = False):
