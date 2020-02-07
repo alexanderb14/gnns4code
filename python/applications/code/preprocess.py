@@ -61,7 +61,7 @@ def process_source_file(src_file, out_filename='/tmp/out', additional_args=[], i
     return stdout_miner, stderr_miner, result_miner
 
 
-def process_source_directory(files, preprocessing_artifact_dir, substract_str=None, optimize_for_size=False):
+def process_source_directory(files, preprocessing_artifact_dir, substract_str=None, optimize_for_size=False, mem2reg=False):
     out_dir = os.path.join(preprocessing_artifact_dir, 'out')
     good_code_dir = os.path.join(preprocessing_artifact_dir, 'bad_code')
     bad_code_dir = os.path.join(preprocessing_artifact_dir, 'good_code')
@@ -95,6 +95,14 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str=No
         stdout_compile, stderr_compile = process.communicate()
         result_compile = process.returncode
 
+        if mem2reg:
+            cmd_mem2reg = [app_utils.OPT_EXECUTABLE,
+                           '-mem2reg', out_filename + '.ll', '-o', out_filename + '.ll']
+            process = subprocess.Popen(cmd_mem2reg, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            stdout_mem2reg, stderr_mem2reg = process.communicate()
+            result_mem2reg = process.returncode
+            print(' '.join(cmd_mem2reg))
+
         # LLVM IR -> Graph
         cmd_miner = [app_utils.OPT_EXECUTABLE,
                      '-load', app_utils.MINER_PASS_SHARED_LIBRARY,
@@ -110,6 +118,8 @@ def process_source_directory(files, preprocessing_artifact_dir, substract_str=No
 
         # In case of an error
         result = result_compile != 0 or result_miner != 0
+        if mem2reg:
+            result = result or result_mem2reg != 0
         if result is False:
             report_filename = os.path.join(
                 error_log_dir,
