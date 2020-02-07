@@ -54,7 +54,7 @@ def execute_ssh_command(cmd):
 
     try:
         stdin, stdout, stderr = ssh_client.exec_command(cmd)
-    except (socket.timeout, paramiko.ssh_exception.SSHException) as e:
+    except (socket.timeout, paramiko.ssh_exception.SSHException, ConnectionResetError) as e:
         ssh_client = None
         return execute_ssh_command(cmd)
 
@@ -1043,7 +1043,13 @@ def main():
                 # Get params from optimizer
                 opt = data['folds'][fold_idx]['opt']
                 x = opt.ask(n_points=num_parallel_per_iteration)
-                data['folds'][fold_idx]['x'] = x
+                if len(data['folds'][fold_idx]['iterations']) == 0:
+                    # Take init parameters
+                    x = [default_params]
+                else:
+                    # Get params from optimizer
+                    opt = data['folds'][fold_idx]['opt']
+                    x = opt.ask(n_points=num_parallel_per_iteration)
 
                 # Create job and add to queue
                 if len(data['folds'][fold_idx]['iterations']) < num_iterations:
@@ -1119,8 +1125,12 @@ def main():
                     y_valid = iteration_data['y_valid'] * (-1)
                     y_test = iteration_data['y_test'] * (-1)
 
-                    y_valid_max = max(y_valid_max, y_valid)
-                    y_test_max = max(y_test_max, y_test)
+                    if y_valid > y_valid_max:
+                        y_valid_max = y_valid
+                        y_test_max = y_test
+
+#                    y_valid_max = max(y_valid_max, y_valid)
+#                    y_test_max = max(y_test_max, y_test)
 
                     result_df = result_df.append({
                         'Method': args.result_labels[result_file_idx],
