@@ -1,0 +1,508 @@
+import copy
+import json
+import numpy as np
+import os
+import pandas as pd
+import shutil
+import tensorflow as tf
+from collections import defaultdict
+from typing import Tuple, Dict
+
+
+# Constants
+SMALL_NUMBER = 1e-7
+VERY_SMALL_NUMBER = 1e-30
+
+LABEL_OFFSET = 20
+ACTION_OFFSET = 30
+I_OFFSET = 40
+
+# Enums
+#######
+class AE:
+    GRAPH_IDX, STEP_IDX, ACTION, \
+    LAST_ADDED_NODE_ID, LAST_ADDED_NODE_TYPE, \
+    ACTIONS, \
+    GRAPH, NODE_STATES, ADJ_LIST, ACTION_CURRENT_IDX, ACTION_CURRENT, \
+    SKIP_NEXT, \
+    SUBGRAPH_START, \
+    NUM_NODES, \
+    PROBABILITY, \
+    NUMS_INCOMING_EDGES_BY_TYPE, \
+    KERNEL_NAME \
+    = range(0, 17)
+
+
+# Labels
+class L:
+    LABEL_0, LABEL_1 = range(LABEL_OFFSET, LABEL_OFFSET + 2)
+
+
+# Actions
+class A:
+    INIT_NODE, ADD_NODE, ADD_EDGE, ADD_EDGE_TO, ADD_FUNCTION, ADD_BASIC_BLOCK = range(ACTION_OFFSET, ACTION_OFFSET + 6)
+
+
+# Type
+class T:
+    NODES, EDGES, NODE_VALUES = range(30, 33)
+
+# Inputs
+class I:
+    AUX_IN_0 = range(LABEL_OFFSET, I_OFFSET + 1)
+
+
+# Functions
+###########
+def action_pretty_print(action, id=0):
+    # Action name
+    action_name = ''
+
+    if action[AE.ACTION] == A.INIT_NODE:
+        action_name = '<init_node>'
+    if action[AE.ACTION] == A.ADD_NODE:
+        if L.LABEL_0 in action and action[L.LABEL_0] != 0:
+            action_name = '<add_node>'
+        else:
+            action_name = '<not_add_node>'
+    elif action[AE.ACTION] == A.ADD_EDGE:
+        if L.LABEL_0 in action and action[L.LABEL_0] != 0:
+            action_name = '  <add_edge>'
+        else:
+            action_name = '  <not_add_edge>'
+    elif action[AE.ACTION] == A.ADD_EDGE_TO:
+        action_name = '  <add_edge_to>'
+
+    # Label names
+    l0_name = ''
+    l1_name = ''
+
+    if L.LABEL_0 in action:
+        l0_name = action[L.LABEL_0]
+    if L.LABEL_1 in action:
+        l1_name = action[L.LABEL_1]
+
+    # Probability
+    p = ''
+    if AE.PROBABILITY in action:
+        p = action[AE.PROBABILITY]
+
+    print('{:<5s}{:<30s}{:<10s}{:<10s}{:<20s}{:<22s}{:<15s}{:<25s}'.format(
+        str(id),
+        action_name,
+        str(l0_name),
+        str(l1_name),
+        str(action[AE.LAST_ADDED_NODE_ID]),
+        str(action[AE.LAST_ADDED_NODE_TYPE]),
+        str(p),
+        str(action[AE.ADJ_LIST]).replace('\n      ', '')))
+
+
+def get_dash():
+    return '-' * 40
+
+
+def print_dash():
+    print(get_dash())
+
+
+def action_pretty_print_header():
+    print_dash()
+    print('{:<5s}{:<30s}{:<10s}{:<10s}{:<20s}{:<22s}{:<15s}{:<25s}'.format(
+        'ID',
+        'ACTION',
+        'LABEL_0',
+        'LABEL_1',
+        'LAST_ADDED_NODE_ID',
+        'LAST_ADDED_NODE_TYPE',
+        'PROBABILITY',
+        'ADJ_LIST'))
+    print_dash()
+
+
+def action_sequence_pretty_print(actions):
+    action_pretty_print_header()
+
+    actions = copy.deepcopy(actions)
+
+    for id, action_idx in enumerate(actions):
+        action = actions[action_idx]
+        action_pretty_print(action, id)
+
+
+def glorot_init(shape):
+    initialization_range = np.sqrt(6.0 / (shape[-2] + shape[-1]))
+    return np.random.uniform(low=-initialization_range, high=initialization_range, size=shape).astype(np.float32)
+
+
+def actionize_default_graphs(graphs, tie_fwd_bkwd, verbose=False):
+    # Load data
+    action_datas = []
+    for graph in graphs:
+        action_data = graph_to_action_sequence(graph[T.EDGES], graph[T.NODES], 0)
+
+        enrich_action_sequence_with_graph_data(action_data, graph)
+        enrich_action_sequence_with_adj_list_data(action_data, tie_fwd_bkwd)
+
+        action_datas.append(action_data)
+
+        if verbose:
+            print('number of actions: %i' % len(action_data))
+            action_sequence_pretty_print(action_data)
+
+    return action_datas
+
+
+def graph_to_action_sequence(edges_in:list, nodes:list, graph_idx:int) -> dict:
+    # print(edges_in)
+    # print(nodes)
+    num_node_states_max = 0
+    actions = {}
+
+    last_added_node_type = 0
+    current = 0
+
+    step_idx = 0
+    for current, node in enumerate(nodes):
+        num_node_states_max = max(node, num_node_states_max)
+
+        actions[step_idx] = {
+                AE.ACTION:          A.ADD_NODE,
+                L.LABEL_0:          node,
+                AE.LAST_ADDED_NODE_ID: max(current-1, 0),
+                AE.LAST_ADDED_NODE_TYPE: last_added_node_type
+        }
+        step_idx = step_idx + 1
+
+        last_added_node_type = node
+
+        actions[step_idx] = {
+                AE.ACTION:              A.INIT_NODE,
+                AE.LAST_ADDED_NODE_ID:     current,
+                AE.LAST_ADDED_NODE_TYPE: last_added_node_type
+        }
+        step_idx = step_idx + 1
+
+        seen_edges = set()
+        for edge_in in edges_in:
+            start = edge_in[0]
+            edge_type = edge_in[1]
+            end = edge_in[2]
+
+            if (start == current and end < current) or (end == current and start < current):
+                if (start, edge_type, end) not in seen_edges:
+                    seen_edges.add((start, edge_type, end))
+                else:
+                    continue
+
+                actions[step_idx] = {
+                        AE.ACTION:              A.ADD_EDGE,
+                        L.LABEL_0:              1,
+                        AE.LAST_ADDED_NODE_ID:     current,
+                        AE.LAST_ADDED_NODE_TYPE: last_added_node_type
+                }
+                step_idx = step_idx + 1
+
+                actions[step_idx] = {
+                        AE.ACTION:              A.ADD_EDGE_TO,
+                        L.LABEL_0:              min(start, end),
+                        L.LABEL_1:              edge_type,
+                        AE.LAST_ADDED_NODE_ID:     current,
+                        AE.LAST_ADDED_NODE_TYPE: last_added_node_type
+                }
+                step_idx = step_idx + 1
+
+        # Action 2 Termination
+        actions[step_idx] = {
+                AE.ACTION:              A.ADD_EDGE,
+                L.LABEL_0:              0,
+                AE.LAST_ADDED_NODE_ID:     current,
+                AE.LAST_ADDED_NODE_TYPE: last_added_node_type
+        }
+        step_idx = step_idx + 1
+
+
+    # Action 1 Termination
+    actions[step_idx] = {
+        AE.ACTION:          A.ADD_NODE,
+        AE.LAST_ADDED_NODE_ID: current,
+        AE.LAST_ADDED_NODE_TYPE: last_added_node_type,
+        L.LABEL_0:          0
+    }
+
+    return actions
+
+
+def enrich_action_sequence_with_graph_data(actions:dict, graph: dict) -> dict:
+
+    for action_idx, action in actions.items():
+        action[AE.GRAPH] = graph
+
+
+def enrich_action_sequence_with_adj_list_data(actions:dict, tie_fwd_bkwd) -> dict:
+    graph_current = {T.NODES: [], T.EDGES: []}
+
+    for action_idx, action in actions.items():
+        adj_list, nums_incoming_edges_dicts_per_type \
+            = graph_to_adjacency_lists(graph_current[T.EDGES], tie_fwd_bkwd)
+        apply_action_to_graph(graph_current, action)
+
+        action[AE.ADJ_LIST] = adj_list
+        action[AE.NUM_NODES] = len(graph_current[T.NODES])
+        action[AE.NUMS_INCOMING_EDGES_BY_TYPE] = nums_incoming_edges_dicts_per_type
+
+
+def apply_action_to_graph(graph:dict, action:dict) -> None:
+    if action[AE.ACTION] == A.ADD_NODE:
+        node_type = action[L.LABEL_0]
+        if node_type == 0:
+            return
+
+        graph[T.NODES].append(node_type)
+
+    elif action[AE.ACTION] == A.ADD_EDGE_TO:
+        graph[T.EDGES].append([ \
+                action[AE.LAST_ADDED_NODE_ID], \
+                action[L.LABEL_1], \
+                action[L.LABEL_0] \
+        ])
+
+
+def graph_to_adjacency_lists(graph, tie_fwd_bkwd) -> (Dict[int, np.ndarray], Dict[int, Dict[int, int]]):
+    adj_lists = defaultdict(list)
+    num_incoming_edges_dicts_per_type = defaultdict(lambda: defaultdict(lambda: 0))
+    for src, e, dest in graph:
+        fwd_edge_type = e
+        adj_lists[fwd_edge_type].append((src, dest))
+        num_incoming_edges_dicts_per_type[fwd_edge_type][dest] += 1
+
+        if tie_fwd_bkwd:
+            adj_lists[fwd_edge_type].append((dest, src))
+            num_incoming_edges_dicts_per_type[fwd_edge_type][src] += 1
+
+    final_adj_lists = {e: np.array(sorted(lm), dtype=np.int32)
+                       for e, lm in adj_lists.items()}
+
+    return final_adj_lists, num_incoming_edges_dicts_per_type
+
+
+def pretty_print_dict(d: dict) -> None:
+    print(json.dumps(d, indent=2))
+
+
+def json_keys_to_int(x):
+    if isinstance(x, dict):
+        return { int(k):v for k,v in x.items() }
+    return x
+
+
+def get_data_stats(data):
+    num_actions = []
+    node_types = []
+    edge_types = []
+
+    for actions in data:
+        actions = actions[AE.ACTIONS]
+        num_actions.append(len(actions))
+
+        for _, action in actions.items():
+            action_type = action[AE.ACTION]
+            if action_type == A.ADD_NODE:
+                node_type = action[L.LABEL_0]
+                node_types.append(node_type)
+
+            elif action_type == A.ADD_EDGE_TO:
+                edge_type = action[L.LABEL_1]
+                edge_types.append(edge_type)
+
+
+    print("Dataset Statistics")
+    print("- num_graphs: %i" % (len(data)))
+    print("- num_actions min: %i, max: %i" % (min(num_actions), max(num_actions)))
+    print("- node_types (max of it): %i" % (max(node_types)))
+    print("- edge_types (max of it): %i" % (max(edge_types)))
+
+
+def freeze_dict(d):
+    if isinstance(d, dict):
+        return frozenset((key, freeze_dict(value)) for key, value in d.items())
+    elif isinstance(d, list):
+        return tuple(freeze_dict(value) for value in d)
+    return d
+
+
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = 'X'):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('%s |%s| %s%% %s' % (prefix, bar, percent, suffix))
+    # Print New Line on Complete
+    if iteration == total:
+        print()
+
+
+def get_one_hot(targets, nb_classes):
+    res = np.eye(nb_classes)[np.array(targets).reshape(-1)]
+    return res.reshape(list(targets.shape)+[nb_classes])
+
+
+def print_df(df, max_rows=100):
+    """Print a dataframe to stdout"""
+    with pd.option_context('display.max_rows', max_rows,
+                           'display.max_columns', None,
+                           'max_colwidth', 999999):
+        print(df)
+
+
+def get_files_by_extension(dirname, extension):
+    filepaths = []
+
+    for root, dirs, files in os.walk(dirname):
+        for file in files:
+            if file.endswith(extension):
+                filepaths.append(os.path.join(root, file))
+
+    return sorted(filepaths)
+
+
+def get_files_by_file_size(dirname, reverse=False):
+    """ Return list of file paths in directory sorted by file size.
+     From: https://stackoverflow.com/questions/20252669/get-files-from-directory-argument-sorting-by-size """
+
+    # Get list of files
+    filepaths = []
+    for basename in os.listdir(dirname):
+        filename = os.path.join(dirname, basename)
+        if os.path.isfile(filename):
+            filepaths.append(filename)
+
+    # Re-populate list with filename, size tuples
+    for i in range(len(filepaths)):
+        filepaths[i] = (filepaths[i], os.path.getsize(filepaths[i]))
+
+    # Sort list by file size
+    # If reverse=True sort from largest to smallest
+    # If reverse=False sort from smallest to largest
+    filepaths.sort(key=lambda filename: filename[1], reverse=reverse)
+
+    # Re-populate list with just filenames
+    for i in range(len(filepaths)):
+        filepaths[i] = os.path.join(dirname, filepaths[i][0])
+
+    return filepaths
+
+
+def delete_and_create_folder(path):
+    shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path, exist_ok=True)
+
+
+def create_folder(path):
+    os.makedirs(path, exist_ok=True)
+
+
+def write_error_report_file(src_filename, report_filename, stdouts, stderrs, returncode, cmd):
+    report = ''
+
+    report += 'COMMAND:' + '\n'
+    report += get_dash() + '\n'
+    report += ' '.join(cmd) + '\n'
+
+    report += 'RETURNCODE:' + '\n'
+    report += get_dash() + '\n'
+    report += str(returncode) + '\n'
+
+    report += 'SOURCE:' + '\n'
+    report += get_dash() + '\n'
+
+    with open(src_filename, 'r') as f:
+        try:
+            report += f.read() + '\n'
+        except:
+            pass
+
+    for stdout in stdouts:
+        report += 'STDOUT:' + '\n'
+        report += get_dash() + '\n'
+        report += stdout.decode('utf-8') + '\n'
+
+    for stderr in stderrs:
+        if stderr:
+            report += 'STDERR:' + '\n'
+            report += get_dash() + '\n'
+            report += stderr.decode('utf-8') + '\n'
+
+    with open(report_filename, 'w+') as f:
+        f.write(report)
+
+
+def prepare_preprocessing_artifact_dir(base_dir):
+    delete_and_create_folder(base_dir)
+    delete_and_create_folder(os.path.join(base_dir, 'out'))
+    delete_and_create_folder(os.path.join(base_dir, 'bad_code'))
+    delete_and_create_folder(os.path.join(base_dir, 'good_code'))
+    delete_and_create_folder(os.path.join(base_dir, 'error_logs'))
+
+
+def min_max_avg(l: list) -> dict:
+    return {
+        'min': min(l),
+        'max': max(l),
+        'avg': int(sum(l) / float(len(l)))
+    }
+
+
+# Classes
+#########
+class MLP(object):
+    def __init__(self, in_size, out_size, hid_sizes, activation, func_name):
+        self.in_size = in_size
+        self.out_size = out_size
+        self.hid_sizes = hid_sizes
+        self.activation = activation
+        self.func_name = func_name
+        self.params = self.make_network_params()
+
+    def make_network_params(self) -> dict:
+        dims = [self.in_size] + self.hid_sizes + [self.out_size]
+        weight_sizes = list(zip(dims[:-1], dims[1:]))
+        weights = [tf.Variable(self.init_weights(s), name='%s_W_layer%i' % (self.func_name, i))
+                   for (i, s) in enumerate(weight_sizes)]
+        biases = [tf.Variable(np.zeros(s[-1]).astype(np.float32), name='%s_b_layer%i' % (self.func_name, i))
+                  for (i, s) in enumerate(weight_sizes)]
+
+        network_params = {
+            'weights': weights,
+            'biases': biases,
+        }
+
+        return network_params
+
+    def init_weights(self, shape: tuple):
+        return np.sqrt(6.0 / (shape[-2] + shape[-1])) * (2 * np.random.rand(*shape).astype(np.float32) - 1)
+
+    def __call__(self, inputs):
+        acts = inputs
+        for W, b in zip(self.params['weights'], self.params['biases']):
+            hid = tf.matmul(acts, W) + b
+            if self.activation == 'relu':
+                acts = tf.nn.relu(hid)
+            elif self.activation == 'sigmoid':
+                acts = tf.nn.sigmoid(hid)
+            elif self.activation == 'linear':
+                acts = hid
+            else:
+                raise Exception('Unknown activation function: %s' % self.activation)
+        last_hidden = hid
+        return last_hidden

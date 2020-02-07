@@ -1,0 +1,36 @@
+__kernel void A() {
+  float16 a;
+  float b;
+  a.s0 = 42.0f;
+  a.s1 = 42.0f;
+  a.s2 = 42.0f;
+  a.s3 = 42.0f;
+  a.s4 = 42.0f;
+  a.s5 = 42.0f;
+  a.s6 = 42.0f;
+  a.s7 = 42.0f;
+  a.s8 = 42.0f;
+  a.s9 = 42.0f;
+  a.sa = 42.0f;
+  a.sb = 42.0f;
+  a.sc = 42.0f;
+  a.sd = 42.0f;
+  a.se = 42.0f;
+  a.sf = 42.0f;
+  b = a.s0;
+  b = a.s1;
+  b = a.s2;
+  b = a.s3;
+  b = a.s4;
+  b = a.s5;
+  b = a.s6;
+  b = a.s7;
+  b = a.s8;
+  b = a.s9;
+  b = a.sa;
+  b = a.sb;
+  b = a.sc;
+  b = a.sd;
+  b = a.se;
+  b = a.sf;
+}

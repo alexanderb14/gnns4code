@@ -1,0 +1,22 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="actionize" type="PythonConfigurationType" factoryName="Python">
+    <module name="python" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="PARENT_ENVS" value="true" />
+    <envs>
+      <env name="PYTHONUNBUFFERED" value="1" />
+    </envs>
+    <option name="SDK_HOME" value="$PROJECT_DIR$/../../brauckmann-diploma-2019/implementation/python/env/bin/python3" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="IS_MODULE_SDK" value="false" />
+    <option name="ADD_CONTENT_ROOTS" value="true" />
+    <option name="ADD_SOURCE_ROOTS" value="true" />
+    <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/applications/clang_code/actionize_data.py" />
+    <option name="PARAMETERS" value="--code_dir ../data/c --graph_dir $PROJECT_DIR$/../../../datasets/gnns4code/preprocess/out --json_out $PROJECT_DIR$/../../../datasets/gnns4code/preprocess/actions.json --num_actions_min 10 --num_actions_max 400" />
+    <option name="SHOW_COMMAND_LINE" value="false" />
+    <option name="EMULATE_TERMINAL" value="false" />
+    <option name="MODULE_MODE" value="false" />
+    <method />
+  </configuration>
+</component>

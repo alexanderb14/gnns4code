@@ -1,0 +1,168 @@
+{
+  "call graph": {
+    "add": {
+      "calls": [],
+      "num calls": 0,
+      "num references": 0
+    }
+  },
+  "functions": {
+    "add": {
+      "args": {
+        "a": {
+          "name": "a",
+          "type": "i32"
+        },
+        "b": {
+          "name": "b",
+          "type": "i32"
+        }
+      },
+      "basic blocks": {
+        "bb0": {
+          "entry instruction": 0,
+          "name": "bb0",
+          "successors": [],
+          "terminator instruction": 7
+        }
+      },
+      "entry block": "bb0",
+      "instructions": [
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 0,
+          "load or store": false,
+          "opcode": "alloca",
+          "operands": [],
+          "type": "i32*"
+        },
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 1,
+          "load or store": false,
+          "opcode": "alloca",
+          "operands": [],
+          "type": "i32*"
+        },
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 2,
+          "load or store": true,
+          "opcode": "store",
+          "operands": [
+            0
+          ],
+          "type": "void"
+        },
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 3,
+          "load or store": true,
+          "opcode": "store",
+          "operands": [
+            1
+          ],
+          "type": "void"
+        },
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 4,
+          "load or store": true,
+          "opcode": "load",
+          "operands": [
+            0
+          ],
+          "type": "i32"
+        },
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 5,
+          "load or store": true,
+          "opcode": "load",
+          "operands": [
+            1
+          ],
+          "type": "i32"
+        },
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 6,
+          "load or store": false,
+          "opcode": "add",
+          "operands": [
+            4,
+            5
+          ],
+          "type": "i32"
+        },
+        {
+          "basic block": "bb0",
+          "calls": "",
+          "id": 7,
+          "load or store": false,
+          "opcode": "ret",
+          "operands": [
+            6
+          ],
+          "type": "void"
+        }
+      ],
+      "memory accesses": [
+        {
+          "basic block": "bb0",
+          "dependencies": [],
+          "id": 0,
+          "inst": -1,
+          "type": "live on entry"
+        },
+        {
+          "basic block": "bb0",
+          "dependencies": [
+            0
+          ],
+          "id": 1,
+          "inst": 2,
+          "type": "def"
+        },
+        {
+          "basic block": "bb0",
+          "dependencies": [
+            1
+          ],
+          "id": 2,
+          "inst": 3,
+          "type": "def"
+        },
+        {
+          "basic block": "bb0",
+          "dependencies": [
+            1
+          ],
+          "id": 3,
+          "inst": 4,
+          "type": "use"
+        },
+        {
+          "basic block": "bb0",
+          "dependencies": [
+            2
+          ],
+          "id": 4,
+          "inst": 5,
+          "type": "use"
+        }
+      ],
+      "name": "add",
+      "num args": 2,
+      "return type": "i32",
+      "var arg": false
+    }
+  }
+}

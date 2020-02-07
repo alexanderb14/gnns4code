@@ -1,0 +1,25 @@
+{
+    "graph_rnn_cell": "GRU",
+
+    "num_timesteps": 4,
+    "hidden_size_orig": 256,
+    "hidden_size": 8,
+    "deepgmg_mlp_size": 2,
+
+    "num_node_types": 174,
+    "num_edge_types": 4,
+
+    "learning_rate": 0.001,
+    "clamp_gradient_norm": 1.0,
+
+    "batch_size": 32,
+    "num_epochs": 600,
+    "train_file": "../../../../../devel/tmp/gnns4code/predictive.json",
+    "out_dir": "/tmp",
+
+    "tie_fwd_bkwd": 0,
+    "use_edge_bias": 0,
+    "use_edge_msg_avg_aggregation": 0,
+
+    "save_best_model_interval": 2000
+}

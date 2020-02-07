@@ -1,0 +1,22 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="preprocess" type="PythonConfigurationType" factoryName="Python">
+    <module name="python" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="PARENT_ENVS" value="true" />
+    <envs>
+      <env name="PYTHONUNBUFFERED" value="1" />
+    </envs>
+    <option name="SDK_HOME" value="$PROJECT_DIR$/../../brauckmann-diploma-2019/implementation/python/env/bin/python3" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="IS_MODULE_SDK" value="false" />
+    <option name="ADD_CONTENT_ROOTS" value="true" />
+    <option name="ADD_SOURCE_ROOTS" value="true" />
+    <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/applications/clang_code/preprocess.py" />
+    <option name="PARAMETERS" value="predictive --code_dir $PROJECT_DIR$/../../gpgpu_benchmarks_early_export/datasets/benchmarks/gpgpu --out_dir $PROJECT_DIR$/../../../tmp/gnns4code/out --good_code_dir $PROJECT_DIR$/../../../tmp/gnns4code/good --bad_code_dir $PROJECT_DIR$/../../../tmp/gnns4code/bad --error_log_dir $PROJECT_DIR$/../../../tmp/gnns4code/error --cgo17_benchmarks_csv $PROJECT_DIR$/../../paper-end2end-dl/data/case-study-a/cgo17-nvidia.csv --json_out $PROJECT_DIR$/../../../tmp/gnns4code/predictive.json --cgo17_benchmarks_csv_out /tmp/out.csv" />
+    <option name="SHOW_COMMAND_LINE" value="false" />
+    <option name="EMULATE_TERMINAL" value="false" />
+    <option name="MODULE_MODE" value="false" />
+    <method />
+  </configuration>
+</component>
