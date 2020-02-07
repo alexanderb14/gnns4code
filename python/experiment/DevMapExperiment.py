@@ -19,6 +19,7 @@ import applications.code.codegraph_models as llvm_codegraph_models
 import applications.code.preprocess as llvm_preprocess
 from model.PredictionModel import PredictionModel, PredictionModelState
 
+sys.setrecursionlimit(50000)
 
 #########################################################
 class CLgenError(Exception):
