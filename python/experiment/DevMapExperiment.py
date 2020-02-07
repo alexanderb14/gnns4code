@@ -1098,6 +1098,10 @@ def main():
 
         utils.pretty_print_dict(node_types)
 
+        # Write graphs to file
+        with open(os.path.join(args.preprocessing_artifact_dir, 'preprocessed_graphs.pickle'), 'wb') as f:
+            pickle.dump(preprocessed, f, protocol=pickle.HIGHEST_PROTOCOL)
+
         # Write cgo17 benchmarks csv file
         if args.cgo17_benchmarks_csv_out:
             # Find this kernel in the cgo17 dataframe
