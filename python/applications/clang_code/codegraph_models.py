@@ -265,10 +265,14 @@ class StatisticsVisitor(VisitorBase):
         super(StatisticsVisitor, self).__init__()
 
         self.num_nodes = 0
+        self.num_edges = 0
 
     def visit(self, obj: object) -> None:
         if isinstance(obj, Statement) or isinstance(obj, Function):
             self.num_nodes += 1
+
+        if isinstance(obj, Edge):
+            self.num_edges += 1
 
 class DFSNodeIdCreateVisitor(VisitorBase):
     """
