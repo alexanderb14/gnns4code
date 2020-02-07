@@ -1099,7 +1099,7 @@ def main():
         utils.pretty_print_dict(node_types)
 
         # Write graphs to file
-        with open(os.path.join(args.preprocessing_artifact_dir, 'preprocessed_graphs.pickle'), 'wb') as f:
+        with open(os.path.join(preprocessing_artifact_dir_clang, 'preprocessed_graphs.pickle'), 'wb') as f:
             pickle.dump(preprocessed, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         # Write cgo17 benchmarks csv file
@@ -1233,6 +1233,10 @@ def main():
             names_export.append(graph.name)
 
         print(names_export)
+
+        # Write graphs to file
+        with open(os.path.join(preprocessing_artifact_dir_llvm, 'preprocessed_graphs.pickle'), 'wb') as f:
+            pickle.dump(preprocessed, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         # Write cgo17 benchmarks csv file
         if args.cgo17_benchmarks_csv_out:
