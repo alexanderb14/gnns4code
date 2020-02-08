@@ -217,6 +217,7 @@ class StatisticsVisitor(VisitorBase):
         self.num_codegraphs = 0
 
         self.current_num_nodes = 0
+        self.current_num_edges = 0
         self.num_nodes = []
 
     def visit(self, obj: object) -> None:
@@ -232,6 +233,7 @@ class StatisticsVisitor(VisitorBase):
 
         if isinstance(obj, Edge):
             self._get_id_for_edge_type(obj.type)
+            self.current_num_edges += 1
 
     def visit_end(self, obj: object):
         if isinstance(obj, CodeGraph):

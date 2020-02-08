@@ -1988,5 +1988,59 @@ def main():
         utils.print_dash()
 
 
+    # Dump csv command
+    if command_arg.command == 'dump_csv':
+        parser_dump = subparsers.add_parser('dump_csv')
+
+        parser_dump.add_argument("--preprocessing_artifact_dir", type=str,
+                                 help="out directory containing preprocessing information")
+        parser_dump.add_argument('--out_csv')
+
+        args = parser_dump.parse_args(sys.argv[2:])
+
+        #
+        preprocessing_artifact_dir_clang = os.path.join(args.preprocessing_artifact_dir, 'clang')
+        preprocessing_artifact_dir_llvm = os.path.join(args.preprocessing_artifact_dir, 'llvm')
+        preprocessing_artifact_dir_llvm_mem2reg = os.path.join(args.preprocessing_artifact_dir, 'llvm_mem2reg')
+
+        with open(os.path.join(preprocessing_artifact_dir_clang, 'preprocessed_graphs.pickle'), 'rb') as f:
+            graphs_clang = pickle.load(f)
+        with open(os.path.join(preprocessing_artifact_dir_llvm, 'preprocessed_graphs.pickle'), 'rb') as f:
+            graphs_llvm = pickle.load(f)
+        with open(os.path.join(preprocessing_artifact_dir_llvm_mem2reg, 'preprocessed_graphs.pickle'), 'rb') as f:
+            graphs_llvm_mem2reg = pickle.load(f)
+
+        result_df = pd.DataFrame(columns=['Number of nodes',
+                                          'Number of edges',
+                                          'Representation'])
+
+        for graph_clang, graph_llvm, graph_llvm_mem2reg in zip(graphs_clang, graphs_llvm, graphs_llvm_mem2reg):
+            stats_clang_vstr = clang_codegraph_models.StatisticsVisitor()
+            graph_clang.accept(stats_clang_vstr)
+            result_df = result_df.append({
+                'Number of nodes': stats_clang_vstr.num_nodes,
+                'Number of edges': stats_clang_vstr.num_edges,
+                'Representation': 'S-DFG'
+            }, ignore_index=True)
+
+            stats_llvm_vstr = llvm_codegraph_models.StatisticsVisitor()
+            graph_llvm.visit(stats_llvm_vstr)
+            result_df = result_df.append({
+                'Number of nodes': stats_llvm_vstr.current_num_nodes,
+                'Number of edges': stats_llvm_vstr.current_num_edges,
+                'Representation': 'LLVM-CDFG'
+            }, ignore_index=True)
+
+            stats_llvm_mem2reg_vstr = llvm_codegraph_models.StatisticsVisitor()
+            graph_llvm_mem2reg.visit(stats_llvm_mem2reg_vstr)
+            result_df = result_df.append({
+                'Number of nodes': stats_llvm_mem2reg_vstr.current_num_nodes,
+                'Number of edges': stats_llvm_mem2reg_vstr.current_num_edges,
+                'Representation': 'LLVM-SSA-CDFG'
+            }, ignore_index=True)
+
+        utils.print_df(result_df)
+        result_df.to_csv(args.out_csv)
+
 if __name__ == '__main__':
     main()
