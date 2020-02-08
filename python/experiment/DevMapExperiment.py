@@ -23,6 +23,7 @@ import applications.code.codegraph_models as llvm_codegraph_models
 import applications.code.preprocess as llvm_preprocess
 from model.PredictionModel import PredictionModel, PredictionModelState
 
+sys.setrecursionlimit(50000)
 
 #########################################################
 class CLgenError(Exception):
@@ -1457,14 +1458,17 @@ def main():
         #
         preprocessing_artifact_dir_clang = os.path.join(args.preprocessing_artifact_dir, 'clang')
         preprocessing_artifact_dir_llvm = os.path.join(args.preprocessing_artifact_dir, 'llvm')
+        preprocessing_artifact_dir_llvm_mem2reg = os.path.join(args.preprocessing_artifact_dir, 'llvm_mem2reg')
         utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_clang)
         utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm)
+        utils.prepare_preprocessing_artifact_dir(preprocessing_artifact_dir_llvm_mem2reg)
 
         # Find all .cl files and extract code graphs from them
         files = utils.get_files_by_extension(args.code_dir, '.cl')
 
         clang_preprocess.process_source_directory(files, preprocessing_artifact_dir_clang, args.code_dir)
         llvm_preprocess.process_source_directory(files, preprocessing_artifact_dir_llvm, args.code_dir)
+        llvm_preprocess.process_source_directory(files, preprocessing_artifact_dir_llvm_mem2reg, args.code_dir, mem2reg=True)
 
         # Extract oracle from the cgo17 dataframe
         # 
@@ -1697,6 +1701,118 @@ def main():
 
             df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
 
+            # LLVM mem2reg
+            # ############################################
+            utils.print_dash()
+            print('Preprocessing LLVM mem2reg')
+            utils.print_dash()
+            out_dir_llvm = os.path.join(preprocessing_artifact_dir_llvm_mem2reg, 'out')
+            filenames_llvm = utils.get_files_by_extension(out_dir_llvm, '.json')
+
+            preprocessed = []
+            num_nodes = []
+            for filename in filenames_llvm:
+                relative_filename = filename.replace(out_dir_llvm + '/', '')
+
+                benchmark_suite_name = relative_filename.split('/')[0]
+                if benchmark_suite_name == 'parboil-0.2' or benchmark_suite_name == 'rodinia-3.1':
+                    benchmark_name = relative_filename.split('/')[2].lower()
+                elif benchmark_suite_name == 'shoc-1.1.5':
+                    benchmark_name = relative_filename.split('/')[4].upper()
+                elif benchmark_suite_name == 'polybench-gpu-1.0':
+                    benchmark_name = relative_filename.split('/')[-2].lower()
+                    if benchmark_name == '2dconv':
+                        benchmark_name = '2DConvolution'
+                    elif benchmark_name == '3dconv':
+                        benchmark_name = '3DConvolution'
+                    elif benchmark_name == 'covar':
+                        benchmark_name = 'covariance'
+                    elif benchmark_name == 'corr':
+                        benchmark_name = 'correlation'
+                    elif benchmark_name == 'gramschm':
+                        benchmark_name = 'gramschmidt'
+                else:
+                    benchmark_name = relative_filename.split('/')[-2]
+
+                print(filename)
+                try:
+                    with open(filename) as f:
+                        jRoot = json.load(f)
+
+                    if not jRoot:
+                        print('!!! Content of %s was None !!!' % filename)
+                        continue
+                except:
+                    print('!!! Content of %s was not JSON parsable !!!' % filename)
+                    continue
+
+                graphs = llvm_codegraph_models.codegraphs_create_from_miner_output(jRoot)
+                for graph_idx, graph in enumerate(graphs):
+                    function_name = graph.functions[0].name
+
+                    # Find this kernel in the cgo17 dataframe
+                    for idx, row in df_benchmarks.iterrows():
+                        b = row['benchmark']
+                        o = row['oracle']
+
+                        function_name_cgo17 = b.split('-')[-1]
+                        benchmark_name_cgo17 = b.split('-')[-2]
+                        benchmark_suite_name_cgo17 = b.split('-')[0]
+
+                        if function_name_cgo17 == function_name \
+                                and benchmark_name_cgo17.upper() in benchmark_name.upper() \
+                                and benchmark_suite_name_cgo17 in benchmark_suite_name:
+                            jRoot['functions'][function_name][utils.AE.KERNEL_NAME] = b
+                            jRoot['functions'][function_name][utils.L.LABEL_0] = o
+
+                            # Add information to graph
+                            graph.name = b
+                            graph.oracle = o
+
+                            # Stats: Number of nodes
+                            stats_vstr = llvm_codegraph_models.StatisticsVisitor()
+                            graph.visit(stats_vstr)
+                            num_nodes.append(stats_vstr.num_nodes)
+
+                            preprocessed.append(graph)
+
+                            print(benchmark_suite_name, benchmark_name, function_name, o, stats_vstr.num_nodes)
+
+                            break
+            print('num_nodes_max:', np.max(num_nodes))
+            print('num_nodes_mean:', np.mean(num_nodes))
+            print('num_graphs:', len(preprocessed))
+
+            # CodeGraph -> graph
+            node_types_of_all_graphs = llvm_codegraph_models.get_node_types(preprocessed)
+            print('num_node_types:', len(node_types_of_all_graphs))
+            utils.pretty_print_dict(node_types_of_all_graphs)
+
+            graphs_export = []
+            names_export = []
+
+            for graph in preprocessed:
+                graph_export = llvm_codegraph_models.graph_to_export_format(graph, node_types_of_all_graphs)
+
+                graphs_export.append(graph_export)
+                names_export.append(graph.name)
+
+            print(names_export)
+
+            # Write graphs to file
+            with open(os.path.join(preprocessing_artifact_dir_llvm_mem2reg, 'preprocessed_graphs.pickle'), 'wb') as f:
+                pickle.dump(preprocessed, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+            # Write cgo17 benchmarks csv file
+            if args.cgo17_benchmarks_csv_out:
+                # Find this kernel in the cgo17 dataframe
+                for row_idx, row in df_benchmarks.iterrows():
+                    for name, graph in zip(names_export, graphs_export):
+                        if row['benchmark'] == name:
+                            print(name)
+                            df_benchmarks.loc[row_idx, 'llvm_mem2reg_graph'] = json.dumps(graph)
+
+                df_benchmarks.to_csv(args.cgo17_benchmarks_csv_out)
 
     # Experiment command
     if command_arg.command == 'experiment' or command_arg.command == 'experiment_fold':
