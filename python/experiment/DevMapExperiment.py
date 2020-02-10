@@ -2104,9 +2104,77 @@ def main():
         utils.print_dash()
 
 
-    # Dump csv command
-    if command_arg.command == 'dump_csv':
-        parser_dump = subparsers.add_parser('dump_csv')
+    # Dump dataset sizes csv command
+    if command_arg.command == 'dump_dataset_csv':
+        parser_dump = subparsers.add_parser('dump_dataset_csv')
+
+        parser_dump.add_argument('--dataset_amd')
+        parser_dump.add_argument('--out_csv')
+
+        args = parser_dump.parse_args(sys.argv[2:])
+
+        #
+        df_benchmarks = pd.read_csv(args.dataset_amd)
+
+        srcs = '\n'.join(df_benchmarks['src'].values)
+        atomizer = GreedyAtomizer.from_text(srcs)
+
+        # Construct dataframe
+        result_df = pd.DataFrame(columns=['Number of nodes',
+                                          'Number of edges',
+                                          'Number of tokens',
+                                          'Representation'])
+
+        max_node_id_clang = 0
+        max_node_id_llvm = 0
+
+        benchmarks_done = []
+        for idx, row in df_benchmarks.iterrows():
+            # Avoid duplicates
+            name = row['benchmark']
+            if name in benchmarks_done:
+                continue
+            else:
+                benchmarks_done.append(name)
+
+            result_df = result_df.append({
+                'Number of nodes': 0,
+                'Number of edges': 0,
+                'Number of tokens': len(atomizer.atomize(row['src'])),
+                'Representation': 'S-TS'
+            }, ignore_index=True)
+
+            clang_graph = json.loads(row['clang_graph'], object_hook=utils.json_keys_to_int)
+            max_node_id_clang = max(max_node_id_clang, max(clang_graph[utils.T.NODES]))
+            result_df = result_df.append({
+                'Number of nodes': len(clang_graph[utils.T.NODES]),
+                'Number of edges': len(clang_graph[utils.T.EDGES]),
+                'Number of tokens': 0,
+                'Representation': 'S-DFG'
+            }, ignore_index=True)
+
+            llvm_graph = json.loads(row['llvm_graph'], object_hook=utils.json_keys_to_int)
+            max_node_id_llvm = max(max_node_id_llvm, max(llvm_graph[utils.T.NODES]))
+            result_df = result_df.append({
+                'Number of nodes': len(llvm_graph[utils.T.NODES]),
+                'Number of edges': len(llvm_graph[utils.T.EDGES]),
+                'Number of tokens': 0,
+                'Representation': 'LLVM-CDFG'
+            }, ignore_index=True)
+
+        result_df.to_csv(args.out_csv)
+
+        print(len(result_df))
+
+        # Print statistics
+        print('number of types in S-TS: ', atomizer.vocab_size)
+        print('number of types in S-DFG: ', max_node_id_clang)
+        print('number of types in LLVM-CDFG: ', max_node_id_llvm)
+
+
+    # Dump hyperparams csv command
+    if command_arg.command == 'dump_hyperparams_csv':
+        parser_dump = subparsers.add_parser('dump_hyperparams_csv')
 
         parser_dump.add_argument("--preprocessing_artifact_dir", type=str,
                                  help="out directory containing preprocessing information")
