@@ -113,6 +113,45 @@ def main():
         parser.print_help()
         exit(1)
 
+
+    # Evaluate command
+    if command_arg.command == 'evaluate_clgen':
+        # Parse args
+        parser_eval_clgen = subparsers.add_parser('evaluate_clgen')
+
+        parser_eval_clgen.add_argument("--code_dir", type=str,
+                                 help="out directory containing generated kernel functions")
+        parser_eval_clgen.add_argument('--out_csv')
+
+        args = parser_eval_clgen.parse_args(sys.argv[2:])
+
+        #
+        clgen_result_dirs = [os.path.join(args.code_dir, o) for o in os.listdir(args.code_dir)
+                             if os.path.isdir(os.path.join(args.code_dir, o))]
+
+        result_df = pd.DataFrame(columns=['Dataset', 'AST Depth', 'Number AST nodes', 'Temperature', 'Validity'])
+
+        for clgen_result_dir in clgen_result_dirs:
+            with open(os.path.join(clgen_result_dir, 'META'), 'r') as f:
+                clgen_config = json.load(f)
+
+            temperature = clgen_config['temperature']
+            num_generated_samples = clgen_config['min_samples']
+
+            num_valid_samples = len([name for name in os.listdir(os.path.join(clgen_result_dir, 'c')) if os.path.isfile(name)])
+
+            results = get_ast_depths_and_num_nodes(args.code_dir)
+            for result in results:
+                result_df = result_df.append({
+                    'Dataset': 'Training',
+                    'AST Depth': result['AST Depth'],
+                    'Number AST nodes': result['Number AST nodes'],
+                    'Temperature': temperature,
+                    'Validity': float(num_valid_samples) / float(num_generated_samples)
+                }, ignore_index=True)
+
+        result_df.to_csv(args.out_csv)
+
     # Evaluate command
     if command_arg.command == 'evaluate':
         # Parse args
