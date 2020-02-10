@@ -114,7 +114,32 @@ def main():
         exit(1)
 
 
-    # Evaluate command
+    # PCA command
+    if command_arg.command == 'pca':
+        parser = subparsers.add_parser('pca')
+
+        parser.add_argument('--result_dirs', nargs='+', default=[])
+        parser.add_argument('--result_labels', nargs='+', default=[])
+
+        args = parser.parse_args(sys.argv[2:])
+
+        #
+        for result_dir, result_label in zip(args.result_dirs, args.result_labels):
+            for filename in os.listdir(result_dir):
+                cmd = ['/devel/clgen/clgen-0.4.1/build/lib/clgen/data/bin/clgen-features',
+                        '-extra-arg=-DCLGEN_FEATURES',
+                        '-extra-arg=-include/devel/git/gnns4code/python/applications/../../c/3rd_party/opencl-shim.h',
+                        filename,
+                        '-extra-arg=-DCLGEN_FEATURES',
+                        '-extra-arg=-include/devel/git/gnns4code/python/applications/../../c/3rd_party/opencl-shim.h']
+                process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = process.communicate()
+
+                result = process.wait()
+
+                print(stdout)
+
+    # Evaluate clgen command (histogram)
     if command_arg.command == 'evaluate_clgen':
         # Parse args
         parser_eval_clgen = subparsers.add_parser('evaluate_clgen')
