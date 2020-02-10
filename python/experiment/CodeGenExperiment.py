@@ -346,12 +346,12 @@ def main():
             temperature = clgen_config['kernels']['temperature']
             num_generated_samples = clgen_config['sampler']['min_samples']
 
-            num_valid_samples = len([name for name in os.listdir(os.path.join(clgen_result_dir, 'c')) if os.path.isfile(name)])
+            num_valid_samples = len(os.listdir(os.path.join(clgen_result_dir, 'c')))
 
             results = get_ast_depths_and_num_nodes(os.path.join(clgen_result_dir, 'c'))
             for result in results:
                 result_df = result_df.append({
-                    'Dataset': 'Training',
+                    'Dataset': 'S-TS',
                     'AST Depth': result['AST Depth'],
                     'Number AST nodes': result['Number AST nodes'],
                     'Temperature': temperature,
