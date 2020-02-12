@@ -267,9 +267,15 @@ class StatisticsVisitor(VisitorBase):
         self.num_nodes = 0
         self.num_edges = 0
 
+        self.stmt_quantities = {}
+
     def visit(self, obj: object) -> None:
         if isinstance(obj, Statement) or isinstance(obj, Function):
             self.num_nodes += 1
+
+            if obj.name not in self.stmt_quantities:
+                self.stmt_quantities[obj.name] = 0
+            self.stmt_quantities[obj.name] += 1
 
         if isinstance(obj, Edge):
             self.num_edges += 1

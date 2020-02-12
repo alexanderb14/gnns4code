@@ -338,7 +338,7 @@ class DeepGMGGenerator(DeepGMGModel):
 
         self.debug = self.config['debug'] == 1
 
-        self.num_nodes_max = config['gen_num_node_max']
+        self.num_nodes_max = config['gen_num_node_max'] * 5
 
         with self.state.graph.as_default():
             self.__make_model()

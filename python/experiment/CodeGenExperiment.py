@@ -1,6 +1,7 @@
 import argparse
 import concurrent.futures
 import json
+import numpy as np
 import os
 import pickle
 import pandas as pd
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import tqdm
 import uuid
+from io import StringIO
 from queue import Queue, Empty
 from threading import Thread
 
@@ -109,6 +111,304 @@ CONFIG = {
 }
 
 
+#########################################################
+class CLgenError(Exception):
+  """Top level error. Never directly thrown."""
+  pass
+
+class CLgenObject(object):
+    """
+    Base object for CLgen classes.
+    """
+    pass
+
+# Taken from the C99 spec, OpenCL spec 1.2, and bag-of-words analysis of
+# GitHub corpus:
+OPENCL_ATOMS = set([
+    '  ',
+    '__assert',
+    '__attribute',
+    '__builtin_astype',
+    '__clc_fabs',
+    '__clc_fma',
+    '__constant',
+    '__global',
+    '__inline',
+    '__kernel',
+    '__local',
+    '__private',
+    '__read_only',
+    '__read_write',
+    '__write_only',
+    '*/',
+    '/*',
+    '//',
+    'abs',
+    'alignas',
+    'alignof',
+    'atomic_add',
+    'auto',
+    'barrier',
+    'bool',
+    'break',
+    'case',
+    'char',
+    'clamp',
+    'complex',
+    'const',
+    'constant',
+    'continue',
+    'default',
+    'define',
+    'defined',
+    'do',
+    'double',
+    'elif',
+    'else',
+    'endif',
+    'enum',
+    'error',
+    'event_t',
+    'extern',
+    'fabs',
+    'false',
+    'float',
+    'for',
+    'get_global_id',
+    'get_global_size',
+    'get_local_id',
+    'get_local_size',
+    'get_num_groups',
+    'global',
+    'goto',
+    'half',
+    'if',
+    'ifdef',
+    'ifndef',
+    'image1d_array_t',
+    'image1d_buffer_t',
+    'image1d_t',
+    'image2d_array_t',
+    'image2d_t',
+    'image3d_t',
+    'imaginary',
+    'include',
+    'inline',
+    'int',
+    'into',
+    'kernel',
+    'line',
+    'local',
+    'long',
+    'noreturn',
+    'pragma',
+    'private',
+    'quad',
+    'read_only',
+    'read_write',
+    'register',
+    'restrict',
+    'return',
+    'sampler_t',
+    'short',
+    'shuffle',
+    'signed',
+    'size_t',
+    'sizeof',
+    'sqrt',
+    'static',
+    'struct',
+    'switch',
+    'true',
+    'typedef',
+    'u32',
+    'uchar',
+    'uint',
+    'ulong',
+    'undef',
+    'union',
+    'unsigned',
+    'void',
+    'volatile',
+    'while',
+    'wide',
+    'write_only',
+])
+
+
+class VocabError(CLgenError):
+    """A character sequence is not in the atomizer's vocab"""
+    pass
+
+
+class Atomizer(CLgenObject):
+    """
+    Atomizer.
+    """
+    def __init__(self, vocab: dict):
+        """
+        Arguments:
+            vocab (dict): A dictionary of string -> integer mappings to use for
+                atomizing text from atoms into indices.
+        """
+        assert(isinstance(vocab, dict))
+        self.vocab = vocab
+        self._vocab_update()
+
+    @property
+    def atoms(self):
+        return list(sorted(self.vocab.keys()))
+
+    @property
+    def indices(self):
+        return list(sorted(self.vocab.values()))
+
+    def _vocab_update(self):
+        """ call this when vocab is modified """
+        self.vocab_size = len(self.vocab)
+        self.decoder = dict((val, key) for key, val in self.vocab.items())
+
+    def atomize(self, text: str) -> np.array:
+        """
+        Atomize a text into an array of vocabulary indices.
+        Arguments:
+            text (str): Input text.
+        Returns:
+            np.array: Indices into vocabulary for all atoms in text.
+        """
+        raise NotImplementedError("abstract class")
+
+    def tokenize(self, text: str) -> list:
+        """
+        Atomize a text into an array of atomsself.
+        Arguments:
+            text (str): Input text.
+        Returns:
+            list of str: Atom strings.
+        """
+        indices = self.atomize(text)
+        return list(map(lambda x: self.decoder[x], indices))
+
+    def deatomize(self, encoded: np.array) -> str:
+        """
+        Translate atomized code back into a string.
+        Arguments:
+            encoded (np.array): Encoded vocabulary indices.
+        Returns:
+            str: Decoded text.
+        """
+        try:
+            return ''.join(list(map(lambda x: self.decoder[x], encoded)))
+        except KeyError:
+            raise VocabError
+
+    @staticmethod
+    def from_text(text: str):
+        """
+        Instantiate and specialize an atomizer from a corpus text.
+        Arguments:
+            text (str): Text corpus
+        Returns:
+            Atomizer: Specialized atomizer.
+        """
+        raise NotImplementedError("abstract class")
+
+
+class CharacterAtomizer(Atomizer):
+    """
+    An atomizer for character-level syntactic modelling.
+    """
+    def __init__(self, *args, **kwargs):
+        super(CharacterAtomizer, self).__init__(*args, **kwargs)
+
+    def atomize(self, text: str) -> np.array:
+        try:
+            return np.array(list(map(lambda x: self.vocab[x], text)))
+        except KeyError:
+            raise VocabError
+
+    def __repr__(self):
+        return "CharacterAtomizer[{n} chars]".format(n=self.vocab_size)
+
+    @staticmethod
+    def from_text(text: str) -> Atomizer:
+        counter = Counter(text)
+        count_pairs = sorted(counter.items(), key=lambda x: -x[1])
+        atoms, _ = zip(*count_pairs)
+        vocab = dict(zip(atoms, range(len(atoms))))
+        return CharacterAtomizer(vocab)
+
+
+class GreedyAtomizer(Atomizer):
+    """
+    Greedy encoding for multi-characten modelling.
+    """
+    def __init__(self, *args, **kwargs):
+        self.determine_chars = kwargs.pop("determine_chars", False)
+        super(GreedyAtomizer, self).__init__(*args, **kwargs)
+
+        multichars = set(k for k in self.atoms if len(k) > 1)
+        first_chars = set(a[0] for a in multichars)
+        self.lookup = dict((c, [a for a in multichars if a[0] == c])
+                           for c in first_chars)
+
+    def atomize(self, text: str) -> np.array:
+        def _add_to_vocab(token: str):
+            if self.determine_chars and token not in self.vocab:
+                maxind = max(self.vocab.values())
+                self.vocab[token] = maxind + 1
+
+            return self.vocab[token]
+
+        indices = []
+        i = 0
+        j = 2
+        try:
+            while i < len(text):
+                if self.lookup.get(text[i]):
+                    if j <= len(text) and any(x.startswith(text[i:j])
+                                              for x in self.lookup[text[i]]):
+                        j += 1
+                    else:
+                        while j > i + 1:
+                            if any(x == text[i:j]
+                                   for x in self.lookup[text[i]]):
+                                indices.append(self.vocab[text[i:j]])
+                                i = j
+                                j = j + 2
+                                break
+                            else:
+                                j -= 1
+                        else:
+                            indices.append(_add_to_vocab(text[i]))
+                            i = i + 1
+                            j = j + 2
+                else:
+                    indices.append(_add_to_vocab(text[i]))
+                    i = i + 1
+                    j = j + 2
+        except KeyError:
+            raise VocabError
+
+        if self.determine_chars:
+            self._vocab_update()
+
+        return np.array(indices)
+
+    def __repr__(self):
+        return "GreedyAtomizer[{n} tokens]".format(n=self.vocab_size)
+
+    @staticmethod
+    def from_text(text: str) -> Atomizer:
+        opencl_vocab = dict(zip(OPENCL_ATOMS, range(len(OPENCL_ATOMS))))
+        c = GreedyAtomizer(opencl_vocab, determine_chars=True)
+
+        tokens = sorted(list(set(c.tokenize(text))))
+        vocab = dict(zip(tokens, range(len(tokens))))
+        return GreedyAtomizer(vocab)
+
+
+#########################################################
 class Worker(Thread):
     def __init__(self, tasks, graphs, graphs_valid):
         Thread.__init__(self)
@@ -172,7 +472,7 @@ def generate(artifact_dir, num_generate, create_pngs, temperature, generate_dir)
     def work(graph, p_codegraph, p_min):
         try:
             # Generate code
-            cg_vstr = clang_codegraph_models.CodeGenVisitor(500)
+            cg_vstr = clang_codegraph_models.CodeGenVisitor(10000)
             graph.accept(cg_vstr, clang_codegraph_models.sort_edges_conforming_c_syntax)
 
             # Format code
@@ -303,16 +603,19 @@ def main():
 
         parser.add_argument('--result_dirs', nargs='+', default=[])
         parser.add_argument('--result_labels', nargs='+', default=[])
+        parser.add_argument('--out_csv')
 
         args = parser.parse_args(sys.argv[2:])
 
         #
-        for result_dir, result_label in zip(args.result_dirs, args.result_labels):
-            for filename in os.listdir(result_dir):
-                cmd = ['/devel/clgen/clgen-0.4.1/build/lib/clgen/data/bin/clgen-features',
+        df_methods = None
+        for result_dir, result_label in tqdm.tqdm(zip(args.result_dirs, args.result_labels), desc='Processing dataset'):
+            df_current = None
+            for filename in tqdm.tqdm(os.listdir(result_dir), desc='Extracting features'):
+                cmd = ['/devel/clgen/clgen-0.4.1/clgen/data/bin/clgen-features',
                         '-extra-arg=-DCLGEN_FEATURES',
                         '-extra-arg=-include/devel/git/gnns4code/python/applications/../../c/3rd_party/opencl-shim.h',
-                        filename,
+                        os.path.join(result_dir, filename),
                         '-extra-arg=-DCLGEN_FEATURES',
                         '-extra-arg=-include/devel/git/gnns4code/python/applications/../../c/3rd_party/opencl-shim.h']
                 process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -320,45 +623,192 @@ def main():
 
                 result = process.wait()
 
-                print(stdout)
+                try:
+                    df = pd.read_csv(StringIO(stdout.decode("utf-8")))
+                    df_current = pd.concat([df_current, df], ignore_index=True)
+                except:
+                    print('Exception occured in %s' % filename)
+                    pass
+            df_current['Method'] = result_label
+            print(df_current)
+
+            df_methods = pd.concat([df_methods, df_current], ignore_index=True)
+
+        df_methods.to_csv(args.out_csv)
 
     # Evaluate clgen command (histogram)
-    if command_arg.command == 'evaluate_clgen':
+    if command_arg.command == 'evaluate_and_dump_csv':
         # Parse args
-        parser_eval_clgen = subparsers.add_parser('evaluate_clgen')
+        evaluate_and_dump_csv = subparsers.add_parser('evaluate_and_dump_csv')
 
-        parser_eval_clgen.add_argument("--code_dir", type=str,
-                                 help="out directory containing generated kernel functions")
-        parser_eval_clgen.add_argument('--out_csv')
+        evaluate_and_dump_csv.add_argument("--code_dir_training", type=str,
+                                 help="out directory containing training kernel functions")
+        evaluate_and_dump_csv.add_argument("--root_dir_gnn", type=str,
+                                 help="out directory containing gnn generated kernel functions")
+        evaluate_and_dump_csv.add_argument("--root_dir_lstm", type=str,
+                                 help="out directory containing lstm generated kernel functions")
+        evaluate_and_dump_csv.add_argument('--out_csv')
 
-        args = parser_eval_clgen.parse_args(sys.argv[2:])
+        args = evaluate_and_dump_csv.parse_args(sys.argv[2:])
 
         #
-        clgen_result_dirs = [os.path.join(args.code_dir, o) for o in os.listdir(args.code_dir)
-                             if os.path.isdir(os.path.join(args.code_dir, o))]
+        gnn_result_dirs = [os.path.join(args.root_dir_gnn, o) for o in os.listdir(args.root_dir_gnn)
+                             if os.path.isdir(os.path.join(args.root_dir_gnn, o))]
+        lstm_result_dirs = [os.path.join(args.root_dir_lstm, o) for o in os.listdir(args.root_dir_lstm)
+                             if os.path.isdir(os.path.join(args.root_dir_lstm, o))]
 
-        result_df = pd.DataFrame(columns=['Dataset', 'AST Depth', 'Number AST nodes', 'Temperature', 'Validity'])
+        # Build tasks
+        tasks = []
+        files = os.listdir(args.code_dir_training)
+        for src_file in files: 
+            tasks.append({
+                'Method': 'Training',
+                'File': os.path.join(args.code_dir_training, src_file),
+            })
+        num_training_samples = len(files)
+        print('num_training_samples: %i', num_training_samples)
 
-        for clgen_result_dir in clgen_result_dirs:
-            with open(os.path.join(clgen_result_dir, 'META'), 'r') as f:
+        for lstm_result_dir in lstm_result_dirs:
+            with open(os.path.join(lstm_result_dir, 'META'), 'r') as f:
                 clgen_config = json.load(f)
-
             temperature = clgen_config['kernels']['temperature']
-            num_generated_samples = clgen_config['sampler']['min_samples']
+            num_generated_samples = 10000
+            num_valid_samples = len(os.listdir(os.path.join(lstm_result_dir, 'c')))
 
-            num_valid_samples = len(os.listdir(os.path.join(clgen_result_dir, 'c')))
-
-            results = get_ast_depths_and_num_nodes(os.path.join(clgen_result_dir, 'c'))
-            for result in results:
-                result_df = result_df.append({
-                    'Dataset': 'S-TS',
-                    'AST Depth': result['AST Depth'],
-                    'Number AST nodes': result['Number AST nodes'],
+            files = os.listdir(os.path.join(lstm_result_dir, 'c'))
+            for i, src_file in enumerate(files): 
+                if i >= num_training_samples:
+                    break
+                tasks.append({
+                    'Method': 'LSTM',
+                    'File': os.path.join(lstm_result_dir, 'c', src_file),
                     'Temperature': temperature,
                     'Validity': float(num_valid_samples) / float(num_generated_samples)
-                }, ignore_index=True)
+                })
+            print('num_lstm_samples: %i', i)
 
-            result_df.to_csv(args.out_csv)
+        for gnn_result_dir in gnn_result_dirs:
+            temperature = '_'.split(gnn_result_dir)[-1]
+            num_generated_samples = 10000
+            num_valid_samples = len(os.listdir(gnn_result_dir))
+
+            for i, src_file in enumerate(os.listdir(gnn_result_dir)):
+                if i >= num_training_samples:
+                    break
+                tasks.append({
+                    'Method': 'GNN',
+                    'File': os.path.join(gnn_result_dir, src_file),
+                    'Temperature': temperature,
+                    'Validity': float(num_valid_samples) / float(num_generated_samples)
+                })
+            print('num_gnn_samples: %i', i)
+
+        # Process
+        def fnc(task):
+            # Create AST graph
+            stdout, stderr, result, cmd = clang_preprocess.process_source_file(task['File'])
+            try:
+                jRoot = json.loads(stdout)
+            except:
+                return {
+                    'AST Depth': -1,
+                    'Number AST nodes': -1
+                }
+            
+            gs = clang_codegraph_models.codegraphs_create_from_miner_output(jRoot)
+            if len(gs) != 1:
+                raise Exception()
+            g = gs[0]
+
+            # Measure AST depth and number of nodes
+            nr_vstr = clang_codegraph_models.NodeRankCreateVisitor()
+            g.accept(nr_vstr)
+            ast_depth = nr_vstr.max_rank
+
+            stats_vstr = clang_codegraph_models.StatisticsVisitor()
+            g.accept(stats_vstr)
+            ast_num_nodes = stats_vstr.num_nodes
+            ast_num_nodes = stats_vstr.num_edges
+
+            # Also AST instruction quantities
+            ast_quantities = stats_vstr.stmt_quantities
+
+            # Extract number of actions
+            nic_vstr = clang_codegraph_models.NodeTypeIdCreateVisitor(with_functionnames=False)
+            g.accept(nic_vstr)
+            num_gnn_actions = len(clang_codegraph_models.create_action_sequence(g, debug=False))
+
+            with open(task['File'], 'r') as f:
+                src = f.read()
+            atomizer = GreedyAtomizer.from_text(src)
+            num_lstm_actions = len(atomizer.atomize(src))
+
+            num_actions = None
+            if task['Method'] == 'GNN':
+                num_actions = num_gnn_actions
+            elif task['Method'] == 'LSTM':
+                num_actions = num_lstm_actions
+
+            # Extract grewe et al features
+            cmd = ['/devel/clgen/clgen-0.4.1/clgen/data/bin/clgen-features',
+                    '-extra-arg=-DCLGEN_FEATURES',
+                    '-extra-arg=-include/devel/git/gnns4code/python/applications/../../c/3rd_party/opencl-shim.h',
+                    task['File'],
+                    '-extra-arg=-DCLGEN_FEATURES',
+                    '-extra-arg=-include/devel/git/gnns4code/python/applications/../../c/3rd_party/opencl-shim.h']
+            process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+
+            result = process.wait()
+
+            try:
+                grewe_df = pd.read_csv(StringIO(stdout.decode("utf-8")))
+            except:
+                print('Exception occured in extracting grewe at al features in %s' % task['File'])
+                return None
+
+            if len(grewe_df) == 0:
+                print('Dataframe of grewe at al features in %s was of length 0' % task['File'])
+                return None
+
+            # All AST stmt quantities
+            task.update(ast_quantities)
+
+            # Build result
+            task.update({
+                # AST measures
+                'ASTDepth': ast_depth,
+                'ASTNodes': ast_num_nodes,
+                # Action numbers
+                'Number actions': num_actions,
+                'Number gnn actions': num_gnn_actions,
+                'Number lstm actions': num_lstm_actions,
+                # Grewe et al features
+                'comp': grewe_df['comp'][0],
+                'rational': grewe_df['rational'][0],
+                'mem': grewe_df['mem'][0],
+                'localmem': grewe_df['localmem'][0],
+                'coalesced': grewe_df['coalesced'][0],
+                'atomic': grewe_df['atomic'][0],
+                'F2:coalesced/mem': grewe_df['F2:coalesced/mem'][0],
+                'F4:comp/mem': grewe_df['F4:comp/mem'][0]
+            })
+
+            return task
+        
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            for result in tqdm.tqdm(executor.map(fnc, tasks), desc='Processing tasks', total=len(tasks)):
+                results.append(result)
+
+        # Add to result dataframe
+        result_df = pd.DataFrame()
+        for result in results:
+            if result != None:
+                result_df = result_df.append(result, ignore_index=True)
+
+        # Dump
+        result_df.to_csv(args.out_csv)
 
     # Evaluate command
     if command_arg.command == 'evaluate':
@@ -374,19 +824,19 @@ def main():
         # Training set
         result_df = pd.DataFrame(columns=['Dataset', 'AST Depth', 'Number AST nodes', 'Temperature', 'Validity'])
 
-        results = get_ast_depths_and_num_nodes(os.path.join(args.artifact_dir, 'filtered_c'))
-        for result in results:
-            result_df = result_df.append({
-                'Dataset': 'Training',
-                'AST Depth': result['AST Depth'],
-                'Number AST nodes': result['Number AST nodes'],
-            }, ignore_index=True)
+        # results = get_ast_depths_and_num_nodes(os.path.join(args.artifact_dir, 'filtered_c'))
+        # for result in results:
+        #     result_df = result_df.append({
+        #         'Dataset': 'Training',
+        #         'AST Depth': result['AST Depth'],
+        #         'Number AST nodes': result['Number AST nodes'],
+        #     }, ignore_index=True)
 
         num_files_trainingset = len(os.listdir(os.path.join(args.artifact_dir, 'filtered_c')))
 
         # Generate
-        for temperature in [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.5, 3, 4, 5]:
-            generate_dir = os.path.join(args.artifact_dir, 'generated_c_' + str(temperature))
+        for temperature in [1]:
+            generate_dir = os.path.join(args.artifact_dir, 'generated_c_new_' + str(temperature))
 
             validity = generate(args.artifact_dir, num_files_trainingset, False, temperature, generate_dir)
             results = get_ast_depths_and_num_nodes(os.path.join(args.artifact_dir, generate_dir))
